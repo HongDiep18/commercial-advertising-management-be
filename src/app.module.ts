@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { appConfig, databaseConfig, jwtConfig } from './config';
 import { DatabaseModule } from './database/database.module';
+import { NewsModule } from './modules/news/news.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { DatabaseModule } from './database/database.module';
       },
     ]),
     DatabaseModule,
+    NewsModule,
   ],
 })
 export class AppModule {}

@@ -11,6 +11,7 @@ services:
       - '${DB_PORT}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   app:
     build:
@@ -26,6 +27,7 @@ services:
       - .env
     environment:
       DB_HOST: postgres
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
 
   dev:
     build:
@@ -41,6 +43,7 @@ services:
       - .env
     environment:
       DB_HOST: postgres
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
     volumes:
       - .:/app
       - /app/node_modules

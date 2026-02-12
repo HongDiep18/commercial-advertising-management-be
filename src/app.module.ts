@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { appConfig, databaseConfig, jwtConfig } from './config';
 import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './modules/health/health.module';
 import { NewsModule } from './modules/news/news.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { NewsModule } from './modules/news/news.module';
       },
     ]),
     DatabaseModule,
+    HealthModule,
     NewsModule,
   ],
 })

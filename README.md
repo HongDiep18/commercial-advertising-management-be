@@ -60,6 +60,11 @@ npx prisma migrate dev
 npx prisma db push
 ```
 
+```bash
+# Browse and edit data in a web UI (http://localhost:5555)
+npx prisma studio
+```
+
 Note: `pnpm build` automatically runs `prisma generate` before compiling.
 
 ## Environment Variables

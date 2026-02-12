@@ -1,29 +1,41 @@
-# README #
+# VN Buyer's Guide — Backend
 
-This README would normally document whatever steps are necessary to get your application up and running.
+B2B directory platform connecting Chinese-speaking businesses with Vietnam.
 
-### What is this repository for? ###
+## Tech Stack
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+- NestJS 11 / TypeScript
+- PostgreSQL 17
+- TypeORM
+- JWT Authentication
+- Swagger API Docs
 
-### How do I get set up? ###
+## Getting Started
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+```bash
+# Copy env and fill in your values
+cp .env.example .env
+```
 
-### Contribution guidelines ###
+### Production
 
-* Writing tests
-* Code review
-* Other guidelines
+```bash
+docker compose up --build
+```
 
-### Who do I talk to? ###
+### Development (with hot reload)
 
-* Repo owner or admin
-* Other community or team contact
+```bash
+docker compose --profile dev up --build
+```
+
+Both modes run entirely in Docker — no need to install Node.js or pnpm locally.
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values:
+
+## API
+
+- Base URL: `http://localhost:3000/api/v1`
+- Swagger Docs: `http://localhost:3000/api/docs`

@@ -1,9 +1,8 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
-import { PaginationDto } from '../../common/dto/pagination.dto';
-import { NewsArticleDto } from './dto/news-article.dto';
+import { NewsArticleDto, NewsCategoryWithSubsDto } from './dto/news-article.dto';
+import { ListNewsQueryDto } from './dto/list-news-query.dto';
 import { NewsService } from './news.service';
 
 @ApiTags('News')
@@ -14,14 +13,23 @@ export class NewsController {
 
   @Get()
   @ApiOkResponse({ type: [NewsArticleDto] })
-  async list(@Query() pagination: PaginationDto) {
-    const page = pagination.page ?? 1;
-    const limit = pagination.limit ?? 20;
-    const result = await this.newsService.listPublished(page, limit);
+  async list(@Query() query: ListNewsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const result = await this.newsService.listPublished(page, limit, {
+      categorySlug: query.categorySlug,
+      subcategoryId: query.subcategoryId,
+    });
     return {
       ...result,
       data: result.data.map((a) => NewsArticleDto.fromEntity(a)),
     };
+  }
+
+  @Get('categories')
+  @ApiOkResponse({ type: [NewsCategoryWithSubsDto] })
+  async categories() {
+    return this.newsService.listCategories();
   }
 
   @Get(':id')
@@ -31,9 +39,4 @@ export class NewsController {
     return NewsArticleDto.fromEntity(article);
   }
 
-  @Get(':id/out')
-  async out(@Param('id') id: string, @Res() res: Response) {
-    const article = await this.newsService.getPublishedById(id);
-    return res.redirect(article.url);
-  }
 }

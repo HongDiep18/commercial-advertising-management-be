@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Environment files
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Editor
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# Prisma migrations (applied via migrate deploy in production)
+# prisma/migrations  ← do NOT ignore this, migrations must be in the image
+
+# Test
+coverage

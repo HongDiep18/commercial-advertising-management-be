@@ -1,5 +1,6 @@
 FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+ARG PNPM_VERSION=10.29.3
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 
 # Install dependencies + generate Prisma client
@@ -8,7 +9,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 RUN pnpm install --frozen-lockfile
-RUN npx prisma generate
+RUN pnpm prisma generate
 
 # Build
 FROM base AS build
@@ -21,7 +22,9 @@ FROM base AS production
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 COPY package.json ./
 
 EXPOSE 3000
-CMD ["node", "dist/src/main.js"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/src/main.js"]

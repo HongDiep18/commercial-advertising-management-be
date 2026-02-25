@@ -17,16 +17,16 @@ B2B directory platform connecting Chinese-speaking businesses with Vietnam.
 cp .env.example .env
 ```
 
-### Production
+### Development (Docker, hot reload)
 
 ```bash
 docker compose up --build
 ```
 
-### Development (with hot reload)
+### Production (Docker)
 
 ```bash
-docker compose --profile dev up --build
+docker compose --profile prod up --build
 ```
 
 Both modes run entirely in Docker — no need to install Node.js or pnpm locally.
@@ -36,13 +36,13 @@ Both modes run entirely in Docker — no need to install Node.js or pnpm locally
 ```bash
 # Install dependencies + generate Prisma client
 pnpm install
-npx prisma generate
+pnpm prisma generate
 
 # Start PostgreSQL
 docker compose up -d postgres
 
 # Apply database schema
-npx prisma migrate dev
+pnpm prisma migrate dev
 
 # Run dev server
 pnpm start:dev
@@ -54,15 +54,15 @@ After PostgreSQL is running, apply the schema:
 
 ```bash
 # Create/apply migrations (development)
-npx prisma migrate dev
+pnpm prisma migrate dev
 
 # Push schema without migrations (quick prototyping)
-npx prisma db push
+pnpm prisma db push
 ```
 
 ```bash
 # Browse and edit data in a web UI (http://localhost:5555)
-npx prisma studio
+pnpm prisma studio
 ```
 
 Note: `pnpm build` automatically runs `prisma generate` before compiling.
@@ -84,3 +84,24 @@ Key variables:
 
 - Base URL: `http://localhost:3000/api/v1`
 - Swagger Docs: `http://localhost:3000/api/docs`
+
+## Quick Smoke Tests
+
+### Dev (Docker)
+
+```bash
+docker compose up --build
+```
+
+Then verify:
+
+- `GET http://localhost:${APP_PORT:-3000}/${API_PREFIX:-api/v1}/health`
+- `GET http://localhost:${APP_PORT:-3000}/api/docs`
+
+### Prod (Docker)
+
+```bash
+docker compose --profile prod up --build
+```
+
+Then verify the same endpoints.

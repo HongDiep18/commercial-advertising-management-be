@@ -21,33 +21,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: vn-buyer-guide-api
-    restart: unless-stopped
-    ports:
-      - '${APP_PORT}:3000'
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      DB_HOST: postgres
-      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
-    healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/v1/health || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-  dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
       target: deps
-    container_name: vn-buyer-guide-dev
+    container_name: vn-buyer-guide-api
     ports:
-      - '${APP_PORT}:3000'
+      - '${APP_PORT}:${APP_PORT}'
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,9 +36,32 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: npx nest start --watch
+    command: pnpm start:dev
+
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vn-buyer-guide-prod
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT}:${APP_PORT}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:${APP_PORT:-3000}/${API_PREFIX:-api/v1}/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     profiles:
-      - dev
+      - prod
 
 volumes:
   pgdata:

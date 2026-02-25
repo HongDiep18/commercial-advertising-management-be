@@ -61,3 +61,28 @@ model NewsArticleTag {
   @@id([articleId, tagId])
   @@map("news_article_tags")
 }
+
+
+// ─── Users & Authentication ──────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email    String  @unique @db.VarChar(255)
+  password String  @db.VarChar(255) // hashed
+  role     String  @default("MEMBER") @db.VarChar(32) // VISITOR, MEMBER, ADMIN, SUPER_ADMIN
+
+  firstName String? @db.VarChar(100)
+  lastName  String? @db.VarChar(100)
+  isActive  Boolean @default(true)
+
+  // Membership tier for MEMBER role
+  membershipTier String? @db.VarChar(32) // NONE, COPPER, SILVER, GOLD, DIAMOND
+  loyaltyPoints  Int     @default(0)
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}

@@ -7,14 +7,21 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile || pnpm install
 RUN npx prisma generate
 
 # Build
 FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+RUN pnpm install --frozen-lockfile
+RUN pnpm exec prisma generate
+
+# Copy source code
 COPY . .
-RUN pnpm build
+# Build NestJS application
+RUN pnpm run build
 
 # Production
 FROM base AS production

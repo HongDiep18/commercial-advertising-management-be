@@ -34,7 +34,8 @@ services:
       DB_HOST: postgres
       DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/v1/health || exit 1']
+      test:
+        ['CMD-SHELL', 'wget -qO- http://localhost:3001/api/v1/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 3

@@ -17,8 +17,8 @@ export class NewsController {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const result = await this.newsService.listPublished(page, limit, {
-      categorySlug: query.categorySlug,
-      subcategoryId: query.subcategoryId,
+      categorySlugs: query.categorySlug,
+      subcategoryIds: query.subcategoryId,
     });
     return {
       ...result,

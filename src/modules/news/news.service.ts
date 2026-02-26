@@ -159,22 +159,15 @@ export class NewsService {
   async listPublished(
     page: number,
     limit: number,
-    filters: { categorySlug?: string; subcategoryId?: string } = {},
+    filters: { categorySlugs?: string[]; subcategoryIds?: string[] } = {},
   ) {
-    const categorySlug = filters.categorySlug?.trim();
-    const where = {
+    const categorySlugs = filters.categorySlugs?.map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const subcategoryIds = filters.subcategoryIds?.filter(Boolean);
+
+    const where: Prisma.NewsArticleWhereInput = {
       status: NewsArticleStatus.PUBLISHED,
-      ...(categorySlug && {
-        category: {
-          is: {
-            slug: {
-              equals: categorySlug,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-        },
-      }),
-      ...(filters.subcategoryId && { subcategoryId: filters.subcategoryId }),
+      ...(categorySlugs?.length && { category: { slug: { in: categorySlugs } } }),
+      ...(subcategoryIds?.length && { subcategoryId: { in: subcategoryIds } }),
     };
 
     const [data, total] = await Promise.all([

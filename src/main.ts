@@ -13,6 +13,16 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
   app.setGlobalPrefix(apiPrefix);
 
+  const frontendUrl = configService.get<string>(
+    'FRONTEND_URL',
+    'http://localhost:3000',
+  );
+  app.enableCors({
+    origin: frontendUrl,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -1,9 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { PrismaService } from '../../database/prisma.service';
 import { NewsService } from './news.service';
-import { NewsArticleStatus } from '@prisma/client';
 
 @Injectable()
 export class NewsTranslatorService implements OnModuleInit {
@@ -12,7 +10,6 @@ export class NewsTranslatorService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
     private readonly newsService: NewsService,
   ) {}
 
@@ -31,17 +28,7 @@ export class NewsTranslatorService implements OnModuleInit {
     }
 
     const batchSize = this.configService.get<number>('news.translateBatchSize', 5);
-
-    const articles = await this.prisma.newsArticle.findMany({
-      where: {
-        status: NewsArticleStatus.DRAFT,
-        summaryVi: { not: null },
-        titleZhTw: null,
-      },
-      include: { category: true },
-      orderBy: { publishedAt: 'desc' },
-      take: batchSize,
-    });
+    const articles = await this.newsService.findDraftsPendingTranslation(batchSize);
 
     let processed = 0;
     let failed = 0;

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import he from 'he';
 import RssParser from 'rss-parser';
 import { PrismaService } from '../../database/prisma.service';
 import { RssSource } from '../../config/news.config';
@@ -8,6 +9,7 @@ import { NewsService } from './news.service';
 type CustomItem = {
   mediaThumbnail?: { $: { url: string } };
   mediaContent?: { $: { url: string; medium?: string } };
+  content?: string;
 };
 
 // Extracts first <img src="..."> from an HTML string (fallback for sites with no enclosure)
@@ -91,11 +93,11 @@ export class RssCrawlerService implements OnModuleInit {
         subcategoryId: subcategoryId ?? undefined,
         guid: item.guid ?? undefined,
         url: (item.link ?? '').trim(),
-        title: (item.title ?? '').trim(),
+        title: he.decode((item.title ?? '').trim()),
         publishedAt: item.isoDate ?? new Date().toISOString(),
         thumbnailUrl: this.extractThumbnail(item) ?? undefined,
         language: 'vi',
-        summaryVi: (item.contentSnippet ?? '').trim() || undefined,
+        summaryVi: he.decode((item.contentSnippet ?? '').trim()) || undefined,
       }))
       .filter((i) => i.url && i.title);
   }
@@ -114,8 +116,8 @@ export class RssCrawlerService implements OnModuleInit {
       return item.mediaContent.$.url;
     }
     // 4. first <img src> in description HTML (Thanh Nien, Dan Tri)
-    const html = (item as any).content ?? '';
-    const match = IMG_SRC_RE.exec(html as string);
+    const html = item.content ?? '';
+    const match = IMG_SRC_RE.exec(html);
     return match?.[1] ?? null;
   }
 }

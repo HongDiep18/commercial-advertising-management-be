@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { NewsArticleStatus } from '@prisma/client';
+import { NewsArticleStatus, Prisma } from '@prisma/client';
+
+const FALLBACK_THUMBNAIL = 'https://about.fb.com/wp-content/uploads/2024/02/Facebook-News-Update_US_AU_Header.jpg?fit=1920%2C1080';
+
+type ArticleWithRelations = Prisma.NewsArticleGetPayload<{
+  include: { category: true; subcategory: true };
+}>;
 
 class NewsCategoryDto {
   @ApiProperty() id: string;
@@ -48,7 +54,7 @@ export class NewsArticleDto {
   @ApiPropertyOptional() summaryZhTw?: string | null;
   @ApiPropertyOptional() summaryEn?: string | null;
 
-  static fromEntity(entity: any): NewsArticleDto {
+  static fromEntity(entity: ArticleWithRelations): NewsArticleDto {
     return {
       id: entity.id,
       sourceSite: entity.sourceSite,
@@ -58,7 +64,7 @@ export class NewsArticleDto {
       titleZhTw: entity.titleZhTw ?? null,
       titleEn: entity.titleEn ?? null,
       publishedAt: entity.publishedAt,
-      thumbnailUrl: entity.thumbnailUrl ?? 'https://about.fb.com/wp-content/uploads/2024/02/Facebook-News-Update_US_AU_Header.jpg?fit=1920%2C1080',
+      thumbnailUrl: entity.thumbnailUrl ?? FALLBACK_THUMBNAIL,
       status: entity.status,
       category: entity.category ?? null,
       subcategory: entity.subcategory ?? null,

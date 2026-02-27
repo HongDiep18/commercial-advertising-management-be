@@ -3,6 +3,9 @@ import { PrismaService } from '../../database/prisma.service';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { NewsArticleStatus, Prisma } from '@prisma/client';
 
+const isNotFound = (e: unknown) =>
+  e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025';
+
 type IngestInput = {
   sourceSite: string;
   categoryId?: string;
@@ -134,26 +137,24 @@ export class NewsService {
       summaryEn: string;
     },
   ) {
-    const article = await this.prisma.newsArticle.findUnique({
-      where: { id: articleId },
-    });
-    if (!article) {
-      throw new NotFoundException('Article not found');
+    try {
+      return await this.prisma.newsArticle.update({
+        where: { id: articleId },
+        data: {
+          title: payload.titleVi,
+          titleZhTw: payload.titleZhTw,
+          titleEn: payload.titleEn,
+          summaryVi: payload.summaryVi,
+          summaryZhTw: payload.summaryZhTw,
+          summaryEn: payload.summaryEn,
+          status: NewsArticleStatus.PUBLISHED,
+        },
+        include: articleInclude,
+      });
+    } catch (e) {
+      if (isNotFound(e)) throw new NotFoundException('Article not found');
+      throw e;
     }
-
-    return this.prisma.newsArticle.update({
-      where: { id: articleId },
-      data: {
-        title: payload.titleVi,
-        titleZhTw: payload.titleZhTw,
-        titleEn: payload.titleEn,
-        summaryVi: payload.summaryVi,
-        summaryZhTw: payload.summaryZhTw,
-        summaryEn: payload.summaryEn,
-        status: NewsArticleStatus.PUBLISHED,
-      },
-      include: articleInclude,
-    });
   }
 
   async listPublished(
@@ -188,6 +189,19 @@ export class NewsService {
     return this.prisma.newsCategory.findMany({
       include: { subcategories: { orderBy: { nameEn: 'asc' } } },
       orderBy: { nameEn: 'asc' },
+    });
+  }
+
+  async findDraftsPendingTranslation(limit: number) {
+    return this.prisma.newsArticle.findMany({
+      where: {
+        status: NewsArticleStatus.DRAFT,
+        summaryVi: { not: null },
+        titleZhTw: null,
+      },
+      include: { category: true },
+      orderBy: { publishedAt: 'desc' },
+      take: limit,
     });
   }
 

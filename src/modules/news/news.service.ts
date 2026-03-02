@@ -1,20 +1,28 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
-import { NewsArticleStatus } from './enums/news-article-status.enum';
+import { NewsArticleStatus, Prisma } from '@prisma/client';
+
+const isNotFound = (e: unknown) =>
+  e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025';
 
 type IngestInput = {
   sourceSite: string;
-  sourceCategory?: string;
+  categoryId?: string;
+  subcategoryId?: string;
   guid?: string;
   url: string;
   title: string;
   publishedAt: string;
   thumbnailUrl?: string;
   language?: string;
-  contentText?: string;
-  rawHtml?: string;
+  summaryVi?: string;
 };
+
+const articleInclude = {
+  category: true,
+  subcategory: true,
+} as const;
 
 @Injectable()
 export class NewsService {
@@ -27,7 +35,6 @@ export class NewsService {
         url: a.url.trim(),
         guid: a.guid?.trim() || undefined,
         sourceSite: a.sourceSite.trim().toLowerCase(),
-        sourceCategory: a.sourceCategory?.trim() || undefined,
         title: a.title.trim(),
       }))
       .filter((a) => a.url && a.sourceSite && a.title);
@@ -39,14 +46,7 @@ export class NewsService {
     const urls = [...new Set(normalized.map((a) => a.url))];
     const byUrlExisting = await this.prisma.newsArticle.findMany({
       where: { url: { in: urls } },
-      select: {
-        id: true,
-        url: true,
-        status: true,
-        aiSummaryVi: true,
-        aiSummaryZhTw: true,
-        aiSummaryEn: true,
-      },
+      select: { id: true, url: true, status: true, summaryZhTw: true, summaryVi: true },
     });
     const existingByUrl = new Map(byUrlExisting.map((a) => [a.url, a]));
 
@@ -55,21 +55,9 @@ export class NewsService {
       guidPairs.length > 0
         ? await this.prisma.newsArticle.findMany({
             where: {
-              OR: guidPairs.map((a) => ({
-                sourceSite: a.sourceSite,
-                guid: a.guid,
-              })),
+              OR: guidPairs.map((a) => ({ sourceSite: a.sourceSite, guid: a.guid })),
             },
-            select: {
-              id: true,
-              url: true,
-              sourceSite: true,
-              guid: true,
-              status: true,
-              aiSummaryVi: true,
-              aiSummaryZhTw: true,
-              aiSummaryEn: true,
-            },
+            select: { id: true, url: true, sourceSite: true, guid: true, status: true, summaryZhTw: true, summaryVi: true },
           })
         : [];
 
@@ -91,15 +79,15 @@ export class NewsService {
         await this.prisma.newsArticle.create({
           data: {
             sourceSite: input.sourceSite,
-            sourceCategory: input.sourceCategory ?? null,
+            categoryId: input.categoryId ?? null,
+            subcategoryId: input.subcategoryId ?? null,
             guid: input.guid ?? null,
             url: input.url,
             title: input.title,
             publishedAt: new Date(input.publishedAt),
             thumbnailUrl: input.thumbnailUrl ?? null,
             language: input.language ?? 'vi',
-            contentText: input.contentText ?? null,
-            rawHtml: input.rawHtml ?? null,
+            summaryVi: input.summaryVi ?? null,
             status: NewsArticleStatus.DRAFT,
           },
         });
@@ -107,10 +95,11 @@ export class NewsService {
         continue;
       }
 
-      const hasAllSummaries =
-        !!existing.aiSummaryVi && !!existing.aiSummaryZhTw && !!existing.aiSummaryEn;
+      // Skip if already published with translation, or if still DRAFT with summaryVi already set
       const canUpdate =
-        existing.status !== NewsArticleStatus.PUBLISHED || !hasAllSummaries;
+        existing.status === NewsArticleStatus.PUBLISHED
+          ? !existing.summaryZhTw
+          : !existing.summaryVi;
 
       if (!canUpdate) {
         skipped += 1;
@@ -120,15 +109,15 @@ export class NewsService {
       await this.prisma.newsArticle.update({
         where: { id: existing.id },
         data: {
-          sourceCategory: input.sourceCategory ?? null,
+          categoryId: input.categoryId ?? null,
+          subcategoryId: input.subcategoryId ?? null,
           guid: input.guid ?? null,
           url: input.url,
           title: input.title,
           publishedAt: new Date(input.publishedAt),
           thumbnailUrl: input.thumbnailUrl ?? null,
           language: input.language ?? 'vi',
-          contentText: input.contentText ?? null,
-          rawHtml: input.rawHtml ?? null,
+          summaryVi: input.summaryVi ?? null,
         },
       });
       updated += 1;
@@ -140,75 +129,52 @@ export class NewsService {
   async writeSummary(
     articleId: string,
     payload: {
-      aiSummaryVi: string;
-      aiSummaryZhTw: string;
-      aiSummaryEn: string;
-      aiModel?: string;
-      tags?: string[];
-      publish?: boolean;
+      titleVi: string;
+      titleZhTw: string;
+      titleEn: string;
+      summaryVi: string;
+      summaryZhTw: string;
+      summaryEn: string;
     },
   ) {
-    const article = await this.prisma.newsArticle.findUnique({
-      where: { id: articleId },
-      include: { tags: { include: { tag: true } } },
-    });
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
-
-    const tagSlugs = (payload.tags ?? [])
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
-
-    // Upsert tags and connect
-    const tagConnections: { articleId: string; tagId: string }[] = [];
-    if (tagSlugs.length > 0) {
-      const uniqueSlugs = [...new Set(tagSlugs)];
-
-      for (const slug of uniqueSlugs) {
-        const tag = await this.prisma.newsTag.upsert({
-          where: { slug },
-          create: { slug, name: slug },
-          update: {},
-        });
-        tagConnections.push({ articleId, tagId: tag.id });
-      }
-
-      // Remove old tag connections and add new ones
-      await this.prisma.newsArticleTag.deleteMany({
-        where: { articleId },
+    try {
+      return await this.prisma.newsArticle.update({
+        where: { id: articleId },
+        data: {
+          title: payload.titleVi,
+          titleZhTw: payload.titleZhTw,
+          titleEn: payload.titleEn,
+          summaryVi: payload.summaryVi,
+          summaryZhTw: payload.summaryZhTw,
+          summaryEn: payload.summaryEn,
+          status: NewsArticleStatus.PUBLISHED,
+        },
+        include: articleInclude,
       });
-      await this.prisma.newsArticleTag.createMany({
-        data: tagConnections,
-      });
+    } catch (e) {
+      if (isNotFound(e)) throw new NotFoundException('Article not found');
+      throw e;
     }
-
-    const shouldPublish =
-      typeof payload.publish === 'boolean' ? payload.publish : true;
-
-    const updated = await this.prisma.newsArticle.update({
-      where: { id: articleId },
-      data: {
-        aiSummaryVi: payload.aiSummaryVi,
-        aiSummaryZhTw: payload.aiSummaryZhTw,
-        aiSummaryEn: payload.aiSummaryEn,
-        aiModel: payload.aiModel ?? null,
-        summarizedAt: new Date(),
-        ...(shouldPublish && { status: NewsArticleStatus.PUBLISHED }),
-      },
-      include: { tags: { include: { tag: true } } },
-    });
-
-    return updated;
   }
 
-  async listPublished(page: number, limit: number) {
-    const where = { status: NewsArticleStatus.PUBLISHED };
+  async listPublished(
+    page: number,
+    limit: number,
+    filters: { categorySlugs?: string[]; subcategoryIds?: string[] } = {},
+  ) {
+    const categorySlugs = filters.categorySlugs?.map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const subcategoryIds = filters.subcategoryIds?.filter(Boolean);
+
+    const where: Prisma.NewsArticleWhereInput = {
+      status: NewsArticleStatus.PUBLISHED,
+      ...(categorySlugs?.length && { category: { slug: { in: categorySlugs } } }),
+      ...(subcategoryIds?.length && { subcategoryId: { in: subcategoryIds } }),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.newsArticle.findMany({
         where,
-        include: { tags: { include: { tag: true } } },
+        include: articleInclude,
         orderBy: { publishedAt: 'desc' },
         take: limit,
         skip: (page - 1) * limit,
@@ -219,10 +185,30 @@ export class NewsService {
     return new PaginatedResult(data, total, page, limit);
   }
 
+  async listCategories() {
+    return this.prisma.newsCategory.findMany({
+      include: { subcategories: { orderBy: { nameEn: 'asc' } } },
+      orderBy: { nameEn: 'asc' },
+    });
+  }
+
+  async findDraftsPendingTranslation(limit: number) {
+    return this.prisma.newsArticle.findMany({
+      where: {
+        status: NewsArticleStatus.DRAFT,
+        summaryVi: { not: null },
+        titleZhTw: null,
+      },
+      include: { category: true },
+      orderBy: { publishedAt: 'desc' },
+      take: limit,
+    });
+  }
+
   async getPublishedById(id: string) {
     const article = await this.prisma.newsArticle.findFirst({
       where: { id, status: NewsArticleStatus.PUBLISHED },
-      include: { tags: { include: { tag: true } } },
+      include: articleInclude,
     });
     if (!article) {
       throw new NotFoundException('Article not found');

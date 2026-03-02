@@ -6,35 +6,71 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── News ───────────────────────────────────────────────────────────
+enum NewsArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ─── News Categories ──────────────────────────────────────────────────────────
+
+model NewsCategory {
+  id       String @id @default(uuid())
+  slug     String @unique @db.VarChar(64)
+  nameVi   String @db.VarChar(128)
+  nameZhTw String @db.VarChar(128)
+  nameEn   String @db.VarChar(128)
+
+  subcategories NewsSubcategory[]
+  articles      NewsArticle[]
+
+  @@map("news_categories")
+}
+
+model NewsSubcategory {
+  id         String @id @default(uuid())
+  slug       String @unique @db.VarChar(128)
+  nameVi     String @db.VarChar(256)
+  nameZhTw   String @db.VarChar(256)
+  nameEn     String @db.VarChar(256)
+
+  categoryId String
+  category   NewsCategory @relation(fields: [categoryId], references: [id])
+
+  articles NewsArticle[]
+
+  @@map("news_subcategories")
+}
+
+// ─── News Articles ────────────────────────────────────────────────────────────
 
 model NewsArticle {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sourceSite     String   @db.VarChar(64)
-  sourceCategory String?  @db.VarChar(256)
-  url            String   @unique @db.VarChar(2048)
-  guid           String?  @db.VarChar(512)
-  title          String   @db.VarChar(1024)
-  publishedAt    DateTime
-  thumbnailUrl   String?  @db.VarChar(2048)
-  language       String   @default("vi") @db.VarChar(16)
-  contentText    String?  @db.Text
-  rawHtml        String?  @db.Text
+  sourceSite   String   @db.VarChar(64)
+  url          String   @unique @db.VarChar(2048)
+  guid         String?  @db.VarChar(512)
+  title        String   @db.VarChar(1024)
+  titleZhTw    String?  @db.VarChar(1024)
+  titleEn      String?  @db.VarChar(1024)
+  publishedAt  DateTime
+  thumbnailUrl String?  @db.VarChar(2048)
+  language     String   @default("vi") @db.VarChar(16)
 
-  status       String  @default("DRAFT") @db.VarChar(16)
-  aiSummaryVi   String? @db.Text
-  aiSummaryZhTw String? @db.Text
-  aiSummaryEn   String? @db.Text
-  aiModel      String? @db.VarChar(128)
-  summarizedAt DateTime?
+  categoryId    String?
+  subcategoryId String?
+  category      NewsCategory?    @relation(fields: [categoryId],    references: [id])
+  subcategory   NewsSubcategory? @relation(fields: [subcategoryId], references: [id])
 
-  tags NewsArticleTag[]
+  status      NewsArticleStatus @default(DRAFT)
+  summaryVi   String? @db.Text
+  summaryZhTw String? @db.Text
+  summaryEn   String? @db.Text
 
   @@index([sourceSite])
-  @@index([guid])
+  @@index([sourceSite, guid])
+  @@index([categoryId])
   @@map("news_articles")
 }
 
@@ -71,15 +107,14 @@ model User {
   updatedAt DateTime @updatedAt
 
   email    String  @unique @db.VarChar(255)
-  password String  @db.VarChar(255) // hashed
-  role     String  @default("MEMBER") @db.VarChar(32) // VISITOR, MEMBER, ADMIN, SUPER_ADMIN
+  password String  @db.VarChar(255) 
+  role     String  @default("MEMBER") @db.VarChar(32) 
 
   firstName String? @db.VarChar(100)
   lastName  String? @db.VarChar(100)
   isActive  Boolean @default(true)
 
-  // Membership tier for MEMBER role
-  membershipTier String? @db.VarChar(32) // NONE, COPPER, SILVER, GOLD, DIAMOND
+  membershipTier String? @db.VarChar(32) 
   loyaltyPoints  Int     @default(0)
 
   @@index([email])

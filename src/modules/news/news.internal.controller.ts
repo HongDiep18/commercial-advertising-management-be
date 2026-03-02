@@ -1,25 +1,19 @@
 import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { InternalApiKeyGuard } from '../../common/guards';
-import {
-  IngestNewsArticlesDto,
-  IngestNewsArticlesResultDto,
-} from './dto/ingest-news-article.dto';
 import { WriteNewsSummaryDto } from './dto/write-news-summary.dto';
 import { NewsArticleDto } from './dto/news-article.dto';
 import { NewsService } from './news.service';
+import { NewsSchedulerService } from './news-scheduler.service';
 
 @ApiTags('Internal News')
 @Controller('internal/news')
 @UseGuards(InternalApiKeyGuard)
 export class NewsInternalController {
-  constructor(private readonly newsService: NewsService) {}
-
-  @Post('articles/ingest')
-  @ApiOkResponse({ type: IngestNewsArticlesResultDto })
-  async ingest(@Body() body: IngestNewsArticlesDto): Promise<IngestNewsArticlesResultDto> {
-    return this.newsService.ingestMany(body.articles);
-  }
+  constructor(
+    private readonly newsService: NewsService,
+    private readonly schedulerService: NewsSchedulerService,
+  ) {}
 
   @Post('articles/:id/summary')
   @ApiOkResponse({ type: NewsArticleDto })
@@ -27,5 +21,10 @@ export class NewsInternalController {
     const updated = await this.newsService.writeSummary(id, body);
     return NewsArticleDto.fromEntity(updated);
   }
-}
 
+  @Post('pipeline/run')
+  @ApiOkResponse({ description: 'Runs crawl + translate pipeline immediately' })
+  async runPipeline() {
+    return this.schedulerService.runNow();
+  }
+}

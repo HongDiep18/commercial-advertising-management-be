@@ -1,37 +1,34 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsOptional, IsString, Length } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, Length } from 'class-validator';
 
 export class WriteNewsSummaryDto {
-  @ApiProperty({ description: 'Vietnamese summary' })
+  @ApiProperty({ description: 'Vietnamese title (from RSS)' })
+  @IsString()
+  @Length(1, 1024)
+  titleVi: string;
+
+  @ApiProperty({ description: 'Traditional Chinese (zh-TW) title' })
+  @IsString()
+  @Length(1, 1024)
+  titleZhTw: string;
+
+  @ApiProperty({ description: 'English title' })
+  @IsString()
+  @Length(1, 1024)
+  titleEn: string;
+
+  @ApiProperty({ description: 'Vietnamese summary (from RSS description)' })
   @IsString()
   @Length(1, 20000)
-  aiSummaryVi: string;
+  summaryVi: string;
 
   @ApiProperty({ description: 'Traditional Chinese (zh-TW) summary' })
   @IsString()
   @Length(1, 20000)
-  aiSummaryZhTw: string;
+  summaryZhTw: string;
 
   @ApiProperty({ description: 'English summary' })
   @IsString()
   @Length(1, 20000)
-  aiSummaryEn: string;
-
-  @ApiPropertyOptional({ example: 'gpt-4.1-mini' })
-  @IsOptional()
-  @IsString()
-  @Length(1, 128)
-  aiModel?: string;
-
-  @ApiPropertyOptional({ example: ['business', 'policy'] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @Length(1, 128, { each: true })
-  tags?: string[];
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  publish?: boolean;
+  summaryEn: string;
 }

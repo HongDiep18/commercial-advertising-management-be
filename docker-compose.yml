@@ -24,13 +24,14 @@ services:
       target: deps
     container_name: vn-buyer-guide-api
     ports:
-      - '${APP_PORT}:${APP_PORT}'
+      - '${APP_PORT_LOCAL}:${APP_PORT}'
     depends_on:
       postgres:
         condition: service_healthy
     env_file:
       - .env
     environment:
+      APP_PORT: ${APP_PORT}
       DB_HOST: postgres
       DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
     volumes:

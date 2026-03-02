@@ -68,6 +68,8 @@ model NewsArticle {
   summaryZhTw String? @db.Text
   summaryEn   String? @db.Text
 
+  tags NewsArticleTag[]
+
   @@index([sourceSite])
   @@index([sourceSite, guid])
   @@index([categoryId])

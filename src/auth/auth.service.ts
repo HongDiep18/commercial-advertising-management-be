@@ -9,6 +9,20 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../common/enums/role.enum';
 import type { RegisterDto } from './dto/register.dto';
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  password: string;
+  role: string;
+  isActive: boolean;
+  firstName: string | null;
+  lastName: string | null;
+};
+
+type UserDelegate = {
+  findUnique: (args: { where: { email: string } }) => Promise<AuthUser | null>;
+};
+
 export type LoginResult = {
   accessToken: string;
   user: { id: string; email: string; role: Role };
@@ -21,8 +35,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({
+  private get userDelegate(): UserDelegate {
+    return (this.prisma as unknown as { user: UserDelegate }).user;
+  }
+
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<AuthUser | null> {
+    const user = await this.userDelegate.findUnique({
       where: { email: email.trim().toLowerCase() },
     });
     if (!user) return null;
@@ -58,7 +79,7 @@ export class AuthService {
     status: string;
   }> {
     const email = data.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
+    const existingUser = await this.userDelegate.findUnique({
       where: { email },
     });
     if (existingUser) {

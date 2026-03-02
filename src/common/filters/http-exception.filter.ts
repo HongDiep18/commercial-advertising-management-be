@@ -25,15 +25,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message =
         typeof exceptionResponse === 'string'
           ? exceptionResponse
-          : (exceptionResponse as any).message || exceptionResponse;
+          : (exceptionResponse as { message?: string | string[] }).message ||
+            exceptionResponse;
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
     }
 
-    response.status(status).json({
-      statusCode: status,
-      message,
-      timestamp: new Date().toISOString(),
-    });
+    if (response.headersSent) return;
+    try {
+      response.status(status).json({
+        statusCode: status,
+        message,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      try {
+        response.end();
+      } catch {
+        //
+      }
+    }
   }
 }

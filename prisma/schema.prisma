@@ -73,3 +73,51 @@ model NewsArticle {
   @@index([categoryId])
   @@map("news_articles")
 }
+
+model NewsTag {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slug String @unique @db.VarChar(128)
+  name String @db.VarChar(256)
+
+  articles NewsArticleTag[]
+
+  @@map("news_tags")
+}
+
+model NewsArticleTag {
+  articleId String
+  tagId     String
+
+  article NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag     NewsTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@map("news_article_tags")
+}
+
+
+// ─── Users & Authentication ──────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email    String  @unique @db.VarChar(255)
+  password String  @db.VarChar(255) 
+  role     String  @default("MEMBER") @db.VarChar(32) 
+
+  firstName String? @db.VarChar(100)
+  lastName  String? @db.VarChar(100)
+  isActive  Boolean @default(true)
+
+  membershipTier String? @db.VarChar(32) 
+  loyaltyPoints  Int     @default(0)
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}

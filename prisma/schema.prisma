@@ -68,43 +68,61 @@ model NewsArticle {
   summaryZhTw String? @db.Text
   summaryEn   String? @db.Text
 
-  tags NewsArticleTag[]
-
   @@index([sourceSite])
   @@index([sourceSite, guid])
   @@index([categoryId])
   @@map("news_articles")
 }
 
-model NewsTag {
+// ─── Company profile requests (register form, no password; pending admin approval) ───
+
+enum CompanyProfileRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MembershipTier {
+  NONE
+  BRONZE
+  SILVER
+  GOLD
+  DIAMOND
+}
+
+
+model CompanyProfileRequest {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  slug String @unique @db.VarChar(128)
-  name String @db.VarChar(256)
+  email           String   @db.VarChar(255)
+  companyNameVi String   @db.VarChar(255)
+  companyNameCn String   @db.VarChar(255)
+  phone           String   @db.VarChar(32)
+  taxId          String   @db.VarChar(64)
+  contactPerson  String   @db.VarChar(255)
+  contactPhone   String   @db.VarChar(32)
+  companyAddress String   @db.VarChar(512)
+  country         String   @db.VarChar(128)
+  region          String   @db.VarChar(128)
+  industry        String   @db.VarChar(128)
+  website         String   @db.VarChar(2048)
+  introduction    String   @db.Text
+  captcha         String?  @db.VarChar(32)
+  membershipTier MembershipTier @default(NONE)
 
-  articles NewsArticleTag[]
+  status CompanyProfileRequestStatus @default(PENDING)
 
-  @@map("news_tags")
+  @@index([email])
+  @@index([status])
+  @@map("company_profile_requests")
 }
-
-model NewsArticleTag {
-  articleId String
-  tagId     String
-
-  article NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  tag     NewsTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([articleId, tagId])
-  @@map("news_article_tags")
-}
-
 
 // ─── Users & Authentication ──────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -116,7 +134,7 @@ model User {
   lastName  String? @db.VarChar(100)
   isActive  Boolean @default(true)
 
-  membershipTier String? @db.VarChar(32) 
+  membershipTier MembershipTier @default(NONE)
   loyaltyPoints  Int     @default(0)
 
   @@index([email])

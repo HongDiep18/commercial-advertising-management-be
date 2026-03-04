@@ -1,5 +1,6 @@
 import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
 import { InternalApiKeyGuard } from '../../common/guards';
 import { WriteNewsSummaryDto } from './dto/write-news-summary.dto';
 import { NewsArticleDto } from './dto/news-article.dto';
@@ -8,6 +9,7 @@ import { NewsSchedulerService } from './news-scheduler.service';
 
 @ApiTags('Internal News')
 @Controller('internal/news')
+@Public()
 @UseGuards(InternalApiKeyGuard)
 export class NewsInternalController {
   constructor(
@@ -17,7 +19,10 @@ export class NewsInternalController {
 
   @Post('articles/:id/summary')
   @ApiOkResponse({ type: NewsArticleDto })
-  async writeSummary(@Param('id') id: string, @Body() body: WriteNewsSummaryDto) {
+  async writeSummary(
+    @Param('id') id: string,
+    @Body() body: WriteNewsSummaryDto,
+  ) {
     const updated = await this.newsService.writeSummary(id, body);
     return NewsArticleDto.fromEntity(updated);
   }

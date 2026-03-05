@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "CompanyProfileRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+CREATE TYPE "UserProfileRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
 --CreateEnum
 CREATE TYPE "MembershipTier" AS ENUM ('NONE', 'BRONZE', 'SILVER', 'GOLD', 'DIAMOND');
@@ -24,7 +24,7 @@ CREATE TABLE "company_profile_requests" (
     "introduction" text NOT NULL,
     "captcha" varchar(32),
     "membershipLevel" "MembershipTier" NOT NULL DEFAULT 'NONE',
-    "status" "CompanyProfileRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "status" "UserProfileRequestStatus" NOT NULL DEFAULT 'PENDING',
 
     CONSTRAINT "company_profile_requests_pkey" PRIMARY KEY ("id")
 );

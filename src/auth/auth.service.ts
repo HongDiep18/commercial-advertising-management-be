@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -92,8 +93,16 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const prismaReq = this.prisma as PrismaWithUserProfileRequest;
-    const existingPending = await prismaReq.userProfileRequest.findFirst({
+    const prismaAny = this.prisma as unknown as Record<string, unknown>;
+    const requestDelegate =
+      (prismaAny.userProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']) ??
+      (prismaAny.companyProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']);
+    if (!requestDelegate?.findFirst || !requestDelegate?.create) {
+      throw new InternalServerErrorException(
+        'Prisma client missing userProfileRequest. Run: npx prisma generate',
+      );
+    }
+    const existingPending = await requestDelegate.findFirst({
       where: { email, status: 'PENDING' },
     });
     if (existingPending) {
@@ -103,7 +112,7 @@ export class AuthService {
     }
 
     const createData = AuthService.registerDtoToRequestData(data);
-    await prismaReq.userProfileRequest.create({
+    await requestDelegate.create({
       data: {
         email,
         ...createData,
@@ -167,11 +176,70 @@ export class AuthService {
     const out: Record<string, string | null> = {};
     for (const [from, to] of map) {
       const v = data[from];
-      if (v !== undefined) {
-        out[to] = typeof v === 'string' ? v.trim() || null : null;
-      }
+      if (v === undefined) continue;
+      const val = typeof v === 'string' ? v.trim() || null : null;
+      if (from === 'upload_logo' && val === null) continue;
+      out[to] = val;
     }
     return out;
+  }
+
+  async getProfile(userId: string): Promise<{
+    id: string;
+    email: string;
+    membershipTier: string;
+    logoUrl?: string | null;
+    companyNameVi?: string | null;
+    companyNameCn?: string | null;
+    phone?: string | null;
+    taxId?: string | null;
+    contactPerson?: string | null;
+    contactPhone?: string | null;
+    companyAddress?: string | null;
+    country?: string | null;
+    region?: string | null;
+    industry?: string | null;
+    website?: string | null;
+    introduction?: string | null;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, membershipTier: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const profileSelectKeys = [
+      'logoUrl',
+      'companyNameVi',
+      'companyNameCn',
+      'phone',
+      'taxId',
+      'contactPerson',
+      'contactPhone',
+      'companyAddress',
+      'email',
+      'country',
+      'region',
+      'industry',
+      'website',
+      'introduction',
+    ] as const;
+    const select = Object.fromEntries(
+      profileSelectKeys.map((k) => [k, true]),
+    ) as Record<(typeof profileSelectKeys)[number], true>;
+    const profile = (await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select,
+    })) as Record<(typeof profileSelectKeys)[number], string | null> | null;
+    const { email: _profileEmail, ...restProfile } = profile ?? {};
+    void _profileEmail;
+    return {
+      id: user.id,
+      email: user.email,
+      membershipTier: user.membershipTier,
+      ...restProfile,
+    };
   }
 
   async updateProfile(
@@ -180,7 +248,7 @@ export class AuthService {
   ): Promise<{
     id: string;
     email: string;
-    membershipLevel: string;
+    membershipTier: string;
     logoUrl?: string | null;
     companyNameVi?: string | null;
     companyNameCn?: string | null;
@@ -266,7 +334,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      membershipLevel: user.membershipTier,
+      membershipTier: user.membershipTier,
       ...restProfile,
     };
   }

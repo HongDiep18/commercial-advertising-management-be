@@ -39,6 +39,37 @@ export type LoginResult = {
   user: { id: string; email: string; role: Role };
 };
 
+const PROFILE_SELECT_KEYS = [
+  'logoUrl',
+  'companyNameVi',
+  'companyNameCn',
+  'phone',
+  'taxId',
+  'contactPerson',
+  'contactPhone',
+  'companyAddress',
+  'email',
+  'country',
+  'region',
+  'industry',
+  'website',
+  'introduction',
+] as const;
+
+type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
+
+export type ProfileResponse = {
+  id: string;
+  email: string;
+  membershipTier: string;
+} & Partial<Record<ProfileField, string | null>>;
+
+function profileSelect(): Record<ProfileField, true> {
+  return Object.fromEntries(
+    PROFILE_SELECT_KEYS.map((k) => [k, true]),
+  ) as Record<ProfileField, true>;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -99,7 +130,7 @@ export class AuthService {
       (prismaAny.companyProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']);
     if (!requestDelegate?.findFirst || !requestDelegate?.create) {
       throw new InternalServerErrorException(
-        'Prisma client missing userProfileRequest. Run: npx prisma generate',
+        'Prisma client missing userProfileRequest. Run: pnpm prisma generate',
       );
     }
     const existingPending = await requestDelegate.findFirst({
@@ -126,82 +157,51 @@ export class AuthService {
   }
 
   private static registerDtoToRequestData(data: RegisterDto) {
-    const map: Array<[keyof RegisterDto, string]> = [
-      ['company_name_vi', 'companyNameVi'],
-      ['company_name_cn', 'companyNameCn'],
-      ['phone', 'phone'],
-      ['tax_id', 'taxId'],
-      ['contact_person', 'contactPerson'],
-      ['contact_phone', 'contactPhone'],
-      ['company_address', 'companyAddress'],
-      ['country', 'country'],
-      ['region', 'region'],
-      ['industry', 'industry'],
-      ['website', 'website'],
-      ['introduction', 'introduction'],
-    ];
-    const out: Record<string, string | null> = {};
-    for (const [from, to] of map) {
-      const v = data[from];
-      out[to] = typeof v === 'string' ? v.trim() : null;
-    }
+    const out: Record<string, unknown> = {};
+    const dataRecord = data as unknown as Record<string, unknown>;
+
+    Object.keys(data).forEach((key) => {
+      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      const value = dataRecord[key];
+      out[camelKey] = typeof value === 'string' ? value.trim() : value;
+    });
+
     return {
       ...out,
-      captcha: data.captcha?.trim() ?? null,
       membershipTier:
-        (data.membership_tier?.trim() as MembershipTier) ||
+        (out.membershipTier as MembershipTier) ||
         DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL,
+      captcha: data.captcha?.trim() ?? null,
     };
   }
 
   private static dtoToProfileData(
     data: UpdateProfileDto,
   ): Record<string, string | null> {
-    const map: Array<[keyof UpdateProfileDto, string]> = [
-      ['upload_logo', 'logoUrl'],
-      ['company_name_vi', 'companyNameVi'],
-      ['company_name_cn', 'companyNameCn'],
-      ['phone', 'phone'],
-      ['tax_id', 'taxId'],
-      ['contact_person', 'contactPerson'],
-      ['contact_phone', 'contactPhone'],
-      ['company_address', 'companyAddress'],
-      ['email', 'email'],
-      ['country', 'country'],
-      ['region', 'region'],
-      ['industry', 'industry'],
-      ['website', 'website'],
-      ['introduction', 'introduction'],
-    ];
     const out: Record<string, string | null> = {};
-    for (const [from, to] of map) {
-      const v = data[from];
-      if (v === undefined) continue;
-      const val = typeof v === 'string' ? v.trim() || null : null;
-      if (from === 'upload_logo' && val === null) continue;
-      out[to] = val;
-    }
+    const dataRecord = data as unknown as Record<string, unknown>;
+
+    const skipKeys = new Set(['membership_tier', 'captcha']);
+
+    Object.keys(data).forEach((key) => {
+      if (dataRecord[key] === undefined || skipKeys.has(key)) return;
+
+      const camelKey =
+        key === 'upload_logo'
+          ? 'logoUrl'
+          : key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      const raw = dataRecord[key];
+      const val = typeof raw === 'string' ? raw.trim() || null : null;
+
+      if (key === 'upload_logo' && val === null) return;
+
+      out[camelKey] = val;
+    });
+
     return out;
   }
 
-  async getProfile(userId: string): Promise<{
-    id: string;
-    email: string;
-    membershipTier: string;
-    logoUrl?: string | null;
-    companyNameVi?: string | null;
-    companyNameCn?: string | null;
-    phone?: string | null;
-    taxId?: string | null;
-    contactPerson?: string | null;
-    contactPhone?: string | null;
-    companyAddress?: string | null;
-    country?: string | null;
-    region?: string | null;
-    industry?: string | null;
-    website?: string | null;
-    introduction?: string | null;
-  }> {
+  async getProfile(userId: string): Promise<ProfileResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, membershipTier: true },
@@ -209,60 +209,27 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    const profileSelectKeys = [
-      'logoUrl',
-      'companyNameVi',
-      'companyNameCn',
-      'phone',
-      'taxId',
-      'contactPerson',
-      'contactPhone',
-      'companyAddress',
-      'email',
-      'country',
-      'region',
-      'industry',
-      'website',
-      'introduction',
-    ] as const;
-    const select = Object.fromEntries(
-      profileSelectKeys.map((k) => [k, true]),
-    ) as Record<(typeof profileSelectKeys)[number], true>;
+
     const profile = (await this.prisma.userProfile.findUnique({
       where: { userId },
-      select,
-    })) as Record<(typeof profileSelectKeys)[number], string | null> | null;
-    const { email: _profileEmail, ...restProfile } = profile ?? {};
-    void _profileEmail;
+      select: profileSelect(),
+    })) as Record<ProfileField, string | null> | null;
+
+    const { email: _omit, ...profileRest } =
+      profile ?? ({} as Record<ProfileField, string | null>);
+    void _omit;
     return {
       id: user.id,
       email: user.email,
       membershipTier: user.membershipTier,
-      ...restProfile,
+      ...profileRest,
     };
   }
 
   async updateProfile(
     userId: string,
     data: UpdateProfileDto,
-  ): Promise<{
-    id: string;
-    email: string;
-    membershipTier: string;
-    logoUrl?: string | null;
-    companyNameVi?: string | null;
-    companyNameCn?: string | null;
-    phone?: string | null;
-    taxId?: string | null;
-    contactPerson?: string | null;
-    contactPhone?: string | null;
-    companyAddress?: string | null;
-    country?: string | null;
-    region?: string | null;
-    industry?: string | null;
-    website?: string | null;
-    introduction?: string | null;
-  }> {
+  ): Promise<ProfileResponse> {
     let user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, membershipTier: true },
@@ -296,46 +263,29 @@ export class AuthService {
     }
 
     const profileData = AuthService.dtoToProfileData(data);
-    const select = {
-      logoUrl: true,
-      companyNameVi: true,
-      companyNameCn: true,
-      phone: true,
-      taxId: true,
-      contactPerson: true,
-      contactPhone: true,
-      companyAddress: true,
-      email: true,
-      country: true,
-      region: true,
-      industry: true,
-      website: true,
-      introduction: true,
-    } as const;
+    const select = profileSelect();
 
-    type ProfileSelect = { [K in keyof typeof select]: string | null };
-
-    const profile: ProfileSelect | null =
+    const profile: Record<ProfileField, string | null> | null =
       Object.keys(profileData).length > 0
         ? ((await this.prisma.userProfile.upsert({
             where: { userId },
             create: { userId, ...profileData },
             update: profileData,
             select,
-          })) as ProfileSelect)
+          })) as Record<ProfileField, string | null>)
         : ((await this.prisma.userProfile.findUnique({
             where: { userId },
             select,
-          })) as ProfileSelect | null);
+          })) as Record<ProfileField, string | null> | null);
 
-    const { email: _profileEmail, ...restProfile } =
-      profile ?? ({} as ProfileSelect);
-    void _profileEmail;
+    const { email: _omit, ...profileRest } =
+      profile ?? ({} as Record<ProfileField, string | null>);
+    void _omit;
     return {
       id: user.id,
       email: user.email,
       membershipTier: user.membershipTier,
-      ...restProfile,
+      ...profileRest,
     };
   }
 }

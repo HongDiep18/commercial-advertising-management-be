@@ -22,13 +22,20 @@ export class NewsTranslatorService implements OnModuleInit {
     }
   }
 
-  async translatePendingArticles(): Promise<{ processed: number; failed: number }> {
+  async translatePendingArticles(): Promise<{
+    processed: number;
+    failed: number;
+  }> {
     if (!this.openai) {
       return { processed: 0, failed: 0 };
     }
 
-    const batchSize = this.configService.get<number>('news.translateBatchSize', 5);
-    const articles = await this.newsService.findDraftsPendingTranslation(batchSize);
+    const batchSize = this.configService.get<number>(
+      'news.translateBatchSize',
+      5,
+    );
+    const articles =
+      await this.newsService.findDraftsPendingTranslation(batchSize);
 
     let processed = 0;
     let failed = 0;
@@ -39,7 +46,9 @@ export class NewsTranslatorService implements OnModuleInit {
         processed += 1;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.error(`Translation failed for article ${article.id}: ${msg}`);
+        this.logger.error(
+          `Translation failed for article ${article.id}: ${msg}`,
+        );
         failed += 1;
       }
     }
@@ -53,8 +62,14 @@ export class NewsTranslatorService implements OnModuleInit {
     summaryVi: string | null;
     category: { nameEn: string } | null;
   }) {
-    const maxChars = this.configService.get<number>('news.maxContentChars', 4000);
-    const model = this.configService.get<string>('news.openAiModel', 'gpt-4o-mini');
+    const maxChars = this.configService.get<number>(
+      'news.maxContentChars',
+      4000,
+    );
+    const model = this.configService.get<string>(
+      'news.openAiModel',
+      'gpt-4o-mini',
+    );
     const summary = (article.summaryVi ?? '').slice(0, maxChars);
     const categoryName = article.category?.nameEn ?? 'General';
 
@@ -84,7 +99,12 @@ export class NewsTranslatorService implements OnModuleInit {
       summaryEn?: string;
     };
 
-    if (!parsed.titleZhTw || !parsed.titleEn || !parsed.summaryZhTw || !parsed.summaryEn) {
+    if (
+      !parsed.titleZhTw ||
+      !parsed.titleEn ||
+      !parsed.summaryZhTw ||
+      !parsed.summaryEn
+    ) {
       throw new Error(`Incomplete translation response: ${raw}`);
     }
 

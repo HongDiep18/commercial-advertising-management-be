@@ -1,5 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
@@ -8,6 +14,7 @@ import { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Auth')
+@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -17,6 +24,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Returns JWT and user info' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiBody({ type: LoginDto, description: 'Email and password credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto.email, loginDto.password);
   }
@@ -63,7 +71,9 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Returns user profile requests' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getAllProfileRequests(@Query('status') status?: string) {
+  async getAllProfileRequests(
+    @Query('status') status?: string,
+  ): Promise<unknown> {
     return this.authService.getAllProfileRequests(status);
   }
 }

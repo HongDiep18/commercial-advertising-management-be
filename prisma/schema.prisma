@@ -27,11 +27,11 @@ model NewsCategory {
 }
 
 model NewsSubcategory {
-  id         String @id @default(uuid())
-  slug       String @unique @db.VarChar(128)
-  nameVi     String @db.VarChar(256)
-  nameZhTw   String @db.VarChar(256)
-  nameEn     String @db.VarChar(256)
+  id       String @id @default(uuid())
+  slug     String @unique @db.VarChar(128)
+  nameVi   String @db.VarChar(256)
+  nameZhTw String @db.VarChar(256)
+  nameEn   String @db.VarChar(256)
 
   categoryId String
   category   NewsCategory @relation(fields: [categoryId], references: [id])
@@ -60,13 +60,15 @@ model NewsArticle {
 
   categoryId    String?
   subcategoryId String?
-  category      NewsCategory?    @relation(fields: [categoryId],    references: [id])
+  category      NewsCategory?    @relation(fields: [categoryId], references: [id])
   subcategory   NewsSubcategory? @relation(fields: [subcategoryId], references: [id])
 
   status      NewsArticleStatus @default(DRAFT)
-  summaryVi   String? @db.Text
-  summaryZhTw String? @db.Text
-  summaryEn   String? @db.Text
+  summaryVi   String?           @db.Text
+  summaryZhTw String?           @db.Text
+  summaryEn   String?           @db.Text
+
+  tags String[]
 
   @@index([sourceSite])
   @@index([sourceSite, guid])
@@ -74,9 +76,9 @@ model NewsArticle {
   @@map("news_articles")
 }
 
-// ─── User request
+// ─── Company Profile Request
 
-enum UserProfileRequestStatus {
+enum CompanyProfileRequestStatus {
   PENDING
   APPROVED
   REJECTED
@@ -90,75 +92,305 @@ enum MembershipTier {
   DIAMOND
 }
 
-model UserProfileRequest {
+model CompanyProfileRequest {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email           String   @db.VarChar(255)
-  companyNameVi String   @db.VarChar(255)
-  companyNameCn String   @db.VarChar(255)
-  phone           String   @db.VarChar(32)
-  taxId          String   @db.VarChar(64)
-  contactPerson  String   @db.VarChar(255)
-  contactPhone   String   @db.VarChar(32)
-  companyAddress String   @db.VarChar(512)
-  country         String   @db.VarChar(128)
-  region          String   @db.VarChar(128)
-  industry        String   @db.VarChar(128)
-  website         String   @db.VarChar(2048)
-  introduction    String   @db.Text
-  captcha         String?  @db.VarChar(32)
+  email          String @db.VarChar(255)
+  companyNameVi  String @db.VarChar(255)
+  companyNameCn  String @db.VarChar(255)
+  phone          String @db.VarChar(32)
+  taxId          String @db.VarChar(64)
+  contactPerson  String @db.VarChar(255)
+  contactPhone   String @db.VarChar(32)
+  companyAddress String @db.VarChar(512)
+  country        String @db.VarChar(128)
+  region         String @db.VarChar(128)
+  industry       String @db.VarChar(128)
+  website        String @db.VarChar(2048)
+  introduction   String @db.Text
+  captcha        String? @db.VarChar(32)
   membershipTier MembershipTier @default(NONE)
 
-  status UserProfileRequestStatus @default(PENDING)
+  status CompanyProfileRequestStatus @default(PENDING)
 
   @@index([email])
   @@index([status])
-  @@map("user_profile_requests")
+  @@map("company_profile_requests")
 }
 
 // ─── Users & Authentication ──────────────────────────────────────────────
 
-// User = Company
+// User = Company User/Member
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email    String  @unique @db.VarChar(255)
-  password String  @db.VarChar(255)
-  role     String  @default("MEMBER") @db.VarChar(32)
+  email    String @unique @db.VarChar(255)
+  password String @db.VarChar(255)
+  role     String @default("MEMBER") @db.VarChar(32)
 
-  isActive  Boolean @default(true)
+  isActive       Boolean        @default(true)
   membershipTier MembershipTier @default(NONE)
-  loyaltyPoints  Int     @default(0)
+  loyaltyPoints  Int            @default(0)
 
-  profile UserProfile?
+  companyId String? @map("company_id") @db.Uuid
+
+  company  Company?  @relation(fields: [companyId], references: [id])
+  adOrders AdOrder[]
 
   @@index([email])
   @@index([role])
   @@map("users")
 }
 
-model UserProfile {
-  id        String   @id @default(uuid())
-  userId    String   @unique @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logoUrl   String?  @db.VarChar(2048)
-  companyNameVi   String?  @db.VarChar(255)
-  companyNameCn   String?  @db.VarChar(255)
-  phone    String?  @db.VarChar(32)
-  taxId    String?  @db.VarChar(64)
-  contactPerson  String?  @db.VarChar(255)
-  contactPhone   String?  @db.VarChar(32)
-  companyAddress String?  @db.VarChar(512)
-  email    String?  @db.VarChar(255)
-  country  String?  @db.VarChar(128)
-  region   String?  @db.VarChar(128)
-  industry String?  @db.VarChar(128)
-  website  String?  @db.VarChar(2048)
-  introduction String? @db.Text
+// ─── Advertising ──────────────────────────────────────────────────────────────
 
-  @@map("user_profiles")
+enum AdCategoryType {
+  HOMEPAGE_POPUP    @map("homepage_popup")
+  FEATURED_COMPANY  @map("featured_company")
+  COMPANY_DIRECTORY @map("company_directory")
+  PLATFORM_PRINT    @map("platform_print")
+  PRODUCT_LISTING   @map("product_listing")
+}
+
+enum AdPackageType {
+  POPUP_PRIORITY_SLOT      @map("popup_priority_slot")
+  POPUP_ROTATION_SLOT      @map("popup_rotation_slot")
+  POPUP_VIEW_DETAILS_LINK  @map("popup_view_details_link")
+  POPUP_RANKING_ADJUSTMENT @map("popup_ranking_adjustment")
+
+  FEATURED_HOMEPAGE_DISPLAY @map("featured_homepage_display")
+  FEATURED_HIGHLIGHT_BOOST  @map("featured_highlight_boost")
+
+  COMPANY_CATEGORY_TOP   @map("company_category_top")
+  COMPANY_INFO_HIGHLIGHT @map("company_info_highlight")
+
+  PRINT_PLACEMENT @map("print_placement")
+
+  LISTING_BASIC_PLAN     @map("listing_basic_plan")
+  LISTING_ADVANCED_PLAN  @map("listing_advanced_plan")
+  LISTING_BOOST_HOMEPAGE @map("listing_boost_homepage")
+  LISTING_BOOST_CATEGORY @map("listing_boost_category")
+}
+
+enum DurationUnit {
+  DAY   @map("day")
+  WEEK  @map("week")
+  MONTH @map("month")
+  YEAR  @map("year")
+}
+
+enum PricingModel {
+  DURATION   @map("duration")
+  ONE_TIME   @map("one_time")
+  PER_ACTION @map("per_action")
+}
+
+enum AdOrderStatus {
+  DRAFT     @map("draft")
+  SUBMITTED @map("submitted")
+  PENDING   @map("pending")
+  APPROVED  @map("approved")
+  REJECTED  @map("rejected")
+}
+
+model Company {
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique @db.VarChar(255)
+  contactName String   @map("contact_name") @db.VarChar(255)
+  phone       String   @db.VarChar(50)
+  industry    String   @db.VarChar(255)
+  address     String   @db.VarChar(255)
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Profile fields (consolidated from UserProfile)
+  logoUrl        String? @map("logo_url") @db.VarChar(2048)
+  companyNameVi  String? @map("company_name_vi") @db.VarChar(255)
+  companyNameCn  String? @map("company_name_cn") @db.VarChar(255)
+  taxId          String? @map("tax_id") @db.VarChar(64)
+  country        String? @db.VarChar(128)
+  region         String? @db.VarChar(128)
+  website        String? @db.VarChar(2048)
+
+  users     User[]
+  adOrders  AdOrder[]
+  activeAds ActiveAd[]
+
+  @@map("companies")
+}
+
+model AdPackageCategory {
+  id          String         @id @default(uuid()) @db.Uuid
+  type        AdCategoryType @unique
+  name        String         @db.VarChar(255)
+  nameZh      String?        @map("name_zh") @db.VarChar(255)
+  description String?        @db.Text
+  sortOrder   Int            @default(0) @map("sort_order")
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  packages AdPackage[]
+
+  @@map("ad_package_categories")
+}
+
+model AdPackage {
+  id           String        @id @default(uuid()) @db.Uuid
+  categoryId   String        @map("category_id") @db.Uuid
+  type         AdPackageType
+  name         String        @db.VarChar(255)
+  nameZh       String?       @map("name_zh") @db.VarChar(255)
+  description  String?       @db.Text
+  pricingModel PricingModel  @map("pricing_model")
+  metadata     Json?         @default("{}") @db.JsonB
+  sortOrder    Int           @default(0) @map("sort_order")
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @map("updated_at")
+
+  category   AdPackageCategory  @relation(fields: [categoryId], references: [id])
+  pricing    AdPackagePricing[]
+  orderItems AdOrderItem[]
+
+  @@map("ad_packages")
+}
+
+model AdPackagePricing {
+  id            String        @id @default(uuid()) @db.Uuid
+  packageId     String        @map("package_id") @db.Uuid
+  pricingModel  PricingModel  @map("pricing_model")
+  durationValue Int?          @map("duration_value")
+  durationUnit  DurationUnit? @map("duration_unit")
+  basePrice     BigInt        @map("base_price")
+  discountRate  Decimal       @default(0.0) @map("discount_rate")
+  finalPrice    BigInt        @map("final_price")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  package    AdPackage     @relation(fields: [packageId], references: [id])
+  orderItems AdOrderItem[]
+  activeAds  ActiveAd[]
+
+  @@map("ad_package_pricing")
+}
+
+model AdOrder {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  companyId     String?       @map("company_id") @db.Uuid
+  status        AdOrderStatus @default(DRAFT)
+  subtotal      BigInt        @default(0) @db.BigInt
+  notes         String?       @db.Text
+  submittedAt   DateTime?     @map("submitted_at")
+  lastUpdatedBy String?       @map("last_updated_by") @db.Uuid
+  lastUpdatedAt DateTime?     @map("last_updated_at")
+  reason        String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @map("updated_at")
+
+  user      User          @relation(fields: [userId], references: [id])
+  company   Company?      @relation(fields: [companyId], references: [id])
+  items     AdOrderItem[]
+  activeAds ActiveAd[]
+
+  @@map("ad_orders")
+}
+
+model AdOrderItem {
+  id                    String        @id @default(uuid()) @db.Uuid
+  orderId               String        @map("order_id") @db.Uuid
+  packageId             String        @map("package_id") @db.Uuid
+  pricingId             String        @map("pricing_id") @db.Uuid
+  durationValue         Int?          @map("duration_value")
+  durationUnit          DurationUnit? @map("duration_unit")
+  startDate             DateTime      @map("start_date")
+  designServiceRequired Boolean       @default(false) @map("design_service_required")
+  adLinkUrl             String        @map("ad_link_url") @db.VarChar(2048)
+  unitPrice             BigInt        @map("unit_price")
+  quantity              Int           @default(1)
+  lineTotal             BigInt        @map("line_total")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  order     AdOrder          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  package   AdPackage        @relation(fields: [packageId], references: [id])
+  pricing   AdPackagePricing @relation(fields: [pricingId], references: [id])
+  assets    AdOrderAsset[]
+  activeAds ActiveAd[]
+
+  @@unique([orderId, pricingId])
+  @@map("ad_order_items")
+}
+
+model AdOrderAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderItemId String   @map("order_item_id") @db.Uuid
+  assetType   String   @map("asset_type") @db.VarChar(50)
+  fileUrl     String?  @map("file_url") @db.VarChar(500)
+  fileSizeKb  Int?     @map("file_size_kb")
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  orderItem AdOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@map("ad_order_assets")
+}
+
+model ActiveAd {
+  id           String        @id @default(uuid()) @db.Uuid
+  companyId    String        @map("company_id") @db.Uuid
+  orderId      String?       @map("order_id") @db.Uuid
+  orderItemId  String?       @map("order_item_id") @db.Uuid
+  pricingId    String        @map("pricing_id") @db.Uuid
+  packageType  AdPackageType @map("package_type")
+  pricingModel PricingModel  @map("pricing_model")
+  adLinkUrl    String?       @map("ad_link_url") @db.VarChar(2048)
+
+  // Duration-based fields
+  startDate DateTime  @map("start_date")
+  endDate   DateTime? @map("end_date")
+
+  // Action-based fields (for PER_ACTION model)
+  totalQuantity Int? @map("total_quantity")
+  usedQuantity  Int  @default(0) @map("used_quantity")
+
+  // Status
+  isActive    Boolean   @default(true) @map("is_active")
+  completedAt DateTime? @map("completed_at")
+
+  // Approval tracking
+  approvedBy String   @map("approved_by") @db.Uuid
+  approvedAt DateTime @default(now()) @map("approved_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  company   Company     @relation(fields: [companyId], references: [id])
+  order     AdOrder?    @relation(fields: [orderId], references: [id])
+  orderItem AdOrderItem? @relation(fields: [orderItemId], references: [id])
+  pricing   AdPackagePricing @relation(fields: [pricingId], references: [id])
+  assets    ActiveAdAsset[]
+
+  @@index([companyId, packageType], map: "idx_active_ads_company_type")
+  @@index([startDate, endDate, isActive], map: "idx_active_ads_dates")
+  @@index([pricingModel, isActive], map: "idx_active_ads_model")
+  @@index([pricingId, isActive], map: "idx_active_ads_pricing_active")
+  @@map("active_ads")
+}
+
+model ActiveAdAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  activeAdId String   @map("active_ad_id") @db.Uuid
+  assetType  String   @map("asset_type") @db.VarChar(50)
+  fileUrl    String?  @map("file_url") @db.VarChar(500)
+  fileSizeKb Int?     @map("file_size_kb")
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  activeAd ActiveAd @relation(fields: [activeAdId], references: [id], onDelete: Cascade)
+
+  @@index([activeAdId], map: "idx_active_ad_assets_active_ad")
+  @@map("active_ad_assets")
 }

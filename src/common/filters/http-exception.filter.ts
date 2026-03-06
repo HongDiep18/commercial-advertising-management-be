@@ -1,7 +1,7 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
+  Catch,
+  ExceptionFilter,
   HttpException,
   HttpStatus,
   Logger,
@@ -22,11 +22,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      message =
-        typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : (exceptionResponse as { message?: string | string[] }).message ||
-            exceptionResponse;
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else {
+        const responseObj = exceptionResponse as {
+          message?: string | string[];
+          code?: string;
+          [key: string]: unknown;
+        };
+        if (responseObj.code) {
+          return response.status(status).json({
+            statusCode: status,
+            code: responseObj.code,
+            message: responseObj.message || 'An error occurred',
+            timestamp: new Date().toISOString(),
+          });
+        }
+        message = responseObj.message || exceptionResponse;
+      }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
     }

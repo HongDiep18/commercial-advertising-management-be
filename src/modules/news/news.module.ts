@@ -8,7 +8,12 @@ import { NewsSchedulerService } from './news-scheduler.service';
 
 @Module({
   controllers: [NewsController, NewsInternalController],
-  providers: [NewsService, RssCrawlerService, NewsTranslatorService, NewsSchedulerService],
+  providers: [
+    NewsService,
+    RssCrawlerService,
+    NewsTranslatorService,
+    NewsSchedulerService,
+  ],
   exports: [NewsService],
 })
 export class NewsModule {}

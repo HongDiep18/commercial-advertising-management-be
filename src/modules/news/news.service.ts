@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma.service';
-import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { NewsArticleStatus, Prisma } from '@prisma/client';
+import { PaginatedResult } from '../../common/dto/pagination.dto';
+import { PrismaService } from '../../database/prisma.service';
 
 const isNotFound = (e: unknown) =>
-  e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025';
+  e instanceof Error && 'code' in e && e.code === 'P2025';
 
 type IngestInput = {
   sourceSite: string;
@@ -46,7 +46,13 @@ export class NewsService {
     const urls = [...new Set(normalized.map((a) => a.url))];
     const byUrlExisting = await this.prisma.newsArticle.findMany({
       where: { url: { in: urls } },
-      select: { id: true, url: true, status: true, summaryZhTw: true, summaryVi: true },
+      select: {
+        id: true,
+        url: true,
+        status: true,
+        summaryZhTw: true,
+        summaryVi: true,
+      },
     });
     const existingByUrl = new Map(byUrlExisting.map((a) => [a.url, a]));
 
@@ -55,9 +61,20 @@ export class NewsService {
       guidPairs.length > 0
         ? await this.prisma.newsArticle.findMany({
             where: {
-              OR: guidPairs.map((a) => ({ sourceSite: a.sourceSite, guid: a.guid })),
+              OR: guidPairs.map((a) => ({
+                sourceSite: a.sourceSite,
+                guid: a.guid,
+              })),
             },
-            select: { id: true, url: true, sourceSite: true, guid: true, status: true, summaryZhTw: true, summaryVi: true },
+            select: {
+              id: true,
+              url: true,
+              sourceSite: true,
+              guid: true,
+              status: true,
+              summaryZhTw: true,
+              summaryVi: true,
+            },
           })
         : [];
 
@@ -162,12 +179,16 @@ export class NewsService {
     limit: number,
     filters: { categorySlugs?: string[]; subcategoryIds?: string[] } = {},
   ) {
-    const categorySlugs = filters.categorySlugs?.map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const categorySlugs = filters.categorySlugs
+      ?.map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
     const subcategoryIds = filters.subcategoryIds?.filter(Boolean);
 
     const where: Prisma.NewsArticleWhereInput = {
       status: NewsArticleStatus.PUBLISHED,
-      ...(categorySlugs?.length && { category: { slug: { in: categorySlugs } } }),
+      ...(categorySlugs?.length && {
+        category: { slug: { in: categorySlugs } },
+      }),
       ...(subcategoryIds?.length && { subcategoryId: { in: subcategoryIds } }),
     };
 

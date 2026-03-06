@@ -1,7 +1,10 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
-import { NewsArticleDto, NewsCategoryWithSubsDto } from './dto/news-article.dto';
+import {
+  NewsArticleDto,
+  NewsCategoryWithSubsDto,
+} from './dto/news-article.dto';
 import { ListNewsQueryDto } from './dto/list-news-query.dto';
 import { NewsService } from './news.service';
 
@@ -38,5 +41,4 @@ export class NewsController {
     const article = await this.newsService.getPublishedById(id);
     return NewsArticleDto.fromEntity(article);
   }
-
 }

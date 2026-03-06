@@ -5,7 +5,11 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 function toArray(value: unknown): string[] {
   if (Array.isArray(value)) return value;
-  if (typeof value === 'string') return value.split(',').map((s) => s.trim()).filter(Boolean);
+  if (typeof value === 'string')
+    return value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   return [];
 }
 
@@ -20,7 +24,9 @@ export class ListNewsQueryDto extends PaginationDto {
   @Transform(({ value }) => toArray(value))
   categorySlug?: string[];
 
-  @ApiPropertyOptional({ description: 'Filter by subcategory ID(s), comma-separated UUIDs.' })
+  @ApiPropertyOptional({
+    description: 'Filter by subcategory ID(s), comma-separated UUIDs.',
+  })
   @IsOptional()
   @IsArray()
   @IsUUID('all', { each: true })

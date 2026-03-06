@@ -17,16 +17,36 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: vn-buyer-guide-minio
+    restart: unless-stopped
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: deps
     container_name: vn-buyer-guide-api
     ports:
       - '${APP_PORT_LOCAL}:${APP_PORT}'
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     env_file:
       - .env
@@ -34,6 +54,9 @@ services:
       APP_PORT: ${APP_PORT}
       DB_HOST: postgres
       DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}?schema=public
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: 'false'
     volumes:
       - .:/app
       - /app/node_modules
@@ -70,3 +93,4 @@ services:
 
 volumes:
   pgdata:
+  minio_data:

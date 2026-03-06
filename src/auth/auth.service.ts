@@ -1,34 +1,24 @@
 import {
+  BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
+  CompanyProfileRequestStatus,
   MembershipTier,
+  Prisma,
   PrismaClient,
-  UserProfileRequestStatus,
 } from '@prisma/client';
-import { PrismaService } from '../database/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { Role } from '../common/enums/role.enum';
 import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../common/enums/membership-tier.enum';
+import { Role } from '../common/enums/role.enum';
+import { PrismaService } from '../database/prisma.service';
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-
-type PrismaWithUserProfileRequest = PrismaClient & {
-  userProfileRequest: {
-    findFirst: (args: {
-      where: { email: string; status: string };
-    }) => Promise<{ id: string } | null>;
-    create: (args: {
-      data: Record<string, unknown>;
-    }) => Promise<{ id: string }>;
-  };
-};
 
 export type AuthUser = {
   id: string;
@@ -47,17 +37,15 @@ const PROFILE_SELECT_KEYS = [
   'logoUrl',
   'companyNameVi',
   'companyNameCn',
+  'contactName',
   'phone',
+  'address',
+  'description',
   'taxId',
-  'contactPerson',
-  'contactPhone',
-  'companyAddress',
-  'email',
   'country',
   'region',
   'industry',
   'website',
-  'introduction',
 ] as const;
 
 type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
@@ -72,6 +60,29 @@ function profileSelect(): Record<ProfileField, true> {
   return Object.fromEntries(
     PROFILE_SELECT_KEYS.map((k) => [k, true]),
   ) as Record<ProfileField, true>;
+}
+
+type CompanyProfileSelectResult = {
+  readonly id: string;
+  readonly logoUrl: string | null;
+  readonly companyNameVi: string | null;
+  readonly companyNameCn: string | null;
+  readonly contactName: string;
+  readonly phone: string;
+  readonly industry: string;
+  readonly address: string;
+  readonly description: string;
+  readonly taxId: string | null;
+  readonly country: string | null;
+  readonly region: string | null;
+  readonly website: string | null;
+};
+
+function companyProfileSelect(): { readonly id: true } & Record<
+  ProfileField,
+  true
+> {
+  return { id: true, ...profileSelect() };
 }
 
 @Injectable()
@@ -128,17 +139,8 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const prismaAny = this.prisma as unknown as Record<string, unknown>;
-    const requestDelegate =
-      (prismaAny.userProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']) ??
-      (prismaAny.companyProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']);
-    if (!requestDelegate?.findFirst || !requestDelegate?.create) {
-      throw new InternalServerErrorException(
-        'Prisma client missing userProfileRequest. Run: pnpm prisma generate',
-      );
-    }
-    const existingPending = await requestDelegate.findFirst({
-      where: { email, status: 'PENDING' },
+    const existingPending = await this.prisma.companyProfileRequest.findFirst({
+      where: { email, status: CompanyProfileRequestStatus.PENDING },
     });
     if (existingPending) {
       throw new ConflictException(
@@ -146,36 +148,41 @@ export class AuthService {
       );
     }
 
-    const createData = AuthService.registerDtoToRequestData(data);
-    await requestDelegate.create({
+    const createData = AuthService.toCompanyProfileRequestCreateInput(data);
+    await this.prisma.companyProfileRequest.create({
       data: {
-        email,
         ...createData,
-        status: 'PENDING',
+        email,
+        status: CompanyProfileRequestStatus.PENDING,
       },
     });
     return {
       message: 'Request submitted. We will email you after approval.',
-      status: 'PENDING',
+      status: CompanyProfileRequestStatus.PENDING,
     };
   }
 
-  private static registerDtoToRequestData(data: RegisterDto) {
-    const out: Record<string, unknown> = {};
-    const dataRecord = data as unknown as Record<string, unknown>;
-
-    Object.keys(data).forEach((key) => {
-      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-      const value = dataRecord[key];
-      out[camelKey] = typeof value === 'string' ? value.trim() : value;
-    });
-
+  private static toCompanyProfileRequestCreateInput(
+    data: RegisterDto,
+  ): Omit<Prisma.CompanyProfileRequestCreateInput, 'email' | 'status'> {
+    const membershipTier =
+      (data.membership_tier?.trim() as MembershipTier | undefined) ??
+      DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL;
     return {
-      ...out,
-      membershipTier:
-        (out.membershipTier as MembershipTier) ||
-        DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL,
-      captcha: data.captcha?.trim() ?? null,
+      companyNameVi: data.company_name_vi.trim(),
+      companyNameCn: data.company_name_cn.trim(),
+      phone: data.phone.trim(),
+      taxId: data.tax_id.trim(),
+      contactPerson: data.contact_person.trim(),
+      contactPhone: data.contact_phone?.trim() || data.phone.trim(),
+      companyAddress: data.company_address.trim(),
+      country: data.country.trim(),
+      region: data.region.trim(),
+      industry: data.industry.trim(),
+      website: data.website.trim(),
+      introduction: data.introduction.trim(),
+      captcha: data.captcha.trim(),
+      membershipTier,
     };
   }
 
@@ -190,14 +197,31 @@ export class AuthService {
     Object.keys(data).forEach((key) => {
       if (dataRecord[key] === undefined || skipKeys.has(key)) return;
 
-      const camelKey =
-        key === 'upload_logo'
-          ? 'logoUrl'
-          : key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      let camelKey: string = key.replace(/_([a-z])/g, (g) =>
+        g[1].toUpperCase(),
+      );
+      if (key === 'upload_logo') camelKey = 'logoUrl';
+      if (key === 'contact_person') camelKey = 'contactName';
+      if (key === 'company_address') camelKey = 'address';
+      if (key === 'introduction') camelKey = 'description';
       const raw = dataRecord[key];
       const val = typeof raw === 'string' ? raw.trim() || null : null;
 
       if (key === 'upload_logo' && val === null) return;
+      if (key === 'contact_phone' && out.phone == null) {
+        if (val !== null) out.phone = val;
+        return;
+      }
+      if (
+        (camelKey === 'contactName' ||
+          camelKey === 'phone' ||
+          camelKey === 'industry' ||
+          camelKey === 'address' ||
+          camelKey === 'description') &&
+        val === null
+      ) {
+        return;
+      }
 
       out[camelKey] = val;
     });
@@ -208,20 +232,19 @@ export class AuthService {
   async getProfile(userId: string): Promise<ProfileResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, membershipTier: true },
+      select: {
+        id: true,
+        email: true,
+        membershipTier: true,
+        company: { select: companyProfileSelect() },
+      },
     });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
-    const profile = (await this.prisma.userProfile.findUnique({
-      where: { userId },
-      select: profileSelect(),
-    })) as Record<ProfileField, string | null> | null;
-
-    const { email: _omit, ...profileRest } =
-      profile ?? ({} as Record<ProfileField, string | null>);
-    void _omit;
+    const profileRest = AuthService.mapCompanyToProfileResponse(
+      user.company as CompanyProfileSelectResult | null,
+    );
     return {
       id: user.id,
       email: user.email,
@@ -236,7 +259,12 @@ export class AuthService {
   ): Promise<ProfileResponse> {
     let user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, membershipTier: true },
+      select: {
+        id: true,
+        email: true,
+        membershipTier: true,
+        companyId: true,
+      },
     });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -253,7 +281,12 @@ export class AuthService {
       user = await this.prisma.user.update({
         where: { id: userId },
         data: { email: newEmail },
-        select: { id: true, email: true, membershipTier: true },
+        select: {
+          id: true,
+          email: true,
+          membershipTier: true,
+          companyId: true,
+        },
       });
     }
 
@@ -262,47 +295,159 @@ export class AuthService {
       user = await this.prisma.user.update({
         where: { id: userId },
         data: { membershipTier: tier },
-        select: { id: true, email: true, membershipTier: true },
+        select: {
+          id: true,
+          email: true,
+          membershipTier: true,
+          companyId: true,
+        },
       });
     }
 
     const profileData = AuthService.dtoToProfileData(data);
-    const select = profileSelect();
-
-    const profile: Record<ProfileField, string | null> | null =
-      Object.keys(profileData).length > 0
-        ? ((await this.prisma.userProfile.upsert({
-            where: { userId },
-            create: { userId, ...profileData },
-            update: profileData,
-            select,
-          })) as Record<ProfileField, string | null>)
-        : ((await this.prisma.userProfile.findUnique({
-            where: { userId },
-            select,
-          })) as Record<ProfileField, string | null> | null);
-
-    const { email: _omit, ...profileRest } =
-      profile ?? ({} as Record<ProfileField, string | null>);
-    void _omit;
+    const companyProfile = await this.saveCompanyProfile({
+      userId,
+      userEmail: user.email,
+      companyId: user.companyId,
+      profileData,
+    });
     return {
       id: user.id,
       email: user.email,
       membershipTier: user.membershipTier,
-      ...profileRest,
+      ...companyProfile,
     };
   }
 
   async getAllProfileRequests(status?: string) {
-    const validStatuses = Object.values(UserProfileRequestStatus) as string[];
+    const validStatuses = Object.values(
+      CompanyProfileRequestStatus,
+    ) as string[];
     const where =
       status && validStatuses.includes(status)
-        ? { status: status as UserProfileRequestStatus }
+        ? { status: status as CompanyProfileRequestStatus }
         : undefined;
 
-    return this.prisma.userProfileRequest.findMany({
+    return this.prisma.companyProfileRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  private async saveCompanyProfile(input: {
+    readonly userId: string;
+    readonly userEmail: string;
+    readonly companyId: string | null;
+    readonly profileData: Record<string, string | null>;
+  }): Promise<Partial<Record<ProfileField, string | null>>> {
+    const { profileData } = input;
+    if (Object.keys(profileData).length === 0) {
+      if (!input.companyId) return {};
+      const company = await this.prisma.company.findUnique({
+        where: { id: input.companyId },
+        select: companyProfileSelect(),
+      });
+      return AuthService.mapCompanyToProfileResponse(
+        company as CompanyProfileSelectResult | null,
+      );
+    }
+    const updateData = AuthService.toCompanyUpdateData(profileData);
+    if (input.companyId) {
+      const company = await this.prisma.company.update({
+        where: { id: input.companyId },
+        data: updateData,
+        select: companyProfileSelect(),
+      });
+      return AuthService.mapCompanyToProfileResponse(
+        company as unknown as CompanyProfileSelectResult,
+      );
+    }
+    const createData = AuthService.toCompanyCreateData({
+      userEmail: input.userEmail,
+      updateData,
+    });
+    const company = await this.prisma.company.create({
+      data: createData,
+      select: companyProfileSelect(),
+    });
+    await this.prisma.user.update({
+      where: { id: input.userId },
+      data: { companyId: company.id },
+      select: { id: true },
+    });
+    return AuthService.mapCompanyToProfileResponse(
+      company as unknown as CompanyProfileSelectResult,
+    );
+  }
+
+  private static toCompanyUpdateData(
+    profileData: Record<string, string | null>,
+  ): Prisma.CompanyUpdateInput {
+    const allowedKeys: ReadonlySet<string> = new Set(PROFILE_SELECT_KEYS);
+    const out: Record<string, string | null> = {};
+    Object.entries(profileData).forEach(([key, value]) => {
+      if (!allowedKeys.has(key)) return;
+      if (value === null) return;
+      out[key] = value;
+    });
+    return out as Prisma.CompanyUpdateInput;
+  }
+
+  private static toCompanyCreateData(input: {
+    readonly userEmail: string;
+    readonly updateData: Prisma.CompanyUpdateInput;
+  }): Prisma.CompanyCreateInput {
+    const requiredKeys = [
+      'contactName',
+      'phone',
+      'industry',
+      'address',
+      'description',
+    ] as const;
+    const updateData = input.updateData as Record<string, unknown>;
+    const missing = requiredKeys.filter((k) => {
+      const v = updateData[k];
+      return typeof v !== 'string' || v.trim() === '';
+    });
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Cannot create company profile; missing required fields: ${missing.join(', ')}`,
+      );
+    }
+    return {
+      email: input.userEmail.trim().toLowerCase(),
+      contactName: updateData.contactName as string,
+      phone: updateData.phone as string,
+      industry: updateData.industry as string,
+      address: updateData.address as string,
+      description: updateData.description as string,
+      logoUrl: (updateData.logoUrl as string | undefined) ?? null,
+      companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
+      companyNameCn: (updateData.companyNameCn as string | undefined) ?? null,
+      taxId: (updateData.taxId as string | undefined) ?? null,
+      country: (updateData.country as string | undefined) ?? null,
+      region: (updateData.region as string | undefined) ?? null,
+      website: (updateData.website as string | undefined) ?? null,
+    };
+  }
+
+  private static mapCompanyToProfileResponse(
+    company: CompanyProfileSelectResult | null,
+  ): Partial<Record<ProfileField, string | null>> {
+    if (!company) return {};
+    return {
+      logoUrl: company.logoUrl,
+      companyNameVi: company.companyNameVi,
+      companyNameCn: company.companyNameCn,
+      contactName: company.contactName,
+      phone: company.phone,
+      address: company.address,
+      description: company.description,
+      taxId: company.taxId,
+      country: company.country,
+      region: company.region,
+      industry: company.industry,
+      website: company.website,
+    };
   }
 }

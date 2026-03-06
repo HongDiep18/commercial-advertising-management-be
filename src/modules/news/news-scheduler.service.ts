@@ -18,13 +18,21 @@ export class NewsSchedulerService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    const enabled = this.configService.get<boolean>('news.scheduleEnabled', true);
+    const enabled = this.configService.get<boolean>(
+      'news.scheduleEnabled',
+      true,
+    );
     if (!enabled) {
-      this.logger.log('News pipeline scheduler is disabled (NEWS_SCHEDULE_ENABLED=false)');
+      this.logger.log(
+        'News pipeline scheduler is disabled (NEWS_SCHEDULE_ENABLED=false)',
+      );
       return;
     }
 
-    const cronExpr = this.configService.get<string>('news.cron', '0 */15 * * * *');
+    const cronExpr = this.configService.get<string>(
+      'news.cron',
+      '0 */15 * * * *',
+    );
     const job = new CronJob(cronExpr, () => void this.runPipeline());
     this.schedulerRegistry.addCronJob('news-pipeline', job);
     job.start();
@@ -44,9 +52,14 @@ export class NewsSchedulerService implements OnModuleInit {
     try {
       this.logger.log('News pipeline started');
       const crawlResult = await this.crawlerService.crawlAll();
-      this.logger.log(`Crawl: created=${crawlResult.created} updated=${crawlResult.updated} skipped=${crawlResult.skipped}`);
-      const translateResult = await this.translatorService.translatePendingArticles();
-      this.logger.log(`Translate: processed=${translateResult.processed} failed=${translateResult.failed}`);
+      this.logger.log(
+        `Crawl: created=${crawlResult.created} updated=${crawlResult.updated} skipped=${crawlResult.skipped}`,
+      );
+      const translateResult =
+        await this.translatorService.translatePendingArticles();
+      this.logger.log(
+        `Translate: processed=${translateResult.processed} failed=${translateResult.failed}`,
+      );
       return { crawlResult, translateResult };
     } finally {
       this.isRunning = false;

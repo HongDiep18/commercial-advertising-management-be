@@ -1,20 +1,31 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
-import { appConfig, databaseConfig, jwtConfig, newsConfig } from './config';
-import { DatabaseModule } from './database/database.module';
-import { HealthModule } from './modules/health/health.module';
-import { NewsModule } from './modules/news/news.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import {
+  appConfig,
+  databaseConfig,
+  jwtConfig,
+  newsConfig,
+  storageConfig,
+} from './config';
+import { DatabaseModule } from './database/database.module';
+import { ActiveAdsModule } from './modules/active-ads/active-ads.module';
+import { AdOrdersModule } from './modules/ad-orders/ad-orders.module';
+import { AdsModule } from './modules/ads/ads.module';
+import { CompaniesModule } from './modules/companies/companies.module';
+import { FileUploadModule } from './modules/file-upload/file-upload.module';
+import { HealthModule } from './modules/health/health.module';
+import { NewsModule } from './modules/news/news.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, newsConfig],
+      load: [appConfig, databaseConfig, jwtConfig, newsConfig, storageConfig],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
@@ -27,6 +38,11 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     AuthModule,
     HealthModule,
     NewsModule,
+    AdsModule,
+    AdOrdersModule,
+    CompaniesModule,
+    FileUploadModule,
+    ActiveAdsModule,
   ],
   providers: [
     {

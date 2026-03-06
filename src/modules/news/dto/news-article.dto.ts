@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NewsArticleStatus, Prisma } from '@prisma/client';
 
-const FALLBACK_THUMBNAIL = 'https://about.fb.com/wp-content/uploads/2024/02/Facebook-News-Update_US_AU_Header.jpg?fit=1920%2C1080';
+const FALLBACK_THUMBNAIL =
+  'https://about.fb.com/wp-content/uploads/2024/02/Facebook-News-Update_US_AU_Header.jpg?fit=1920%2C1080';
 
 type ArticleWithRelations = Prisma.NewsArticleGetPayload<{
   include: { category: true; subcategory: true };
@@ -29,7 +30,8 @@ export class NewsCategoryWithSubsDto {
   @ApiProperty() nameVi: string;
   @ApiProperty() nameZhTw: string;
   @ApiProperty() nameEn: string;
-  @ApiProperty({ type: [NewsSubcategoryDto] }) subcategories: NewsSubcategoryDto[];
+  @ApiProperty({ type: [NewsSubcategoryDto] })
+  subcategories: NewsSubcategoryDto[];
 }
 
 export class NewsArticleDto {

@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { MembershipTier, PrismaClient } from '@prisma/client';
+import {
+  MembershipTier,
+  PrismaClient,
+  UserProfileRequestStatus,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../common/enums/role.enum';
@@ -287,5 +291,18 @@ export class AuthService {
       membershipTier: user.membershipTier,
       ...profileRest,
     };
+  }
+
+  async getAllProfileRequests(status?: string) {
+    const validStatuses = Object.values(UserProfileRequestStatus) as string[];
+    const where =
+      status && validStatuses.includes(status)
+        ? { status: status as UserProfileRequestStatus }
+        : undefined;
+
+    return this.prisma.userProfileRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

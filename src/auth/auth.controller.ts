@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -55,5 +55,15 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(userId, updateProfileDto);
+  }
+
+  @Get('all-profile-requests')
+  @ApiOperation({
+    summary: 'Get all profile requests (optional filter by status)',
+  })
+  @ApiResponse({ status: 200, description: 'Returns user profile requests' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getAllProfileRequests(@Query('status') status?: string) {
+    return this.authService.getAllProfileRequests(status);
   }
 }

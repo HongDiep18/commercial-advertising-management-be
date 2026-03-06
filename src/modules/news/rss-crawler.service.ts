@@ -46,7 +46,9 @@ export class RssCrawlerService implements OnModuleInit {
   private async refreshCache() {
     const [categories, subcategories] = await Promise.all([
       this.prisma.newsCategory.findMany({ select: { id: true, slug: true } }),
-      this.prisma.newsSubcategory.findMany({ select: { id: true, slug: true } }),
+      this.prisma.newsSubcategory.findMany({
+        select: { id: true, slug: true },
+      }),
     ]);
     this.categoryCache = new Map(categories.map((c) => [c.slug, c.id]));
     this.subcategoryCache = new Map(subcategories.map((s) => [s.slug, s.id]));
@@ -55,7 +57,11 @@ export class RssCrawlerService implements OnModuleInit {
     );
   }
 
-  async crawlAll(): Promise<{ created: number; updated: number; skipped: number }> {
+  async crawlAll(): Promise<{
+    created: number;
+    updated: number;
+    skipped: number;
+  }> {
     await this.refreshCache();
     const sources = this.configService.get<RssSource[]>('news.sources', []);
     let created = 0;
@@ -72,7 +78,9 @@ export class RssCrawlerService implements OnModuleInit {
         skipped += result.skipped;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.error(`Feed failed [${source.name} ${source.feedUrl}]: ${msg}`);
+        this.logger.error(
+          `Feed failed [${source.name} ${source.feedUrl}]: ${msg}`,
+        );
       }
     }
 

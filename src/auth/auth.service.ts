@@ -2,23 +2,29 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { MembershipTier, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../common/enums/role.enum';
 import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../common/enums/membership-tier.enum';
 import type { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
-interface PrismaWithCompanyProfileRequest {
-  companyProfileRequest: {
+type PrismaWithUserProfileRequest = PrismaClient & {
+  userProfileRequest: {
     findFirst: (args: {
       where: { email: string; status: string };
-    }) => Promise<unknown>;
-    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+    }) => Promise<{ id: string } | null>;
+    create: (args: {
+      data: Record<string, unknown>;
+    }) => Promise<{ id: string }>;
   };
-}
+};
 
 export type AuthUser = {
   id: string;
@@ -26,8 +32,6 @@ export type AuthUser = {
   password: string;
   role: string;
   isActive: boolean;
-  firstName: string | null;
-  lastName: string | null;
 };
 
 export type LoginResult = {
@@ -35,10 +39,41 @@ export type LoginResult = {
   user: { id: string; email: string; role: Role };
 };
 
+const PROFILE_SELECT_KEYS = [
+  'logoUrl',
+  'companyNameVi',
+  'companyNameCn',
+  'phone',
+  'taxId',
+  'contactPerson',
+  'contactPhone',
+  'companyAddress',
+  'email',
+  'country',
+  'region',
+  'industry',
+  'website',
+  'introduction',
+] as const;
+
+type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
+
+export type ProfileResponse = {
+  id: string;
+  email: string;
+  membershipTier: string;
+} & Partial<Record<ProfileField, string | null>>;
+
+function profileSelect(): Record<ProfileField, true> {
+  return Object.fromEntries(
+    PROFILE_SELECT_KEYS.map((k) => [k, true]),
+  ) as Record<ProfileField, true>;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(PrismaService) private readonly prisma: PrismaClient,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -46,14 +81,7 @@ export class AuthService {
     email: string,
     password: string,
   ): Promise<AuthUser | null> {
-    const prismaWithUser = this.prisma as unknown as {
-      user: {
-        findUnique: (args: {
-          where: { email: string };
-        }) => Promise<AuthUser | null>;
-      };
-    };
-    const user = await prismaWithUser.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
     });
     if (!user) return null;
@@ -89,28 +117,23 @@ export class AuthService {
     status: string;
   }> {
     const email = data.email.trim().toLowerCase();
-    const prismaWithUser = this.prisma as unknown as {
-      user: {
-        findUnique: (args: {
-          where: { email: string };
-        }) => Promise<AuthUser | null>;
-      };
-    };
-
-    const existingUser = await prismaWithUser.user.findUnique({
+    const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
-    const prisma = this.prisma as unknown as PrismaWithCompanyProfileRequest;
-    if (!prisma.companyProfileRequest) {
+
+    const prismaAny = this.prisma as unknown as Record<string, unknown>;
+    const requestDelegate =
+      (prismaAny.userProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']) ??
+      (prismaAny.companyProfileRequest as PrismaWithUserProfileRequest['userProfileRequest']);
+    if (!requestDelegate?.findFirst || !requestDelegate?.create) {
       throw new InternalServerErrorException(
-        'Prisma client missing companyProfileRequest. Run: npx prisma generate, then rebuild and restart.',
+        'Prisma client missing userProfileRequest. Run: pnpm prisma generate',
       );
     }
-
-    const existingPending = await prisma.companyProfileRequest.findFirst({
+    const existingPending = await requestDelegate.findFirst({
       where: { email, status: 'PENDING' },
     });
     if (existingPending) {
@@ -119,31 +142,150 @@ export class AuthService {
       );
     }
 
-    await prisma.companyProfileRequest.create({
+    const createData = AuthService.registerDtoToRequestData(data);
+    await requestDelegate.create({
       data: {
         email,
-        company_name_vi: data.company_name_vi.trim(),
-        company_name_cn: data.company_name_cn.trim(),
-        phone: data.phone.trim(),
-        tax_id: data.tax_id.trim(),
-        contact_person: data.contact_person.trim(),
-        contact_phone: data.contact_phone.trim(),
-        company_address: data.company_address.trim(),
-        country: data.country.trim(),
-        region: data.region.trim(),
-        industry: data.industry.trim(),
-        website: data.website.trim(),
-        introduction: data.introduction.trim(),
-        captcha: data.captcha?.trim() ?? null,
-        membership_level:
-          data.membership_level?.trim() ||
-          DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL,
+        ...createData,
         status: 'PENDING',
       },
     });
     return {
       message: 'Request submitted. We will email you after approval.',
       status: 'PENDING',
+    };
+  }
+
+  private static registerDtoToRequestData(data: RegisterDto) {
+    const out: Record<string, unknown> = {};
+    const dataRecord = data as unknown as Record<string, unknown>;
+
+    Object.keys(data).forEach((key) => {
+      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      const value = dataRecord[key];
+      out[camelKey] = typeof value === 'string' ? value.trim() : value;
+    });
+
+    return {
+      ...out,
+      membershipTier:
+        (out.membershipTier as MembershipTier) ||
+        DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL,
+      captcha: data.captcha?.trim() ?? null,
+    };
+  }
+
+  private static dtoToProfileData(
+    data: UpdateProfileDto,
+  ): Record<string, string | null> {
+    const out: Record<string, string | null> = {};
+    const dataRecord = data as unknown as Record<string, unknown>;
+
+    const skipKeys = new Set(['membership_tier', 'captcha']);
+
+    Object.keys(data).forEach((key) => {
+      if (dataRecord[key] === undefined || skipKeys.has(key)) return;
+
+      const camelKey =
+        key === 'upload_logo'
+          ? 'logoUrl'
+          : key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      const raw = dataRecord[key];
+      const val = typeof raw === 'string' ? raw.trim() || null : null;
+
+      if (key === 'upload_logo' && val === null) return;
+
+      out[camelKey] = val;
+    });
+
+    return out;
+  }
+
+  async getProfile(userId: string): Promise<ProfileResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, membershipTier: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const profile = (await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: profileSelect(),
+    })) as Record<ProfileField, string | null> | null;
+
+    const { email: _omit, ...profileRest } =
+      profile ?? ({} as Record<ProfileField, string | null>);
+    void _omit;
+    return {
+      id: user.id,
+      email: user.email,
+      membershipTier: user.membershipTier,
+      ...profileRest,
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    data: UpdateProfileDto,
+  ): Promise<ProfileResponse> {
+    let user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, membershipTier: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (data.email !== undefined && data.email.trim()) {
+      const newEmail = data.email.trim().toLowerCase();
+      const existing = await this.prisma.user.findFirst({
+        where: { email: newEmail, id: { not: userId } },
+      });
+      if (existing) {
+        throw new ConflictException('Email already in use');
+      }
+      user = await this.prisma.user.update({
+        where: { id: userId },
+        data: { email: newEmail },
+        select: { id: true, email: true, membershipTier: true },
+      });
+    }
+
+    if (data.membership_tier !== undefined && data.membership_tier.trim()) {
+      const tier = data.membership_tier.trim() as MembershipTier;
+      user = await this.prisma.user.update({
+        where: { id: userId },
+        data: { membershipTier: tier },
+        select: { id: true, email: true, membershipTier: true },
+      });
+    }
+
+    const profileData = AuthService.dtoToProfileData(data);
+    const select = profileSelect();
+
+    const profile: Record<ProfileField, string | null> | null =
+      Object.keys(profileData).length > 0
+        ? ((await this.prisma.userProfile.upsert({
+            where: { userId },
+            create: { userId, ...profileData },
+            update: profileData,
+            select,
+          })) as Record<ProfileField, string | null>)
+        : ((await this.prisma.userProfile.findUnique({
+            where: { userId },
+            select,
+          })) as Record<ProfileField, string | null> | null);
+
+    const { email: _omit, ...profileRest } =
+      profile ?? ({} as Record<ProfileField, string | null>);
+    void _omit;
+    return {
+      id: user.id,
+      email: user.email,
+      membershipTier: user.membershipTier,
+      ...profileRest,
     };
   }
 }

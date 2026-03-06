@@ -6,8 +6,6 @@ CREATE TABLE "users" (
     "email" VARCHAR(255) NOT NULL,
     "password" VARCHAR(255) NOT NULL,
     "role" VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
-    "firstName" VARCHAR(100),
-    "lastName" VARCHAR(100),
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "membershipTier" VARCHAR(32),
     "loyaltyPoints" INTEGER NOT NULL DEFAULT 0,

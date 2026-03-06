@@ -97,8 +97,8 @@ export class RegisterDto {
   @ValidateIf((_o, v) => v != null && v !== '')
   @IsString()
   @IsIn(REGISTRATION_MEMBERSHIP_LEVELS as unknown as string[], {
-    message: `membership_level must be one of: ${REGISTRATION_MEMBERSHIP_LEVELS.join(', ')}`,
+    message: `membership_tier must be one of: ${REGISTRATION_MEMBERSHIP_LEVELS.join(', ')}`,
   })
   @MaxLength(32)
-  membership_level?: string;
+  membership_tier?: string;
 }

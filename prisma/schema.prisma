@@ -74,9 +74,9 @@ model NewsArticle {
   @@map("news_articles")
 }
 
-// ─── Company profile requests (register form, no password; pending admin approval) ───
+// ─── User request
 
-enum CompanyProfileRequestStatus {
+enum UserProfileRequestStatus {
   PENDING
   APPROVED
   REJECTED
@@ -90,8 +90,7 @@ enum MembershipTier {
   DIAMOND
 }
 
-
-model CompanyProfileRequest {
+model UserProfileRequest {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -112,32 +111,54 @@ model CompanyProfileRequest {
   captcha         String?  @db.VarChar(32)
   membershipTier MembershipTier @default(NONE)
 
-  status CompanyProfileRequestStatus @default(PENDING)
+  status UserProfileRequestStatus @default(PENDING)
 
   @@index([email])
   @@index([status])
-  @@map("company_profile_requests")
+  @@map("user_profile_requests")
 }
 
 // ─── Users & Authentication ──────────────────────────────────────────────
 
+// User = Company
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   email    String  @unique @db.VarChar(255)
-  password String  @db.VarChar(255) 
-  role     String  @default("MEMBER") @db.VarChar(32) 
+  password String  @db.VarChar(255)
+  role     String  @default("MEMBER") @db.VarChar(32)
 
-  firstName String? @db.VarChar(100)
-  lastName  String? @db.VarChar(100)
   isActive  Boolean @default(true)
-
   membershipTier MembershipTier @default(NONE)
   loyaltyPoints  Int     @default(0)
+
+  profile UserProfile?
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logoUrl   String?  @db.VarChar(2048)
+  companyNameVi   String?  @db.VarChar(255)
+  companyNameCn   String?  @db.VarChar(255)
+  phone    String?  @db.VarChar(32)
+  taxId    String?  @db.VarChar(64)
+  contactPerson  String?  @db.VarChar(255)
+  contactPhone   String?  @db.VarChar(32)
+  companyAddress String?  @db.VarChar(512)
+  email    String?  @db.VarChar(255)
+  country  String?  @db.VarChar(128)
+  region   String?  @db.VarChar(128)
+  industry String?  @db.VarChar(128)
+  website  String?  @db.VarChar(2048)
+  introduction String? @db.Text
+
+  @@map("user_profiles")
 }

@@ -1,4 +1,3 @@
-import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -6,12 +5,28 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Role } from '../common/enums';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateProfileRequestStatusDto } from './dto/update-profile-request-status.dto';
 
 @ApiTags('Auth')
 @ApiBearerAuth()
@@ -65,7 +80,23 @@ export class AuthController {
     return this.authService.updateProfile(userId, updateProfileDto);
   }
 
+  @Patch('profile-requests/:id/status')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update a profile request status' })
+  @ApiResponse({ status: 200, description: 'Profile request updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Profile request not found' })
+  updateProfileRequestStatus(
+    @Param('id') id: string,
+    @Body() body: UpdateProfileRequestStatusDto,
+  ) {
+    return this.authService.updateProfileRequestStatus(id, body.status);
+  }
+
   @Get('all-profile-requests')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get all profile requests (optional filter by status)',
   })

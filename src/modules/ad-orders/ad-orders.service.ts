@@ -451,7 +451,7 @@ export class AdOrdersService {
             companyNameVi: true,
             companyNameCn: true,
             email: true,
-            contactName: true,
+            contactPerson: true,
             phone: true,
           },
         },
@@ -497,7 +497,7 @@ export class AdOrdersService {
             nameVi: order.company.companyNameVi,
             nameCn: order.company.companyNameCn,
             email: order.company.email,
-            contactName: order.company.contactName,
+            contactPerson: order.company.contactPerson ?? '',
             phone: order.company.phone,
           }
         : {
@@ -505,7 +505,7 @@ export class AdOrdersService {
             nameVi: '',
             nameCn: '',
             email: '',
-            contactName: '',
+            contactPerson: '',
             phone: '',
           },
       items: order.items.map((item) => ({

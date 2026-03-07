@@ -198,10 +198,9 @@ enum AdOrderStatus {
 }
 
 model Company {
-  id          String   @id @default(uuid()) @db.Uuid
-  email       String   @unique @db.VarChar(255)
-  contactName String   @map("contact_name") @db.VarChar(255)
-  phone       String   @db.VarChar(50)
+  id     String   @id @default(uuid()) @db.Uuid
+  email  String   @unique @db.VarChar(255)
+  phone  String   @db.VarChar(50)
   industry    String   @db.VarChar(255)
   address     String   @db.VarChar(255)
   description String   @db.Text
@@ -215,6 +214,8 @@ model Company {
   country        String? @db.VarChar(128)
   region         String? @db.VarChar(128)
   website        String? @db.VarChar(2048)
+  contactPerson  String? @map("contact_person") @db.VarChar(255)
+  contactPhone   String? @map("contact_phone") @db.VarChar(32)
 
   users     User[]
   adOrders  AdOrder[]

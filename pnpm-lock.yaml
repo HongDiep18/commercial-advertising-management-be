@@ -59,6 +59,9 @@ importers:
       he:
         specifier: ^1.2.0
         version: 1.2.0
+      minimo:
+        specifier: ^0.0.6
+        version: 0.0.6
       minio:
         specifier: ^8.0.7
         version: 8.0.7
@@ -2836,6 +2839,9 @@ packages:
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
+
+  minimo@0.0.6:
+    resolution: {integrity: sha512-KMaV0DtuWVVJQ9vScOd0iv3CWMtrRZmAaIGzhzgB8LIh3ojq44X0mRHDpuYvhd8P5dqeiw593Y4CA9HZnLXRuQ==}
 
   minio@8.0.7:
     resolution: {integrity: sha512-E737MgufW8CeQAsTAtnEMrxZ9scMSf29kkhZoXzDTKj/Jszzo2SfeZUH9wbDQH2Rsq6TCtl/yQL0+XdVKZansQ==}
@@ -6889,6 +6895,8 @@ snapshots:
       brace-expansion: 2.0.2
 
   minimist@1.2.8: {}
+
+  minimo@0.0.6: {}
 
   minio@8.0.7:
     dependencies:

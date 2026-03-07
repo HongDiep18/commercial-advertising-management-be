@@ -37,7 +37,6 @@ const PROFILE_SELECT_KEYS = [
   'logoUrl',
   'companyNameVi',
   'companyNameCn',
-  'contactName',
   'phone',
   'address',
   'description',
@@ -46,6 +45,8 @@ const PROFILE_SELECT_KEYS = [
   'region',
   'industry',
   'website',
+  'contactPerson',
+  'contactPhone',
 ] as const;
 
 type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
@@ -67,7 +68,6 @@ type CompanyProfileSelectResult = {
   readonly logoUrl: string | null;
   readonly companyNameVi: string | null;
   readonly companyNameCn: string | null;
-  readonly contactName: string;
   readonly phone: string;
   readonly industry: string;
   readonly address: string;
@@ -76,6 +76,8 @@ type CompanyProfileSelectResult = {
   readonly country: string | null;
   readonly region: string | null;
   readonly website: string | null;
+  readonly contactPerson: string | null;
+  readonly contactPhone: string | null;
 };
 
 function companyProfileSelect(): { readonly id: true } & Record<
@@ -201,20 +203,16 @@ export class AuthService {
         g[1].toUpperCase(),
       );
       if (key === 'upload_logo') camelKey = 'logoUrl';
-      if (key === 'contact_person') camelKey = 'contactName';
+      if (key === 'contact_person') camelKey = 'contactPerson';
+      if (key === 'contact_phone') camelKey = 'contactPhone';
       if (key === 'company_address') camelKey = 'address';
       if (key === 'introduction') camelKey = 'description';
       const raw = dataRecord[key];
       const val = typeof raw === 'string' ? raw.trim() || null : null;
 
       if (key === 'upload_logo' && val === null) return;
-      if (key === 'contact_phone' && out.phone == null) {
-        if (val !== null) out.phone = val;
-        return;
-      }
       if (
-        (camelKey === 'contactName' ||
-          camelKey === 'phone' ||
+        (camelKey === 'phone' ||
           camelKey === 'industry' ||
           camelKey === 'address' ||
           camelKey === 'description') &&
@@ -322,12 +320,11 @@ export class AuthService {
   async getAllProfileRequests(status?: string) {
     const validStatuses = Object.values(
       CompanyProfileRequestStatus,
-    ) as string[];
+    ) as readonly string[];
     const where =
       status && validStatuses.includes(status)
         ? { status: status as CompanyProfileRequestStatus }
         : undefined;
-
     return this.prisma.companyProfileRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -398,7 +395,7 @@ export class AuthService {
     readonly updateData: Prisma.CompanyUpdateInput;
   }): Prisma.CompanyCreateInput {
     const requiredKeys = [
-      'contactName',
+      'contactPerson',
       'phone',
       'industry',
       'address',
@@ -416,11 +413,12 @@ export class AuthService {
     }
     return {
       email: input.userEmail.trim().toLowerCase(),
-      contactName: updateData.contactName as string,
       phone: updateData.phone as string,
       industry: updateData.industry as string,
       address: updateData.address as string,
       description: updateData.description as string,
+      contactPerson: (updateData.contactPerson as string | undefined) ?? null,
+      contactPhone: (updateData.contactPhone as string | undefined) ?? null,
       logoUrl: (updateData.logoUrl as string | undefined) ?? null,
       companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
       companyNameCn: (updateData.companyNameCn as string | undefined) ?? null,
@@ -428,7 +426,7 @@ export class AuthService {
       country: (updateData.country as string | undefined) ?? null,
       region: (updateData.region as string | undefined) ?? null,
       website: (updateData.website as string | undefined) ?? null,
-    };
+    } as Prisma.CompanyCreateInput;
   }
 
   private static mapCompanyToProfileResponse(
@@ -439,7 +437,6 @@ export class AuthService {
       logoUrl: company.logoUrl,
       companyNameVi: company.companyNameVi,
       companyNameCn: company.companyNameCn,
-      contactName: company.contactName,
       phone: company.phone,
       address: company.address,
       description: company.description,
@@ -448,6 +445,25 @@ export class AuthService {
       region: company.region,
       industry: company.industry,
       website: company.website,
+      contactPerson: company.contactPerson,
+      contactPhone: company.contactPhone,
     };
+  }
+
+  async updateProfileRequestStatus(
+    id: string,
+    status: CompanyProfileRequestStatus,
+  ) {
+    const existing = await this.prisma.companyProfileRequest.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Profile request not found');
+    }
+    return this.prisma.companyProfileRequest.update({
+      where: { id },
+      data: { status },
+    });
   }
 }

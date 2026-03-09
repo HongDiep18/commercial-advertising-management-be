@@ -130,7 +130,7 @@ export class AdminOrderDto {
     nameVi: string | null;
     nameCn: string | null;
     email: string;
-    contactPerson: string;
+    contactName: string;
     phone: string;
   };
 

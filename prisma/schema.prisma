@@ -102,7 +102,7 @@ model CompanyProfileRequest {
   companyNameCn  String @db.VarChar(255)
   phone          String @db.VarChar(32)
   taxId          String @db.VarChar(64)
-  contactPerson  String @db.VarChar(255)
+  contactName    String @map("contact_name") @db.VarChar(255)
   contactPhone   String @db.VarChar(32)
   companyAddress String @db.VarChar(512)
   country        String @db.VarChar(128)
@@ -216,7 +216,7 @@ model Company {
   country        String? @db.VarChar(128)
   region         String? @db.VarChar(128)
   website        String? @db.VarChar(2048)
-  contactPerson  String? @map("contact_person") @db.VarChar(255)
+  contactName    String? @map("contact_name") @db.VarChar(255)
   contactPhone   String? @map("contact_phone") @db.VarChar(32)
 
   users     User[]

@@ -23,7 +23,7 @@ export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  contactPerson: string;
+  contactName: string;
 
   @ApiProperty({
     description: 'Company phone number',

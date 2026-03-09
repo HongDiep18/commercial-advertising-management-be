@@ -400,7 +400,7 @@ async function main() {
       companyNameCn: '越南青銅有限公司',
       phone: '+84 28 1234 5001',
       taxId: '0123456789',
-      contactPerson: 'Nguyễn Văn Bronze',
+      contactName: 'Nguyễn Văn Bronze',
       address: '123 Đường Bronze, Quận 1, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
@@ -418,7 +418,7 @@ async function main() {
       companyNameCn: '銀業股份有限公司',
       phone: '+84 28 1234 5002',
       taxId: '0123456790',
-      contactPerson: 'Trần Thị Silver',
+      contactName: 'Trần Thị Silver',
       address: '456 Đường Silver, Quận 3, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
@@ -436,7 +436,7 @@ async function main() {
       companyNameCn: '金業集團',
       phone: '+84 28 1234 5003',
       taxId: '0123456791',
-      contactPerson: 'Lê Văn Gold',
+      contactName: 'Lê Văn Gold',
       address: '789 Đường Gold, Quận 7, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
@@ -454,7 +454,7 @@ async function main() {
       companyNameCn: '鑽石全球有限公司',
       phone: '+84 28 1234 5004',
       taxId: '0123456792',
-      contactPerson: 'Phạm Thị Diamond',
+      contactName: 'Phạm Thị Diamond',
       address: '100 Đường Diamond, Quận 2, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
@@ -478,7 +478,7 @@ async function main() {
     const company = await prisma.company.upsert({
       where: { email: u.companyEmail },
       update: {
-        contactPerson: u.contactPerson,
+        contactName: u.contactName,
         phone: u.phone,
         industry: u.industry,
         address: u.address,
@@ -492,7 +492,7 @@ async function main() {
       },
       create: {
         email: u.companyEmail,
-        contactPerson: u.contactPerson,
+        contactName: u.contactName,
         phone: u.phone,
         industry: u.industry,
         address: u.address,
@@ -531,7 +531,7 @@ async function seedDefaultCompany(): Promise<string> {
   const company = await prisma.company.upsert({
     where: { email: companyEmail },
     update: {
-      contactPerson: 'Corporate Communications',
+      contactName: 'Corporate Communications',
       phone: '+86-571-8502-2088',
       industry: 'E-commerce and Technology',
       address:
@@ -546,7 +546,7 @@ async function seedDefaultCompany(): Promise<string> {
     },
     create: {
       email: companyEmail,
-      contactPerson: 'Corporate Communications',
+      contactName: 'Corporate Communications',
       phone: '+86-571-8502-2088',
       industry: 'E-commerce and Technology',
       address:

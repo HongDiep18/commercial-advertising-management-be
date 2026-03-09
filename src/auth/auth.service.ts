@@ -48,7 +48,7 @@ const PROFILE_SELECT_KEYS = [
   'region',
   'industry',
   'website',
-  'contactPerson',
+  'contactName',
   'contactPhone',
 ] as const;
 
@@ -79,7 +79,7 @@ type CompanyProfileSelectResult = {
   readonly country: string | null;
   readonly region: string | null;
   readonly website: string | null;
-  readonly contactPerson: string | null;
+  readonly contactName: string | null;
   readonly contactPhone: string | null;
 };
 
@@ -99,7 +99,7 @@ type ProfileRequestForCompany = Pick<
   | 'companyNameCn'
   | 'phone'
   | 'taxId'
-  | 'contactPerson'
+  | 'contactName'
   | 'contactPhone'
   | 'companyAddress'
   | 'country'
@@ -199,7 +199,7 @@ export class AuthService {
       companyNameCn: data.company_name_cn.trim(),
       phone: data.phone.trim(),
       taxId: data.tax_id.trim(),
-      contactPerson: data.contact_person.trim(),
+      contactName: data.contact_person.trim(),
       contactPhone: data.contact_phone?.trim() || data.phone.trim(),
       companyAddress: data.company_address.trim(),
       country: data.country.trim(),
@@ -227,7 +227,7 @@ export class AuthService {
         g[1].toUpperCase(),
       );
       if (key === 'upload_logo') camelKey = 'logoUrl';
-      if (key === 'contact_person') camelKey = 'contactPerson';
+      if (key === 'contact_person') camelKey = 'contactName';
       if (key === 'contact_phone') camelKey = 'contactPhone';
       if (key === 'company_address') camelKey = 'address';
       if (key === 'introduction') camelKey = 'description';
@@ -419,7 +419,7 @@ export class AuthService {
     readonly updateData: Prisma.CompanyUpdateInput;
   }): Prisma.CompanyCreateInput {
     const requiredKeys = [
-      'contactPerson',
+      'contactName',
       'phone',
       'industry',
       'address',
@@ -441,7 +441,7 @@ export class AuthService {
       industry: updateData.industry as string,
       address: updateData.address as string,
       description: updateData.description as string,
-      contactPerson: (updateData.contactPerson as string | undefined) ?? null,
+      contactName: (updateData.contactName as string | undefined) ?? null,
       contactPhone: (updateData.contactPhone as string | undefined) ?? null,
       logoUrl: (updateData.logoUrl as string | undefined) ?? null,
       companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
@@ -469,7 +469,7 @@ export class AuthService {
       region: company.region,
       industry: company.industry,
       website: company.website,
-      contactPerson: company.contactPerson,
+      contactName: company.contactName,
       contactPhone: company.contactPhone,
     };
   }
@@ -490,7 +490,7 @@ export class AuthService {
       country: request.country,
       region: request.region,
       website: request.website,
-      contactPerson: request.contactPerson,
+      contactName: request.contactName,
       contactPhone: request.contactPhone,
     } as Prisma.CompanyCreateInput;
   }

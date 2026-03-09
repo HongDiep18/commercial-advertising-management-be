@@ -11,7 +11,7 @@ export class CompanyWithAdsResponseDto {
   email!: string;
 
   @ApiProperty()
-  contactPerson!: string;
+  contactName!: string;
 
   @ApiProperty()
   phone!: string;

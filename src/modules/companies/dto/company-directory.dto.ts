@@ -80,7 +80,7 @@ export class CompanyDirectoryItemDto {
   email!: string;
 
   @ApiProperty({ example: 'Jane Nguyen' })
-  contactPerson!: string;
+  contactName!: string;
 
   @ApiProperty({ example: '+84 28 1234 5678' })
   phone!: string;

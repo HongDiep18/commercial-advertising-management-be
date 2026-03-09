@@ -160,8 +160,9 @@ export class AuthController {
   updateProfileRequestStatus(
     @Param('id') id: string,
     @Body() body: UpdateProfileRequestStatusDto,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.authService.updateProfileRequestStatus(id, body.status);
+    return this.authService.updateProfileRequestStatus(id, body.status, userId);
   }
 
   @Get('all-profile-requests')

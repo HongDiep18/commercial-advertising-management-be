@@ -15,6 +15,8 @@ import {
   PrismaClient,
 } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
 import { Role } from '../common/enums/role.enum';
 import { PrismaService } from '../database/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -116,6 +118,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly auditService: AuditService,
   ) {}
 
   async validateUser(
@@ -498,6 +501,7 @@ export class AuthService {
   async updateProfileRequestStatus(
     id: string,
     status: CompanyProfileRequestStatus,
+    actorId?: string | null,
   ) {
     const request = await this.prisma.companyProfileRequest.findUnique({
       where: { id },
@@ -506,9 +510,19 @@ export class AuthService {
       throw new NotFoundException('Profile request not found');
     }
 
+    const previousStatus = request.status;
     const updated = await this.prisma.companyProfileRequest.update({
       where: { id },
       data: { status },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROFILE_REQUEST_STATUS_CHANGED,
+      entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+      entityId: id,
+      actorId: actorId ?? null,
+      oldValue: previousStatus,
+      newValue: status,
     });
 
     if (status === CompanyProfileRequestStatus.APPROVED) {
@@ -618,6 +632,13 @@ export class AuthService {
         setPasswordToken: null,
         setPasswordTokenExpiresAt: null,
       } as Prisma.UserUncheckedUpdateInput,
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.SET_PASSWORD_USED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: user.id,
+      metadata: { by: 'token' },
     });
 
     if (!user.companyId) {

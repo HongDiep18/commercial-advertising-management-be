@@ -140,12 +140,37 @@ model User {
   setPasswordToken         String?   @db.VarChar(255)
   setPasswordTokenExpiresAt DateTime?
 
-  company  Company?  @relation(fields: [companyId], references: [id])
-  adOrders AdOrder[]
+  company   Company?    @relation(fields: [companyId], references: [id])
+  adOrders  AdOrder[]
+  auditLogs AuditLog[]  @relation("AuditLogActor")
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  action     String  @db.VarChar(64)
+  entityType String  @map("entity_type") @db.VarChar(64)
+  entityId   String  @map("entity_id") @db.VarChar(255)
+  actorId    String? @map("actor_id") @db.Uuid
+  oldValue   String? @map("old_value") @db.Text
+  newValue   String? @map("new_value") @db.Text
+  metadata   String? @db.Text
+
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id])
+
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ─── Advertising ──────────────────────────────────────────────────────────────

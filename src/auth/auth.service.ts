@@ -564,6 +564,36 @@ export class AuthService {
     await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, isActive: true },
+    });
+    if (!user || !user.isActive) {
+      return {
+        message:
+          'If an account exists with this email, you will receive a password reset link.',
+      };
+    }
+    const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
+    const expiryHours =
+      this.config.get<number>('mail.resetPasswordTokenExpiryHours') ?? 24;
+    const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        setPasswordToken: token,
+        setPasswordTokenExpiresAt: expiresAt,
+      } as Prisma.UserUncheckedUpdateInput,
+    });
+    await this.mailService.sendForgotPasswordEmail(normalizedEmail, token);
+    return {
+      message:
+        'If an account exists with this email, you will receive a password reset link.',
+    };
+  }
+
   async setPassword(
     token: string,
     newPassword: string,
@@ -573,7 +603,7 @@ export class AuthService {
         setPasswordToken: token,
         setPasswordTokenExpiresAt: { gt: new Date() },
       } as Prisma.UserWhereInput,
-      select: { id: true, email: true },
+      select: { id: true, email: true, companyId: true },
     });
     if (!user) {
       throw new BadRequestException(
@@ -590,23 +620,27 @@ export class AuthService {
       } as Prisma.UserUncheckedUpdateInput,
     });
 
-    const approvedRequest = await this.prisma.companyProfileRequest.findFirst({
-      where: {
-        email: user.email,
-        status: CompanyProfileRequestStatus.APPROVED,
-      },
-    });
-    if (approvedRequest) {
-      const companyData =
-        AuthService.companyCreateInputFromProfileRequest(approvedRequest);
-      const company = await this.prisma.company.create({
-        data: companyData,
-        select: { id: true },
-      });
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { companyId: company.id },
-      });
+    if (!user.companyId) {
+      const approvedRequest = await this.prisma.companyProfileRequest.findFirst(
+        {
+          where: {
+            email: user.email,
+            status: CompanyProfileRequestStatus.APPROVED,
+          },
+        },
+      );
+      if (approvedRequest) {
+        const companyData =
+          AuthService.companyCreateInputFromProfileRequest(approvedRequest);
+        const company = await this.prisma.company.create({
+          data: companyData,
+          select: { id: true },
+        });
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { companyId: company.id },
+        });
+      }
     }
 
     return { message: 'Password set successfully. You can sign in now.' };

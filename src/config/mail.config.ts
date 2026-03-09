@@ -3,6 +3,8 @@ import { registerAs } from '@nestjs/config';
 export default registerAs('mail', () => ({
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   setPasswordTokenExpiryDays: 7,
+  resetPasswordTokenExpiryHours:
+    parseInt(process.env.RESET_PASSWORD_TOKEN_EXPIRY_HOURS ?? '24', 10) || 24,
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT ?? '587', 10),

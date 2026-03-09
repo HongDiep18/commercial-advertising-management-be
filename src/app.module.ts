@@ -9,10 +9,12 @@ import {
   appConfig,
   databaseConfig,
   jwtConfig,
+  mailConfig,
   newsConfig,
   storageConfig,
 } from './config';
 import { DatabaseModule } from './database/database.module';
+import { MailModule } from './mail/mail.module';
 import { ActiveAdsModule } from './modules/active-ads/active-ads.module';
 import { AdOrdersModule } from './modules/ad-orders/ad-orders.module';
 import { AdsModule } from './modules/ads/ads.module';
@@ -25,7 +27,14 @@ import { NewsModule } from './modules/news/news.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, newsConfig, storageConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        jwtConfig,
+        mailConfig,
+        newsConfig,
+        storageConfig,
+      ],
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
@@ -35,6 +44,7 @@ import { NewsModule } from './modules/news/news.module';
       },
     ]),
     DatabaseModule,
+    MailModule,
     AuthModule,
     HealthModule,
     NewsModule,

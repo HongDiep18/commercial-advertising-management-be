@@ -100,3 +100,21 @@ export class UpdateProfileDto {
   @MaxLength(32)
   captcha?: string;
 }
+
+export const UPDATE_PROFILE_FORM_KEYS = [
+  'company_name_vi',
+  'company_name_cn',
+  'phone',
+  'tax_id',
+  'contact_person',
+  'contact_phone',
+  'company_address',
+  'email',
+  'country',
+  'region',
+  'industry',
+  'website',
+  'introduction',
+  'membership_tier',
+  'captcha',
+] as const;

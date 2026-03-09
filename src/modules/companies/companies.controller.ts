@@ -41,7 +41,7 @@ export class CompaniesController {
       id: company.id,
       name,
       email: company.email,
-      contactName: company.contactName,
+      contactName: company.contactName ?? '',
       phone: company.phone,
       industry: company.industry,
       address: company.address,

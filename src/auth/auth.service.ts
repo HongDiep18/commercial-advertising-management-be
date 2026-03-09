@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
   CompanyProfileRequestStatus,
@@ -13,10 +14,12 @@ import {
   Prisma,
   PrismaClient,
 } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../common/enums/membership-tier.enum';
+import { randomBytes } from 'node:crypto';
 import { Role } from '../common/enums/role.enum';
 import { PrismaService } from '../database/prisma.service';
+import { MailService } from '../mail/mail.service';
+import * as bcrypt from 'bcrypt';
+import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../common/enums/membership-tier.enum';
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
@@ -37,7 +40,6 @@ const PROFILE_SELECT_KEYS = [
   'logoUrl',
   'companyNameVi',
   'companyNameCn',
-  'contactName',
   'phone',
   'address',
   'description',
@@ -46,6 +48,8 @@ const PROFILE_SELECT_KEYS = [
   'region',
   'industry',
   'website',
+  'contactName',
+  'contactPhone',
 ] as const;
 
 type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
@@ -67,7 +71,6 @@ type CompanyProfileSelectResult = {
   readonly logoUrl: string | null;
   readonly companyNameVi: string | null;
   readonly companyNameCn: string | null;
-  readonly contactName: string;
   readonly phone: string;
   readonly industry: string;
   readonly address: string;
@@ -76,6 +79,8 @@ type CompanyProfileSelectResult = {
   readonly country: string | null;
   readonly region: string | null;
   readonly website: string | null;
+  readonly contactName: string | null;
+  readonly contactPhone: string | null;
 };
 
 function companyProfileSelect(): { readonly id: true } & Record<
@@ -85,11 +90,32 @@ function companyProfileSelect(): { readonly id: true } & Record<
   return { id: true, ...profileSelect() };
 }
 
+const SET_PASSWORD_TOKEN_BYTES = 32;
+
+type ProfileRequestForCompany = Pick<
+  Prisma.CompanyProfileRequestGetPayload<object>,
+  | 'email'
+  | 'companyNameVi'
+  | 'companyNameCn'
+  | 'phone'
+  | 'taxId'
+  | 'contactName'
+  | 'contactPhone'
+  | 'companyAddress'
+  | 'country'
+  | 'region'
+  | 'industry'
+  | 'website'
+  | 'introduction'
+>;
+
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaClient,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async validateUser(
@@ -173,7 +199,7 @@ export class AuthService {
       companyNameCn: data.company_name_cn.trim(),
       phone: data.phone.trim(),
       taxId: data.tax_id.trim(),
-      contactPerson: data.contact_person.trim(),
+      contactName: data.contact_person.trim(),
       contactPhone: data.contact_phone?.trim() || data.phone.trim(),
       companyAddress: data.company_address.trim(),
       country: data.country.trim(),
@@ -202,19 +228,15 @@ export class AuthService {
       );
       if (key === 'upload_logo') camelKey = 'logoUrl';
       if (key === 'contact_person') camelKey = 'contactName';
+      if (key === 'contact_phone') camelKey = 'contactPhone';
       if (key === 'company_address') camelKey = 'address';
       if (key === 'introduction') camelKey = 'description';
       const raw = dataRecord[key];
       const val = typeof raw === 'string' ? raw.trim() || null : null;
 
       if (key === 'upload_logo' && val === null) return;
-      if (key === 'contact_phone' && out.phone == null) {
-        if (val !== null) out.phone = val;
-        return;
-      }
       if (
-        (camelKey === 'contactName' ||
-          camelKey === 'phone' ||
+        (camelKey === 'phone' ||
           camelKey === 'industry' ||
           camelKey === 'address' ||
           camelKey === 'description') &&
@@ -322,12 +344,11 @@ export class AuthService {
   async getAllProfileRequests(status?: string) {
     const validStatuses = Object.values(
       CompanyProfileRequestStatus,
-    ) as string[];
+    ) as readonly string[];
     const where =
       status && validStatuses.includes(status)
         ? { status: status as CompanyProfileRequestStatus }
         : undefined;
-
     return this.prisma.companyProfileRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -416,11 +437,12 @@ export class AuthService {
     }
     return {
       email: input.userEmail.trim().toLowerCase(),
-      contactName: updateData.contactName as string,
       phone: updateData.phone as string,
       industry: updateData.industry as string,
       address: updateData.address as string,
       description: updateData.description as string,
+      contactName: (updateData.contactName as string | undefined) ?? null,
+      contactPhone: (updateData.contactPhone as string | undefined) ?? null,
       logoUrl: (updateData.logoUrl as string | undefined) ?? null,
       companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
       companyNameCn: (updateData.companyNameCn as string | undefined) ?? null,
@@ -428,7 +450,7 @@ export class AuthService {
       country: (updateData.country as string | undefined) ?? null,
       region: (updateData.region as string | undefined) ?? null,
       website: (updateData.website as string | undefined) ?? null,
-    };
+    } as Prisma.CompanyCreateInput;
   }
 
   private static mapCompanyToProfileResponse(
@@ -439,7 +461,6 @@ export class AuthService {
       logoUrl: company.logoUrl,
       companyNameVi: company.companyNameVi,
       companyNameCn: company.companyNameCn,
-      contactName: company.contactName,
       phone: company.phone,
       address: company.address,
       description: company.description,
@@ -448,6 +469,146 @@ export class AuthService {
       region: company.region,
       industry: company.industry,
       website: company.website,
+      contactName: company.contactName,
+      contactPhone: company.contactPhone,
     };
+  }
+
+  private static companyCreateInputFromProfileRequest(
+    request: ProfileRequestForCompany,
+  ): Prisma.CompanyCreateInput {
+    return {
+      email: request.email.trim().toLowerCase(),
+      phone: request.phone,
+      industry: request.industry,
+      address: request.companyAddress,
+      description: request.introduction,
+      logoUrl: null,
+      companyNameVi: request.companyNameVi,
+      companyNameCn: request.companyNameCn,
+      taxId: request.taxId,
+      country: request.country,
+      region: request.region,
+      website: request.website,
+      contactName: request.contactName,
+      contactPhone: request.contactPhone,
+    } as Prisma.CompanyCreateInput;
+  }
+
+  async updateProfileRequestStatus(
+    id: string,
+    status: CompanyProfileRequestStatus,
+  ) {
+    const request = await this.prisma.companyProfileRequest.findUnique({
+      where: { id },
+    });
+    if (!request) {
+      throw new NotFoundException('Profile request not found');
+    }
+
+    const updated = await this.prisma.companyProfileRequest.update({
+      where: { id },
+      data: { status },
+    });
+
+    if (status === CompanyProfileRequestStatus.APPROVED) {
+      await this.onProfileRequestApproved(
+        request.email,
+        request.membershipTier,
+      );
+    }
+    if (status === CompanyProfileRequestStatus.REJECTED) {
+      await this.mailService.sendAccountRejectedEmail(
+        request.email.trim().toLowerCase(),
+      );
+    }
+
+    return updated;
+  }
+
+  private async onProfileRequestApproved(
+    email: string,
+    membershipTier: MembershipTier,
+  ): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (existingUser) {
+      throw new ConflictException(
+        'A user already exists for this email; cannot approve again.',
+      );
+    }
+
+    const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
+    const expiryDays =
+      this.config.get<number>('mail.setPasswordTokenExpiryDays') ?? 7;
+    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+    const placeholderPassword = await bcrypt.hash(
+      randomBytes(32).toString('hex'),
+      10,
+    );
+
+    await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: placeholderPassword,
+        role: Role.MEMBER,
+        membershipTier,
+        setPasswordToken: token,
+        setPasswordTokenExpiresAt: expiresAt,
+      } as Prisma.UserUncheckedCreateInput,
+    });
+
+    await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
+  }
+
+  async setPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        setPasswordToken: token,
+        setPasswordTokenExpiresAt: { gt: new Date() },
+      } as Prisma.UserWhereInput,
+      select: { id: true, email: true },
+    });
+    if (!user) {
+      throw new BadRequestException(
+        'Invalid or expired set-password link. Request a new one or contact support.',
+      );
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashed,
+        setPasswordToken: null,
+        setPasswordTokenExpiresAt: null,
+      } as Prisma.UserUncheckedUpdateInput,
+    });
+
+    const approvedRequest = await this.prisma.companyProfileRequest.findFirst({
+      where: {
+        email: user.email,
+        status: CompanyProfileRequestStatus.APPROVED,
+      },
+    });
+    if (approvedRequest) {
+      const companyData =
+        AuthService.companyCreateInputFromProfileRequest(approvedRequest);
+      const company = await this.prisma.company.create({
+        data: companyData,
+        select: { id: true },
+      });
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { companyId: company.id },
+      });
+    }
+
+    return { message: 'Password set successfully. You can sign in now.' };
   }
 }

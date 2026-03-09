@@ -19,7 +19,7 @@ type CompanyWithActiveAdsRecord = {
   companyNameVi: string | null;
   companyNameCn: string | null;
   email: string;
-  contactName: string;
+  contactName: string | null;
   phone: string;
   industry: string;
   address: string;
@@ -70,7 +70,7 @@ export class CompaniesService {
       id: company.id,
       name: displayName,
       email: company.email,
-      contactName: company.contactName,
+      contactName: company.contactName ?? '',
       phone: company.phone,
       industry: company.industry,
       address: company.address,
@@ -153,7 +153,7 @@ export class CompaniesService {
         id: company.id,
         name,
         email: company.email,
-        contactName: company.contactName,
+        contactName: company.contactName ?? '',
         phone: company.phone,
         industry: company.industry,
         address: company.address,
@@ -242,7 +242,7 @@ export class CompaniesService {
         id: company.id,
         name,
         email: company.email,
-        contactName: company.contactName,
+        contactName: company.contactName ?? '',
         phone: company.phone,
         industry: company.industry,
         address: company.address,
@@ -306,7 +306,7 @@ export class CompaniesService {
         id: company.id,
         name,
         email: company.email,
-        contactName: company.contactName,
+        contactName: company.contactName ?? '',
         phone: company.phone,
         industry: company.industry,
         address: company.address,
@@ -427,7 +427,7 @@ export class CompaniesService {
         id: company.id,
         name,
         email: company.email,
-        contactName: company.contactName,
+        contactName: company.contactName ?? '',
         phone: company.phone,
         industry: company.industry,
         address: company.address,

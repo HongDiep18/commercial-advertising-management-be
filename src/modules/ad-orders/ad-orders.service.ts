@@ -497,7 +497,7 @@ export class AdOrdersService {
             nameVi: order.company.companyNameVi,
             nameCn: order.company.companyNameCn,
             email: order.company.email,
-            contactName: order.company.contactName,
+            contactName: order.company.contactName ?? '',
             phone: order.company.phone,
           }
         : {

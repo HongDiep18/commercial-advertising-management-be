@@ -102,7 +102,7 @@ model CompanyProfileRequest {
   companyNameCn  String @db.VarChar(255)
   phone          String @db.VarChar(32)
   taxId          String @db.VarChar(64)
-  contactPerson  String @db.VarChar(255)
+  contactName    String @map("contact_name") @db.VarChar(255)
   contactPhone   String @db.VarChar(32)
   companyAddress String @db.VarChar(512)
   country        String @db.VarChar(128)
@@ -137,6 +137,8 @@ model User {
   loyaltyPoints  Int            @default(0)
 
   companyId String? @map("company_id") @db.Uuid
+  setPasswordToken         String?   @db.VarChar(255)
+  setPasswordTokenExpiresAt DateTime?
 
   company  Company?  @relation(fields: [companyId], references: [id])
   adOrders AdOrder[]
@@ -198,10 +200,9 @@ enum AdOrderStatus {
 }
 
 model Company {
-  id          String   @id @default(uuid()) @db.Uuid
-  email       String   @unique @db.VarChar(255)
-  contactName String   @map("contact_name") @db.VarChar(255)
-  phone       String   @db.VarChar(50)
+  id     String   @id @default(uuid()) @db.Uuid
+  email  String   @unique @db.VarChar(255)
+  phone  String   @db.VarChar(50)
   industry    String   @db.VarChar(255)
   address     String   @db.VarChar(255)
   description String   @db.Text
@@ -215,6 +216,8 @@ model Company {
   country        String? @db.VarChar(128)
   region         String? @db.VarChar(128)
   website        String? @db.VarChar(2048)
+  contactName    String? @map("contact_name") @db.VarChar(255)
+  contactPhone   String? @map("contact_phone") @db.VarChar(32)
 
   users     User[]
   adOrders  AdOrder[]

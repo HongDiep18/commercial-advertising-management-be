@@ -30,6 +30,7 @@ import { FileUploadService } from '../modules/file-upload/file-upload.service';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import {
   UpdateProfileDto,
   UPDATE_PROFILE_FORM_KEYS,
@@ -82,6 +83,16 @@ export class AuthController {
   })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Post('set-password')
+  @Public()
+  @ApiOperation({ summary: 'Set password using token from approval email' })
+  @ApiResponse({ status: 200, description: 'Password set, user can sign in' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiBody({ type: SetPasswordDto })
+  async setPassword(@Body() dto: SetPasswordDto) {
+    return this.authService.setPassword(dto.token, dto.password);
   }
 
   @Get('profile')

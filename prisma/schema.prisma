@@ -137,6 +137,8 @@ model User {
   loyaltyPoints  Int            @default(0)
 
   companyId String? @map("company_id") @db.Uuid
+  setPasswordToken         String?   @db.VarChar(255)
+  setPasswordTokenExpiresAt DateTime?
 
   company  Company?  @relation(fields: [companyId], references: [id])
   adOrders AdOrder[]

@@ -1,3 +1,3 @@
 -- AlterTable
-ALTER TABLE "companies" ADD COLUMN "contact_person" VARCHAR(255),
+ALTER TABLE "companies"
 ADD COLUMN "contact_phone" VARCHAR(32);

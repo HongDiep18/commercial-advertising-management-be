@@ -28,6 +28,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Role } from '../common/enums';
 import { FileUploadService } from '../modules/file-upload/file-upload.service';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
@@ -85,9 +86,25 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @Post('forgot-password')
+  @Public()
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'If the email is registered, a reset link is sent (same message either way)',
+  })
+  @ApiBody({ type: ForgotPasswordDto })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
   @Post('set-password')
   @Public()
-  @ApiOperation({ summary: 'Set password using token from approval email' })
+  @ApiOperation({
+    summary:
+      'Set password using token (from approval or forgot-password email)',
+  })
   @ApiResponse({ status: 200, description: 'Password set, user can sign in' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
   @ApiBody({ type: SetPasswordDto })
@@ -143,8 +160,9 @@ export class AuthController {
   updateProfileRequestStatus(
     @Param('id') id: string,
     @Body() body: UpdateProfileRequestStatusDto,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.authService.updateProfileRequestStatus(id, body.status);
+    return this.authService.updateProfileRequestStatus(id, body.status, userId);
   }
 
   @Get('all-profile-requests')

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import {
@@ -44,6 +45,7 @@ import { NewsModule } from './modules/news/news.module';
       },
     ]),
     DatabaseModule,
+    AuditModule,
     MailModule,
     AuthModule,
     HealthModule,

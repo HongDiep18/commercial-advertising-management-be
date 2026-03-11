@@ -17,11 +17,11 @@ import {
 import { randomBytes } from 'node:crypto';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
-import { Role } from '../common/enums/role.enum';
-import { PrismaService } from '../database/prisma.service';
+import { Role } from '../../common/enums/role.enum';
+import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
-import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../common/enums/membership-tier.enum';
+import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../../common/enums/membership-tier.enum';
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 

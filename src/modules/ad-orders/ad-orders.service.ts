@@ -467,9 +467,12 @@ export class AdOrdersService {
             pricing: {
               include: {
                 package: {
-                  select: {
-                    id: true,
-                    name: true,
+                  include: {
+                    category: {
+                      select: {
+                        type: true,
+                      },
+                    },
                   },
                 },
               },
@@ -520,9 +523,14 @@ export class AdOrdersService {
         pricingId: item.pricingId,
         packageId: item.pricing.packageId,
         packageName: item.pricing.package.name,
-        pricingName: `${item.pricing.durationValue || 'N/A'} ${
-          item.pricing.durationUnit || ''
+        packageType: item.pricing.package.type,
+        pricingName: `${item.durationValue || 'N/A'} ${
+          item.durationUnit || ''
         }`.trim(),
+        pricingModel: item.pricing.pricingModel,
+        categoryType: item.pricing.package.category?.type ?? null,
+        durationValue: item.durationValue ?? item.pricing.durationValue ?? null,
+        durationUnit: item.durationUnit ?? item.pricing.durationUnit ?? null,
         price: Number(item.unitPrice),
         designServiceRequired: item.designServiceRequired,
         startDate: item.startDate,
@@ -533,6 +541,8 @@ export class AdOrdersService {
           fileSizeKb: asset.fileSizeKb ?? 0,
           assetType: asset.assetType,
         })),
+        packageMetadata:
+          (item.pricing.package.metadata as Record<string, unknown>) ?? null,
       })),
     }));
 

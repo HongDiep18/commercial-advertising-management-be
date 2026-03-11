@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AdOrderStatus } from '@prisma/client';
+import {
+  AdCategoryType,
+  AdOrderStatus,
+  AdPackageType,
+  DurationUnit,
+  PricingModel,
+} from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
@@ -76,8 +82,38 @@ export class AdminOrderItemDto {
   @ApiPropertyOptional()
   packageName: string;
 
+  @ApiPropertyOptional({
+    description: 'Ad package type',
+    enum: AdPackageType,
+  })
+  packageType: AdPackageType;
+
   @ApiPropertyOptional()
   pricingName: string;
+
+  @ApiPropertyOptional({
+    description: 'Pricing model of the selected package pricing',
+    enum: PricingModel,
+  })
+  pricingModel: PricingModel;
+
+  @ApiPropertyOptional({
+    description: 'Ad package category type',
+    enum: AdCategoryType,
+  })
+  categoryType: AdCategoryType | null;
+
+  @ApiPropertyOptional({
+    description: 'Selected duration value for this order item',
+    example: 3,
+  })
+  durationValue: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Selected duration unit for this order item',
+    enum: DurationUnit,
+  })
+  durationUnit: DurationUnit | null;
 
   @ApiPropertyOptional()
   price: number;
@@ -98,6 +134,11 @@ export class AdminOrderItemDto {
     fileSizeKb: number;
     assetType: string;
   }>;
+
+  @ApiPropertyOptional({
+    description: 'Raw metadata from the related ad package',
+  })
+  packageMetadata?: Record<string, unknown> | null;
 }
 
 export class AdminOrderDto {

@@ -28,6 +28,7 @@ import {
   AdminOrderActionResponseDto,
   AdminRejectOrderDto,
 } from './dto/admin-order-actions.dto';
+import { AdminOrdersMetricsResponseDto } from './dto/admin-orders-metrics.dto';
 
 @ApiTags('Admin - Ad Orders')
 @ApiBearerAuth()
@@ -62,6 +63,22 @@ export class AdOrdersAdminController {
   ): Promise<AdminListOrdersResponseDto> {
     const result = await this.adOrdersService.adminListOrders(query);
     return result;
+  }
+
+  @Get('metrics')
+  @ApiOperation({
+    summary: 'Get ad orders metrics for dashboard',
+    description:
+      'Get current month revenue, order counts, and month-over-month revenue growth for ad orders.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Metrics retrieved successfully',
+    type: AdminOrdersMetricsResponseDto,
+  })
+  async getMetrics(): Promise<AdminOrdersMetricsResponseDto> {
+    const metrics = await this.adOrdersService.getAdminOrdersMetrics();
+    return metrics;
   }
 
   @Post(':id/approve')

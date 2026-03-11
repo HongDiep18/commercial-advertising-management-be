@@ -14,7 +14,7 @@ import {
 import { Readable } from 'stream';
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
-import type { OrderInvoiceData } from '../file-generating/types/order-invoice-data.types';
+import { MailService } from '../mail/mail.service';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
   AdminListOrdersQueryDto,
@@ -71,51 +71,22 @@ export type AdOrderSummary = {
   items: AdOrderItemSummary[];
 };
 
-type AdOrderAssetEntity = {
-  id: string;
-  orderItemId: string;
-  assetType: string;
-  fileUrl: string | null;
-  fileSizeKb: number | null;
-  notes: string | null;
-  createdAt: Date;
-};
-
-type AdOrderItemEntity = {
-  id: string;
-  orderId: string;
-  packageId: string;
-  pricingId: string;
-  durationValue: number | null;
-  durationUnit: string | null;
-  startDate: Date;
-  designServiceRequired: boolean;
-  adLinkUrl: string;
-  unitPrice: bigint;
-  quantity: number;
-  lineTotal: bigint;
-  createdAt: Date;
-  assets: AdOrderAssetEntity[];
-};
-
-type AdOrderWithRelations = {
-  id: string;
-  userId: string;
-  companyId: string | null;
-  status: AdOrderStatus;
-  subtotal: bigint;
-  notes: string | null;
-  submittedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  items: AdOrderItemEntity[];
-};
+type UpdatedOrderType = Prisma.AdOrderGetPayload<{
+  include: {
+    items: {
+      include: {
+        assets: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class AdOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileGeneratingService: FileGeneratingService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -190,7 +161,7 @@ export class AdOrdersService {
       };
     });
 
-    const createdOrder = (await this.prisma.$transaction((tx) =>
+    const createdOrder = await this.prisma.$transaction((tx) =>
       tx.adOrder.create({
         data: {
           userId,
@@ -210,7 +181,7 @@ export class AdOrdersService {
           },
         },
       }),
-    )) as AdOrderWithRelations;
+    );
 
     return this.mapOrderToSummary(createdOrder);
   }
@@ -227,78 +198,80 @@ export class AdOrdersService {
     dto: UploadAdOrderAssetsDto,
   ): Promise<AdOrderSummary> {
     try {
-      const updatedOrder = (await this.prisma.$transaction(async (tx) => {
-        const existingOrder = await tx.adOrder.findUnique({
-          where: { id: orderId },
-          include: {
-            items: {
-              include: {
-                assets: true,
+      const updatedOrder: UpdatedOrderType = await this.prisma.$transaction(
+        async (tx) => {
+          const existingOrder = await tx.adOrder.findUnique({
+            where: { id: orderId },
+            include: {
+              items: {
+                include: {
+                  assets: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        if (!existingOrder) {
-          throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
-        }
-        if (existingOrder.userId !== userId) {
-          throw new ForbiddenException(AdOrdersErrors.ORDER_NOT_OWNER);
-        }
-        if (existingOrder.status !== AdOrderStatus.DRAFT) {
-          throw new BadRequestException(AdOrdersErrors.ORDER_NOT_DRAFT);
-        }
-
-        if (dto.assets && dto.assets.length > 0) {
-          const itemByPricingId = new Map(
-            existingOrder.items.map((item) => [item.pricingId, item.id]),
-          );
-
-          for (const asset of dto.assets) {
-            const orderItemId = itemByPricingId.get(asset.pricingId);
-            if (!orderItemId) {
-              throw new BadRequestException(
-                AdOrdersErrors.INVALID_ASSET_PRICING_REF,
-              );
-            }
+          if (!existingOrder) {
+            throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
+          }
+          if (existingOrder.userId !== userId) {
+            throw new ForbiddenException(AdOrdersErrors.ORDER_NOT_OWNER);
+          }
+          if (existingOrder.status !== AdOrderStatus.DRAFT) {
+            throw new BadRequestException(AdOrdersErrors.ORDER_NOT_DRAFT);
           }
 
-          await tx.adOrderAsset.createMany({
-            data: dto.assets.map((asset) => {
+          if (dto.assets && dto.assets.length > 0) {
+            const itemByPricingId = new Map(
+              existingOrder.items.map((item) => [item.pricingId, item.id]),
+            );
+
+            for (const asset of dto.assets) {
               const orderItemId = itemByPricingId.get(asset.pricingId);
               if (!orderItemId) {
                 throw new BadRequestException(
                   AdOrdersErrors.INVALID_ASSET_PRICING_REF,
                 );
               }
-              return {
-                orderItemId,
-                assetType: asset.assetType,
-                fileUrl: asset.fileUrl,
-                fileSizeKb: asset.fileSizeKb ?? null,
-                notes: asset.notes ?? null,
-              };
-            }),
-          });
-        }
+            }
 
-        const finalOrder = await tx.adOrder.update({
-          where: { id: orderId },
-          data: {
-            status: AdOrderStatus.PENDING,
-            submittedAt: new Date(),
-          },
-          include: {
-            items: {
-              include: {
-                assets: true,
+            await tx.adOrderAsset.createMany({
+              data: dto.assets.map((asset) => {
+                const orderItemId = itemByPricingId.get(asset.pricingId);
+                if (!orderItemId) {
+                  throw new BadRequestException(
+                    AdOrdersErrors.INVALID_ASSET_PRICING_REF,
+                  );
+                }
+                return {
+                  orderItemId,
+                  assetType: asset.assetType,
+                  fileUrl: asset.fileUrl,
+                  fileSizeKb: asset.fileSizeKb ?? null,
+                  notes: asset.notes ?? null,
+                };
+              }),
+            });
+          }
+
+          const finalOrder = await tx.adOrder.update({
+            where: { id: orderId },
+            data: {
+              status: AdOrderStatus.PENDING,
+              submittedAt: new Date(),
+            },
+            include: {
+              items: {
+                include: {
+                  assets: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        return finalOrder;
-      })) as AdOrderWithRelations;
+          return finalOrder;
+        },
+      );
 
       return this.mapOrderToSummary(updatedOrder);
     } catch (err) {
@@ -325,7 +298,7 @@ export class AdOrdersService {
     }
   }
 
-  private mapOrderToSummary(order: AdOrderWithRelations): AdOrderSummary {
+  private mapOrderToSummary(order: UpdatedOrderType): AdOrderSummary {
     const items: AdOrderItemSummary[] = order.items.map((item) => ({
       id: item.id,
       orderId: item.orderId,
@@ -722,7 +695,7 @@ export class AdOrdersService {
       throw new NotFoundException(AdOrdersErrors.COMPANY_NOT_FOUND);
     }
 
-    const invoiceData: OrderInvoiceData = {
+    const invoiceData = {
       id: order.id,
       status: order.status,
       subtotal: order.subtotal,
@@ -736,7 +709,7 @@ export class AdOrdersService {
         email: order.company.email,
         contactName: order.company.contactName ?? '',
         phone: order.company.phone,
-        address: order.company.address,
+        address: order.company.address ?? '',
         taxId: order.company.taxId,
       },
       items: order.items.map((item) => ({
@@ -768,7 +741,7 @@ export class AdOrdersService {
     adminUserId: string,
     dto: AdminApproveOrderDto,
   ): Promise<{ id: string; status: AdOrderStatus; message: string }> {
-    return this.prisma.$transaction(async (tx) => {
+    const { result } = await this.prisma.$transaction(async (tx) => {
       // Check if order exists and is in PENDING status
       const order = await tx.adOrder.findUnique({
         where: { id: orderId },
@@ -793,21 +766,16 @@ export class AdOrdersService {
           company: true,
         },
       });
-
       if (!order) {
         throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
       }
-
       if (order.status !== AdOrderStatus.PENDING) {
         throw new BadRequestException(AdOrdersErrors.ORDER_NOT_PENDING);
       }
-
       if (!order.companyId) {
         throw new BadRequestException(AdOrdersErrors.ORDER_COMPANY_REQUIRED);
       }
-
       const companyId: string = order.companyId;
-
       // Update order status
       const updatedOrder = await tx.adOrder.update({
         where: { id: orderId },
@@ -818,20 +786,23 @@ export class AdOrdersService {
           reason: dto.reason,
         },
       });
-
       // Create active ads for each order item
       await this.createActiveAdsFromOrder(
         tx,
         { id: order.id, companyId, items: order.items },
         adminUserId,
       );
-
       return {
-        id: updatedOrder.id,
-        status: updatedOrder.status,
-        message: 'Order approved successfully and ads activated',
+        result: {
+          id: updatedOrder.id,
+          status: updatedOrder.status,
+          message: 'Order approved successfully and ads activated',
+        },
       };
     });
+
+    await this.mailService.sendAdOrderDecisionEmail(orderId, true, dto.reason);
+    return result;
   }
 
   /**
@@ -868,6 +839,8 @@ export class AdOrdersService {
         reason: dto.reason,
       },
     });
+
+    await this.mailService.sendAdOrderDecisionEmail(orderId, false, dto.reason);
 
     return {
       id: updatedOrder.id,

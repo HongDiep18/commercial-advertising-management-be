@@ -60,6 +60,7 @@ export type ProfileResponse = {
   id: string;
   email: string;
   membershipTier: string;
+  role: string;
 } & Partial<Record<ProfileField, string | null>>;
 
 function profileSelect(): Record<ProfileField, true> {
@@ -261,6 +262,7 @@ export class AuthService {
         id: true,
         email: true,
         membershipTier: true,
+        role: true,
         company: { select: companyProfileSelect() },
       },
     });
@@ -274,6 +276,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       membershipTier: user.membershipTier,
+      role: user.role,
       ...profileRest,
     };
   }
@@ -288,6 +291,7 @@ export class AuthService {
         id: true,
         email: true,
         membershipTier: true,
+        role: true,
         companyId: true,
       },
     });
@@ -310,6 +314,7 @@ export class AuthService {
           id: true,
           email: true,
           membershipTier: true,
+          role: true,
           companyId: true,
         },
       });
@@ -324,6 +329,7 @@ export class AuthService {
           id: true,
           email: true,
           membershipTier: true,
+          role: true,
           companyId: true,
         },
       });
@@ -340,6 +346,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       membershipTier: user.membershipTier,
+      role: user.role,
       ...companyProfile,
     };
   }

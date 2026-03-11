@@ -1,4 +1,8 @@
 export const AdOrdersErrors = {
+  COMPANY_NOT_FOUND: {
+    code: 'AD_ORDER_COMPANY_NOT_FOUND',
+    message: 'Company not found',
+  },
   INVALID_ITEMS_EMPTY: {
     code: 'AD_ORDER_INVALID_ITEMS',
     message: 'At least one order item is required',

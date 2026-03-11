@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { RssCrawlerService } from './rss-crawler.service';
 import { NewsTranslatorService } from './news-translator.service';
+import { RssCrawlerService } from './rss-crawler.service';
 
 @Injectable()
 export class NewsSchedulerService implements OnModuleInit {
@@ -27,6 +27,10 @@ export class NewsSchedulerService implements OnModuleInit {
         'News pipeline scheduler is disabled (NEWS_SCHEDULE_ENABLED=false)',
       );
       return;
+    } else {
+      this.logger.log(
+        'News pipeline scheduler is enabled (NEWS_SCHEDULE_ENABLED=true)',
+      );
     }
 
     const cronExpr = this.configService.get<string>(

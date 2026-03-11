@@ -31,6 +31,9 @@ export class AdminPricingResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  deletedAt?: Date | null;
 }
 
 export class AdminPricingListQueryDto {
@@ -51,6 +54,12 @@ export class AdminPricingListQueryDto {
     example: true,
   })
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Include soft-deleted pricing options',
+    default: false,
+  })
+  includeDeleted?: boolean;
 
   @ApiPropertyOptional({
     description: 'Page number (1-based)',

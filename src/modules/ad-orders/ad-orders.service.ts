@@ -11,7 +11,10 @@ import {
   PricingModel,
   Prisma,
 } from '@prisma/client';
+import { Readable } from 'stream';
 import { PrismaService } from '../../database/prisma.service';
+import { FileGeneratingService } from '../file-generating/file-generating.service';
+import type { OrderInvoiceData } from '../file-generating/types/order-invoice-data.types';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
   AdminListOrdersQueryDto,
@@ -110,7 +113,10 @@ type AdOrderWithRelations = {
 
 @Injectable()
 export class AdOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileGeneratingService: FileGeneratingService,
+  ) {}
 
   /**
    * Create a draft ad order with its items in a single transaction.
@@ -137,6 +143,7 @@ export class AdOrdersService {
       where: {
         id: { in: pricingIds },
         isActive: true,
+        deletedAt: null,
       },
     });
     if (pricingList.length !== dto.items.length) {
@@ -649,6 +656,98 @@ export class AdOrdersService {
         totalPages,
       },
     };
+  }
+
+  /**
+   * Get order invoice as PDF stream for the authenticated user.
+   * User must own the order.
+   */
+  async getOrderInvoice(
+    userId: string,
+    orderId: string,
+  ): Promise<{ stream: Readable; filename: string }> {
+    const order = await this.prisma.adOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        company: {
+          select: {
+            companyNameVi: true,
+            companyNameCn: true,
+            email: true,
+            contactName: true,
+            phone: true,
+            address: true,
+            taxId: true,
+          },
+        },
+        items: {
+          include: {
+            pricing: {
+              include: {
+                package: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
+    }
+    if (order.userId !== userId) {
+      throw new ForbiddenException(AdOrdersErrors.ORDER_NOT_OWNER);
+    }
+    if (!order.company) {
+      throw new NotFoundException(AdOrdersErrors.COMPANY_NOT_FOUND);
+    }
+
+    const invoiceData: OrderInvoiceData = {
+      id: order.id,
+      status: order.status,
+      subtotal: order.subtotal,
+      notes: order.notes,
+      submittedAt: order.submittedAt,
+      createdAt: order.createdAt,
+      user: { email: order.user.email },
+      company: {
+        companyNameVi: order.company.companyNameVi,
+        companyNameCn: order.company.companyNameCn,
+        email: order.company.email,
+        contactName: order.company.contactName,
+        phone: order.company.phone,
+        address: order.company.address,
+        taxId: order.company.taxId,
+      },
+      items: order.items.map((item) => ({
+        id: item.id,
+        startDate: item.startDate,
+        designServiceRequired: item.designServiceRequired,
+        adLinkUrl: item.adLinkUrl,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+        pricing: {
+          durationValue: item.pricing.durationValue,
+          durationUnit: item.pricing.durationUnit,
+          package: { name: item.pricing.package.name },
+        },
+      })),
+    };
+    const stream =
+      this.fileGeneratingService.generateOrderInvoicePdf(invoiceData);
+    const filename = `invoice-${order.id}.pdf`;
+    return { stream, filename };
   }
 
   /**

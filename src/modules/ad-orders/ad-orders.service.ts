@@ -530,6 +530,97 @@ export class AdOrdersService {
     };
   }
 
+  async getAdminOrdersMetrics(): Promise<{
+    currentMonthRevenue: number;
+    currentMonthOrders: {
+      pending: number;
+      approved: number;
+      rejected: number;
+      total: number;
+    };
+    monthlyGrowthPercentage: number;
+  }> {
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const currentMonthRange = {
+      gte: currentMonthStart,
+      lt: nextMonthStart,
+    } as const;
+    const lastMonthRange = {
+      gte: lastMonthStart,
+      lt: currentMonthStart,
+    } as const;
+
+    const [
+      currentMonthRevenueAgg,
+      lastMonthRevenueAgg,
+      pendingCount,
+      approvedCount,
+      rejectedCount,
+    ] = await Promise.all([
+      this.prisma.adOrder.aggregate({
+        where: {
+          status: AdOrderStatus.APPROVED,
+          createdAt: currentMonthRange,
+        },
+        _sum: { subtotal: true },
+      }),
+      this.prisma.adOrder.aggregate({
+        where: {
+          status: AdOrderStatus.APPROVED,
+          createdAt: lastMonthRange,
+        },
+        _sum: { subtotal: true },
+      }),
+      this.prisma.adOrder.count({
+        where: {
+          status: AdOrderStatus.PENDING,
+          createdAt: currentMonthRange,
+        },
+      }),
+      this.prisma.adOrder.count({
+        where: {
+          status: AdOrderStatus.APPROVED,
+          createdAt: currentMonthRange,
+        },
+      }),
+      this.prisma.adOrder.count({
+        where: {
+          status: AdOrderStatus.REJECTED,
+          createdAt: currentMonthRange,
+        },
+      }),
+    ]);
+
+    const currentMonthRevenueBigInt = currentMonthRevenueAgg._sum.subtotal ?? 0n;
+    const lastMonthRevenueBigInt = lastMonthRevenueAgg._sum.subtotal ?? 0n;
+
+    const currentMonthRevenue = Number(currentMonthRevenueBigInt);
+    const lastMonthRevenue = Number(lastMonthRevenueBigInt);
+
+    let monthlyGrowthPercentage = 0;
+    if (lastMonthRevenue > 0) {
+      monthlyGrowthPercentage =
+        ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+    }
+
+    const total = pendingCount + approvedCount + rejectedCount;
+
+    return {
+      currentMonthRevenue,
+      currentMonthOrders: {
+        pending: pendingCount,
+        approved: approvedCount,
+        rejected: rejectedCount,
+        total,
+      },
+      monthlyGrowthPercentage,
+    };
+  }
+
   /**
    * User method to get their own order history
    */

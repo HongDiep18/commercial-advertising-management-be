@@ -56,6 +56,12 @@ Generate code, corrections, and refactorings that comply with the basic principl
   - Declare necessary types for input arguments and output.
 - Use a single level of abstraction.
 
+### Types vs Interfaces
+
+- **Prefer `type` over `interface`** for plain data types (object shapes, DTOs, payloads).
+- Use `interface` only when declaration merging or `extends`/`implements` semantics are required (e.g. class contracts).
+- Name type files with `.types.ts` suffix when they contain type definitions.
+
 ### Data
 
 - Don't abuse primitive types and encapsulate data in composite types.
@@ -68,7 +74,7 @@ Generate code, corrections, and refactorings that comply with the basic principl
 
 - Follow SOLID principles.
 - Prefer composition over inheritance.
-- Declare interfaces to define contracts.
+- Declare types or interfaces to define contracts (prefer type for data-only contracts).
 - Write small classes with a single purpose.
   - Less than 200 instructions.
   - Less than 10 public methods.

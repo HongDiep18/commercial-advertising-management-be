@@ -159,7 +159,7 @@ export class AdsService {
           orderBy: { sortOrder: 'asc' },
           include: {
             pricing: {
-              where: { isActive: true },
+              where: { isActive: true, deletedAt: null },
               orderBy: { finalPrice: 'asc' },
             },
           },

@@ -83,7 +83,14 @@ export class AdPackagePricingService {
   async listPricing(
     query: AdminPricingListQueryDto,
   ): Promise<AdminPricingListResponseDto> {
-    const { packageId, pricingModel, isActive, page = 1, limit = 20 } = query;
+    const {
+      packageId,
+      pricingModel,
+      isActive,
+      includeDeleted = false,
+      page = 1,
+      limit = 20,
+    } = query;
 
     // Build where clause
     const where: Prisma.AdPackagePricingWhereInput = {};
@@ -98,6 +105,10 @@ export class AdPackagePricingService {
 
     if (isActive !== undefined) {
       where.isActive = isActive;
+    }
+
+    if (!includeDeleted) {
+      where.deletedAt = null;
     }
 
     // Get total count
@@ -162,13 +173,26 @@ export class AdPackagePricingService {
   ): Promise<AdminPricingResponseDto> {
     const existingPricing = await this.prisma.adPackagePricing.findUnique({
       where: { id: pricingId },
-      select: { id: true, basePrice: true, discountRate: true },
+      select: {
+        id: true,
+        basePrice: true,
+        discountRate: true,
+        deletedAt: true,
+      },
     });
 
     if (!existingPricing) {
       throw new NotFoundException({
         code: 'PRICING_NOT_FOUND',
         message: 'Pricing option not found',
+      });
+    }
+
+    if (existingPricing.deletedAt) {
+      throw new BadRequestException({
+        code: 'PRICING_DELETED',
+        message:
+          'Cannot update a deleted pricing option. Restore it first if needed.',
       });
     }
 
@@ -225,12 +249,13 @@ export class AdPackagePricingService {
   }
 
   /**
-   * Delete a pricing option
+   * Delete a pricing option (soft delete).
+   * Sets deletedAt so the row is kept for referential integrity with orders/active ads.
    */
   async deletePricing(pricingId: string): Promise<{ message: string }> {
     const pricing = await this.prisma.adPackagePricing.findUnique({
       where: { id: pricingId },
-      select: { id: true },
+      select: { id: true, deletedAt: true },
     });
 
     if (!pricing) {
@@ -240,26 +265,13 @@ export class AdPackagePricingService {
       });
     }
 
-    // Check if pricing is used in any orders or active ads
-    const [orderItemsCount, activeAdsCount] = await Promise.all([
-      this.prisma.adOrderItem.count({
-        where: { pricingId },
-      }),
-      this.prisma.activeAd.count({
-        where: { pricingId },
-      }),
-    ]);
-
-    if (orderItemsCount > 0 || activeAdsCount > 0) {
-      throw new BadRequestException({
-        code: 'PRICING_IN_USE',
-        message:
-          'Cannot delete pricing option that is used in orders or active ads. Consider deactivating it instead.',
-      });
+    if (pricing.deletedAt) {
+      return { message: 'Pricing option was already deleted' };
     }
 
-    await this.prisma.adPackagePricing.delete({
+    await this.prisma.adPackagePricing.update({
       where: { id: pricingId },
+      data: { deletedAt: new Date() },
     });
 
     return { message: 'Pricing option deleted successfully' };
@@ -280,6 +292,7 @@ export class AdPackagePricingService {
       finalPrice: Number(pricing.finalPrice),
       isActive: pricing.isActive,
       createdAt: pricing.createdAt,
+      deletedAt: pricing.deletedAt ?? undefined,
     };
   }
 }

@@ -3,12 +3,14 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Post,
   Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
+import { StreamableFile } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -191,5 +193,43 @@ export class AdOrdersController {
     @Query() query: UserOrderHistoryQueryDto,
   ): Promise<UserOrderHistoryResponseDto> {
     return this.adOrdersService.getUserOrderHistory(user.userId, query);
+  }
+
+  /**
+   * Download order invoice as PDF
+   */
+  @Get(':orderId/invoice')
+  @ApiOperation({
+    summary: 'Download order invoice',
+    description:
+      'Download a PDF invoice for the specified order. Only the order owner can download.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice PDF file',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({ status: 403, description: 'Not authorized to access this order' })
+  @Header('Content-Type', 'application/pdf')
+  async downloadOrderInvoice(
+    @CurrentUser() user: UserPayload,
+    @Param('orderId') orderId: string,
+  ): Promise<StreamableFile> {
+    const { stream, filename } = await this.adOrdersService.getOrderInvoice(
+      user.userId,
+      orderId,
+    );
+    return new StreamableFile(stream, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+    });
   }
 }

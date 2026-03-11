@@ -8,7 +8,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { REGISTRATION_MEMBERSHIP_LEVELS } from '../../common/enums/membership-tier.enum';
+import { REGISTRATION_MEMBERSHIP_LEVELS } from '../../../common/enums/membership-tier.enum';
 
 export class RegisterDto {
   @IsNotEmpty()

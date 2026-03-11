@@ -3,8 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { AuditModule } from './audit/audit.module';
-import { AuthModule } from './auth/auth.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import {
   appConfig,
@@ -15,7 +15,7 @@ import {
   storageConfig,
 } from './config';
 import { DatabaseModule } from './database/database.module';
-import { MailModule } from './mail/mail.module';
+import { MailModule } from './modules/mail/mail.module';
 import { ActiveAdsModule } from './modules/active-ads/active-ads.module';
 import { AdOrdersModule } from './modules/ad-orders/ad-orders.module';
 import { AdsModule } from './modules/ads/ads.module';

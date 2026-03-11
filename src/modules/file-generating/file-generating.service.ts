@@ -74,7 +74,7 @@ export class FileGeneratingService {
 
     doc.fontSize(9);
     doc.text('Item', col1, tableTop);
-    doc.text('Pricing', col2, tableTop);
+    doc.text('Duration', col2, tableTop);
     doc.text('Start Date', col3, tableTop);
     doc.text('Qty', col4, tableTop);
     doc.text('Unit Price', col5, tableTop);

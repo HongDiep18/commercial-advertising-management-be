@@ -7,6 +7,7 @@ import type {
   CompanyData,
 } from '../ad-effects/interfaces/ad-effect.interface';
 import type {
+  CompanyCategoriesResponseDto,
   CompanyDirectoryItemDto,
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
@@ -18,6 +19,7 @@ type CompanyWithActiveAdsRecord = {
   id: string;
   companyNameVi: string | null;
   companyNameCn: string | null;
+  logoUrl: string | null;
   email: string;
   contactName: string | null;
   phone: string;
@@ -426,6 +428,7 @@ export class CompaniesService {
       return {
         id: company.id,
         name,
+        logoUrl: company.logoUrl ?? null,
         email: company.email,
         contactName: company.contactName ?? '',
         phone: company.phone,
@@ -458,5 +461,21 @@ export class CompaniesService {
         totalPages,
       },
     };
+  }
+
+  async getCompanyCategories(): Promise<CompanyCategoriesResponseDto> {
+    const grouped = await this.prisma.company.groupBy({
+      by: ['industry'],
+      _count: {
+        _all: true,
+      },
+    });
+    const categories: CompanyCategoriesResponseDto['categories'] = grouped
+      .filter((item) => item.industry !== null)
+      .map((item) => ({
+        industry: item.industry ?? '',
+        count: item._count._all,
+      }));
+    return { categories };
   }
 }

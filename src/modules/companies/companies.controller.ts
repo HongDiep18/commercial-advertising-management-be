@@ -11,6 +11,7 @@ import { CompaniesService } from './companies.service';
 import {
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
+  CompanyCategoriesResponseDto,
 } from './dto/company-directory.dto';
 import { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -68,6 +69,23 @@ export class CompaniesController {
     @Query() query: CompanyDirectoryQueryDto,
   ): Promise<CompanyDirectoryResponseDto> {
     return this.companiesService.getCompanyDirectory(query);
+  }
+
+  @Get('categories')
+  @Public()
+  @ApiOperation({
+    summary: 'Get all company categories with counts',
+    description:
+      'Returns directory categories and the number of companies in each category.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of company categories with counts',
+    type: CompanyCategoriesResponseDto,
+  })
+  async getCompanyCategories(): Promise<CompanyCategoriesResponseDto> {
+    const result = await this.companiesService.getCompanyCategories();
+    return result;
   }
 
   @Get('featured')

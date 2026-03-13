@@ -61,6 +61,8 @@ services:
       - .:/app
       - /app/node_modules
     command: pnpm start:dev
+    profiles:
+      - dev
 
   prod:
     build:

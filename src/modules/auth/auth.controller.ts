@@ -10,6 +10,7 @@ import {
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -24,6 +25,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { ThrottleAuth } from '../../common/decorators/throttle-auth.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/enums';
 import { FileUploadService } from '../file-upload/file-upload.service';
@@ -37,6 +39,7 @@ import {
   UPDATE_PROFILE_FORM_KEYS,
 } from './dto/update-profile.dto';
 import { UpdateProfileRequestStatusDto } from './dto/update-profile-request-status.dto';
+import { UpdateUserActiveDto } from './dto/update-user-active.dto';
 
 const UPDATE_PROFILE_MULTIPART_SCHEMA = {
   type: 'object',
@@ -63,9 +66,12 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @ThrottleAuth()
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Returns JWT and user info' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Account not approved' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   @ApiBody({ type: LoginDto, description: 'Email and password credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto.email, loginDto.password);
@@ -73,6 +79,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
+  @ThrottleAuth()
   @ApiOperation({ summary: 'Submit company profile registration request' })
   @ApiResponse({
     status: 201,
@@ -82,18 +89,21 @@ export class AuthController {
     status: 409,
     description: 'Email already registered or pending request',
   })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Post('forgot-password')
   @Public()
+  @ThrottleAuth()
   @ApiOperation({ summary: 'Request password reset email' })
   @ApiResponse({
     status: 200,
     description:
       'If the email is registered, a reset link is sent (same message either way)',
   })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   @ApiBody({ type: ForgotPasswordDto })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
@@ -177,5 +187,51 @@ export class AuthController {
     @Query('status') status?: string,
   ): Promise<unknown> {
     return this.authService.getAllProfileRequests(status);
+  }
+
+  @Patch('users/:id/active')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Enable or disable a user account',
+    description:
+      'Set isActive to true (enable) or false (disable). :id is the userId (e.g. from getAllProfileRequests item.userId). Disabled users cannot log in.',
+  })
+  @ApiBody({ type: UpdateUserActiveDto })
+  @ApiResponse({ status: 200, description: 'User active status updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin or Super Admin only',
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async setUserActive(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserActiveDto,
+    @CurrentUser('userId') adminUserId: string,
+  ) {
+    return this.authService.setUserActive(adminUserId, id, dto.isActive);
+  }
+
+  @Delete('users/:id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Soft-delete user',
+    description:
+      'Sets user isActive to false and deletedAt to now. Stronger than disable; use PATCH to enable (clears deletedAt).',
+  })
+  @ApiResponse({ status: 200, description: 'User soft-deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin or Super Admin only',
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async deleteUser(
+    @Param('id') id: string,
+    @CurrentUser('userId') adminUserId: string,
+  ) {
+    return this.authService.softDeleteUser(adminUserId, id);
   }
 }

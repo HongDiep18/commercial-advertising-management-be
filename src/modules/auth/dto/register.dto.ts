@@ -1,14 +1,11 @@
 import {
   IsEmail,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
-  ValidateIf,
 } from 'class-validator';
-import { REGISTRATION_MEMBERSHIP_LEVELS } from '../../../common/enums/membership-tier.enum';
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -63,11 +60,11 @@ export class RegisterDto {
   @MaxLength(128)
   country: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(128)
-  region: string;
+  region?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -92,13 +89,4 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(32)
   captcha: string;
-
-  @IsOptional()
-  @ValidateIf((_o, v) => v != null && v !== '')
-  @IsString()
-  @IsIn(REGISTRATION_MEMBERSHIP_LEVELS as unknown as string[], {
-    message: `membership_tier must be one of: ${REGISTRATION_MEMBERSHIP_LEVELS.join(', ')}`,
-  })
-  @MaxLength(32)
-  membership_tier?: string;
 }

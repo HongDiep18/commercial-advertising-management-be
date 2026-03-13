@@ -10,9 +10,6 @@ export const REGISTRATION_MEMBERSHIP_LEVELS: MembershipTier[] = Object.values(
   MembershipTier,
 ) as MembershipTier[];
 
-export const DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL: MembershipTier =
-  MembershipTier.NONE;
-
 export const TIER_THRESHOLDS = {
   [MembershipTier.BRONZE]: { points: 50_000, spending: 0 },
   [MembershipTier.SILVER]: { points: 150_000, spending: 80_000 },

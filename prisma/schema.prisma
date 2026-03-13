@@ -106,12 +106,12 @@ model CompanyProfileRequest {
   contactPhone   String @db.VarChar(32)
   companyAddress String @db.VarChar(512)
   country        String @db.VarChar(128)
-  region         String @db.VarChar(128)
+  region         String? @db.VarChar(128)
   industry       String @db.VarChar(128)
   website        String @db.VarChar(2048)
   introduction   String @db.Text
   captcha        String? @db.VarChar(32)
-  membershipTier MembershipTier @default(NONE)
+  membershipTier MembershipTier @default(BRONZE)
 
   status CompanyProfileRequestStatus @default(PENDING)
 
@@ -133,12 +133,13 @@ model User {
   role     String @default("MEMBER") @db.VarChar(32)
 
   isActive       Boolean        @default(true)
-  membershipTier MembershipTier @default(NONE)
+  membershipTier MembershipTier @default(BRONZE)
   loyaltyPoints  Int            @default(0)
 
   companyId String? @map("company_id") @db.Uuid
   setPasswordToken         String?   @db.VarChar(255)
   setPasswordTokenExpiresAt DateTime?
+  deletedAt DateTime? @map("deleted_at")
 
   company   Company?    @relation(fields: [companyId], references: [id])
   adOrders  AdOrder[]

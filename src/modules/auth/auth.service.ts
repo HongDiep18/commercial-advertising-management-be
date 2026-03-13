@@ -21,7 +21,9 @@ import { Role } from '../../common/enums/role.enum';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
-import { DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL } from '../../common/enums/membership-tier.enum';
+
+import { assertUserActive } from './auth.utils';
+
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
@@ -132,7 +134,7 @@ export class AuthService {
     if (!user) return null;
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return null;
-    if (!user.isActive) return null;
+    assertUserActive(user);
     return user;
   }
 
@@ -195,9 +197,6 @@ export class AuthService {
   private static toCompanyProfileRequestCreateInput(
     data: RegisterDto,
   ): Omit<Prisma.CompanyProfileRequestCreateInput, 'email' | 'status'> {
-    const membershipTier =
-      (data.membership_tier?.trim() as MembershipTier | undefined) ??
-      DEFAULT_REGISTRATION_MEMBERSHIP_LEVEL;
     return {
       companyNameVi: data.company_name_vi.trim(),
       companyNameCn: data.company_name_cn.trim(),
@@ -207,13 +206,15 @@ export class AuthService {
       contactPhone: data.contact_phone?.trim() || data.phone.trim(),
       companyAddress: data.company_address.trim(),
       country: data.country.trim(),
-      region: data.region.trim(),
+      ...(data.region && data.region.trim()
+        ? { region: data.region.trim() }
+        : {}),
       industry: data.industry.trim(),
       website: data.website.trim(),
       introduction: data.introduction.trim(),
       captcha: data.captcha.trim(),
-      membershipTier,
-    };
+      membershipTier: MembershipTier.BRONZE,
+    } as Omit<Prisma.CompanyProfileRequestCreateInput, 'email' | 'status'>;
   }
 
   private static dtoToProfileData(
@@ -359,10 +360,123 @@ export class AuthService {
       status && validStatuses.includes(status)
         ? { status: status as CompanyProfileRequestStatus }
         : undefined;
-    return this.prisma.companyProfileRequest.findMany({
+    const requests = await this.prisma.companyProfileRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
+
+    const approvedEmails = requests
+      .filter((r) => r.status === CompanyProfileRequestStatus.APPROVED)
+      .map((r) => r.email.trim().toLowerCase());
+    const userByEmail = new Map<string, { id: string; isActive: boolean }>();
+    if (approvedEmails.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          email: { in: [...new Set(approvedEmails)] },
+          deletedAt: null,
+        },
+        select: { id: true, email: true, isActive: true },
+      });
+      for (const u of users) {
+        userByEmail.set(u.email.trim().toLowerCase(), {
+          id: u.id,
+          isActive: u.isActive,
+        });
+      }
+    }
+
+    return requests
+      .filter((r) => {
+        if (r.status !== CompanyProfileRequestStatus.APPROVED) return true;
+        const emailKey = r.email.trim().toLowerCase();
+        // Hide approved requests whose user has been soft-deleted (no active user entry)
+        return userByEmail.has(emailKey);
+      })
+      .map((r) => {
+        const user =
+          r.status === CompanyProfileRequestStatus.APPROVED
+            ? userByEmail.get(r.email.trim().toLowerCase())
+            : undefined;
+        return {
+          ...r,
+          userId: user?.id ?? null,
+          isActive: user?.isActive ?? null,
+        };
+      });
+  }
+
+  async setUserActive(
+    adminUserId: string,
+    id: string,
+    isActive: boolean,
+  ): Promise<{ id: string; email: string; isActive: boolean }> {
+    let target = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, isActive: true },
+    });
+    if (!target) {
+      target = await this.prisma.user.findFirst({
+        where: { companyId: id },
+        select: { id: true, email: true, isActive: true },
+      });
+    }
+    if (!target) {
+      throw new NotFoundException('User not found');
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: target.id },
+      data: { isActive },
+      select: { id: true, email: true, isActive: true },
+    });
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.USER,
+      action: AUDIT_ACTION.USER_ACTIVE_CHANGED,
+      entityId: target.id,
+      actorId: adminUserId,
+      oldValue: String(target.isActive),
+      newValue: String(isActive),
+    });
+    return updated;
+  }
+
+  async softDeleteUser(
+    adminUserId: string,
+    userId: string,
+  ): Promise<{ id: string; email: string; isActive: boolean }> {
+    const target = (await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, isActive: true, deletedAt: true } as {
+        id: boolean;
+        email: boolean;
+        isActive: boolean;
+        deletedAt: boolean;
+      },
+    })) as {
+      id: string;
+      email: string;
+      isActive: boolean;
+      deletedAt: Date | null;
+    } | null;
+    if (!target) {
+      throw new NotFoundException('User not found');
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+        deletedAt: new Date(),
+      } as Prisma.UserUpdateInput,
+      select: { id: true, email: true, isActive: true },
+    });
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.USER,
+      action: AUDIT_ACTION.USER_SOFT_DELETED,
+      entityId: userId,
+      actorId: adminUserId,
+      oldValue: target.deletedAt ? 'deleted' : String(target.isActive),
+      newValue: 'deleted',
+    });
+    return updated;
   }
 
   private async saveCompanyProfile(input: {
@@ -587,11 +701,15 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({
+    const user = (await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
-      select: { id: true, isActive: true },
-    });
-    if (!user || !user.isActive) {
+      select: { id: true, isActive: true, deletedAt: true } as {
+        id: boolean;
+        isActive: boolean;
+        deletedAt: boolean;
+      },
+    })) as { id: string; isActive: boolean; deletedAt: Date | null } | null;
+    if (!user || !user.isActive || user.deletedAt != null) {
       return {
         message:
           'If an account exists with this email, you will receive a password reset link.',

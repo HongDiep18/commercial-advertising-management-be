@@ -96,17 +96,52 @@ export class CompaniesService {
    * Computes effects on the fly using active ads and the ad effects registry.
    */
   async getPopupCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.getPopupCompaniesBySlotTypes(
+      [AdPackageType.POPUP_PRIORITY_SLOT, AdPackageType.POPUP_ROTATION_SLOT],
+      [AdPackageType.POPUP_PRIORITY_SLOT, AdPackageType.POPUP_ROTATION_SLOT],
+    );
+  }
+
+  /**
+   * Get companies with POPUP_PRIORITY_SLOT ads.
+   * Computes effects on the fly using active ads and the ad effects registry.
+   */
+  async getPopupPriorityCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.getPopupCompaniesBySlotTypes(
+      [AdPackageType.POPUP_PRIORITY_SLOT],
+      [
+        AdPackageType.POPUP_PRIORITY_SLOT,
+        AdPackageType.POPUP_RANKING_ADJUSTMENT,
+      ],
+    );
+  }
+
+  /**
+   * Get companies with POPUP_ROTATION_SLOT ads.
+   * Computes effects on the fly using active ads and the ad effects registry.
+   */
+  async getPopupRotationalCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.getPopupCompaniesBySlotTypes(
+      [AdPackageType.POPUP_ROTATION_SLOT],
+      [
+        AdPackageType.POPUP_ROTATION_SLOT,
+        AdPackageType.POPUP_RANKING_ADJUSTMENT,
+      ],
+    );
+  }
+
+  private async getPopupCompaniesBySlotTypes(
+    requiredSlotTypes: readonly AdPackageType[],
+    includedSlotTypes: readonly AdPackageType[],
+  ): Promise<CompanyWithAdsResponseDto[]> {
     const now = new Date();
 
-    const queryArgs = {
+    const queryArgs: Prisma.CompanyFindManyArgs = {
       where: {
         activeAds: {
           some: {
             packageType: {
-              in: [
-                AdPackageType.POPUP_PRIORITY_SLOT,
-                AdPackageType.POPUP_ROTATION_SLOT,
-              ],
+              in: [...requiredSlotTypes],
             },
             isActive: true,
             startDate: { lte: now },
@@ -120,6 +155,9 @@ export class CompaniesService {
             isActive: true,
             startDate: { lte: now },
             OR: [{ endDate: null }, { endDate: { gte: now } }],
+            packageType: {
+              in: [...includedSlotTypes],
+            },
           },
           include: {
             orderItem: {
@@ -154,6 +192,7 @@ export class CompaniesService {
       return {
         id: company.id,
         name,
+        logoUrl: company.logoUrl,
         email: company.email,
         contactName: company.contactName ?? '',
         phone: company.phone,
@@ -243,6 +282,7 @@ export class CompaniesService {
       return {
         id: company.id,
         name,
+        logoUrl: company.logoUrl,
         email: company.email,
         contactName: company.contactName ?? '',
         phone: company.phone,
@@ -267,12 +307,25 @@ export class CompaniesService {
     const now = new Date();
 
     const queryArgs = {
-      include: {
+      where: {
         activeAds: {
-          where: {
+          some: {
+            packageType: AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
             isActive: true,
             startDate: { lte: now },
             OR: [{ endDate: null }, { endDate: { gte: now } }],
+          },
+        },
+      },
+      include: {
+        activeAds: {
+          where: {
+            packageType: {
+              in: [
+                AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
+                AdPackageType.FEATURED_HIGHLIGHT_BOOST,
+              ],
+            },
           },
           include: {
             orderItem: {
@@ -307,6 +360,7 @@ export class CompaniesService {
       return {
         id: company.id,
         name,
+        logoUrl: company.logoUrl,
         email: company.email,
         contactName: company.contactName ?? '',
         phone: company.phone,

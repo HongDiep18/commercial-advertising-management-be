@@ -41,6 +41,7 @@ export class CompaniesController {
     return {
       id: company.id,
       name,
+      logoUrl: company.logoUrl ?? null,
       email: company.email,
       contactName: company.contactName ?? '',
       phone: company.phone,

@@ -7,6 +7,12 @@ export class CompanyWithAdsResponseDto {
   @ApiProperty()
   name!: string;
 
+  @ApiPropertyOptional({
+    description: 'Company logo URL',
+    nullable: true,
+  })
+  logoUrl?: string | null;
+
   @ApiProperty()
   email!: string;
 

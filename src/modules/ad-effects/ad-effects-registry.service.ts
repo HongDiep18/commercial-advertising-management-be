@@ -71,17 +71,11 @@ export class AdEffectsRegistryService {
    */
   getApplicableEffects(activeAds: ActiveAdInfo[]): AdEffect[] {
     const applicableEffects: AdEffect[] = [];
-    const processedTypes = new Set<AdPackageType>();
 
     for (const ad of activeAds) {
-      if (processedTypes.has(ad.packageType)) {
-        continue;
-      }
-
       const effect = this.effects.get(ad.packageType);
       if (effect && effect.shouldApply(activeAds)) {
         applicableEffects.push(effect);
-        processedTypes.add(ad.packageType);
       }
     }
 

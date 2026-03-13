@@ -9,15 +9,14 @@ import {
 import { Public } from '../../common/decorators/public.decorator';
 import { CompaniesService } from './companies.service';
 import {
+  CompanyCategoriesResponseDto,
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
-  CompanyCategoriesResponseDto,
 } from './dto/company-directory.dto';
 import { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 
 @ApiTags('Companies')
-@ApiBearerAuth()
 @Controller('companies')
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
@@ -32,6 +31,7 @@ export class CompaniesController {
     description: 'Company created successfully',
     type: CompanyWithAdsResponseDto,
   })
+  @ApiBearerAuth()
   async createCompany(
     @Body() dto: CreateCompanyDto,
   ): Promise<CompanyWithAdsResponseDto> {
@@ -90,6 +90,7 @@ export class CompaniesController {
   }
 
   @Get('featured')
+  @Public()
   @ApiOperation({
     summary: 'Get all companies with featured effects',
     description:

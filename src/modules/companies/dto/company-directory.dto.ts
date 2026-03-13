@@ -76,6 +76,12 @@ export class CompanyDirectoryItemDto {
   @ApiProperty({ example: 'VN Buyer Guide Co.' })
   name!: string;
 
+  @ApiPropertyOptional({
+    description: 'Public logo URL for company card',
+    example: 'https://cdn.example.com/company-logos/acme.png',
+  })
+  logoUrl?: string | null;
+
   @ApiProperty({ example: 'contact@vnbuyerguide.com' })
   email!: string;
 
@@ -132,4 +138,23 @@ export class CompanyDirectoryResponseDto {
     total: number;
     totalPages: number;
   };
+}
+
+export class CompanyCategoryItemDto {
+  @ApiProperty({
+    description: 'Raw industry name from the database',
+    example: '紡織、成衣及配件',
+  })
+  industry!: string;
+
+  @ApiProperty({
+    description: 'Number of companies in this category',
+    example: 238,
+  })
+  count!: number;
+}
+
+export class CompanyCategoriesResponseDto {
+  @ApiProperty({ type: [CompanyCategoryItemDto] })
+  categories!: CompanyCategoryItemDto[];
 }

@@ -3,7 +3,8 @@ import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdPackageType } from '@prisma/client';
 import { Public } from '../../common/decorators/public.decorator';
 import { CompanyWithAdsResponseDto } from '../companies/dto/company-with-ads-response.dto';
-import { ActiveAdResponse, ActiveAdsService } from './active-ads.service';
+import type { ActiveAdResponse } from './active-ads.service';
+import { ActiveAdsService } from './active-ads.service';
 
 @ApiTags('Active Ads')
 @Controller('active-ads')
@@ -56,24 +57,40 @@ export class ActiveAdsController {
     return this.activeAdsService.getCompanyActiveAds(companyId);
   }
 
-  @Get('popup')
+  @Get('popup-priority')
   @ApiOperation({
-    summary: 'Get companies for popup display',
+    summary: 'Get companies for popup priority display',
     description:
-      'Returns companies that have POPUP_PRIORITY_SLOT or POPUP_ROTATION_SLOT ads activated. ' +
+      'Returns companies that have POPUP_PRIORITY_SLOT ads activated. ' +
       'If a company has POPUP_VIEW_DETAILS_LINK activated, ad_link_url is included. ' +
       'Companies with POPUP_RANKING_ADJUSTMENT are prioritized.',
   })
   @ApiResponse({
     status: 200,
-    description: 'List of companies eligible for popup display',
+    description: 'List of companies eligible for popup priority display',
     type: CompanyWithAdsResponseDto,
     isArray: true,
   })
-  async getPopupCompanies(): Promise<CompanyWithAdsResponseDto[]> {
-    const companies: CompanyWithAdsResponseDto[] =
-      await this.activeAdsService.getPopupCompanies();
-    return companies;
+  getPopupPriorityCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.activeAdsService.getPopupPriorityCompanies();
+  }
+
+  @Get('popup-rotational')
+  @ApiOperation({
+    summary: 'Get companies for popup rotational display',
+    description:
+      'Returns companies that have POPUP_ROTATION_SLOT ads activated. ' +
+      'If a company has POPUP_VIEW_DETAILS_LINK activated, ad_link_url is included. ' +
+      'Companies with POPUP_RANKING_ADJUSTMENT are prioritized.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of companies eligible for popup rotational display',
+    type: CompanyWithAdsResponseDto,
+    isArray: true,
+  })
+  getPopupRotationalCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.activeAdsService.getPopupRotationalCompanies();
   }
 
   @Get('placement')

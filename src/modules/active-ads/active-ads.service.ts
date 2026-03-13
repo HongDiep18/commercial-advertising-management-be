@@ -177,6 +177,22 @@ export class ActiveAdsService {
   }
 
   /**
+   * Get companies for popup priority display (POPUP_PRIORITY_SLOT).
+   * Delegates to CompaniesService to apply ad effects.
+   */
+  async getPopupPriorityCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.companiesService.getPopupPriorityCompanies();
+  }
+
+  /**
+   * Get companies for popup rotational display (POPUP_ROTATION_SLOT).
+   * Delegates to CompaniesService to apply ad effects.
+   */
+  async getPopupRotationalCompanies(): Promise<CompanyWithAdsResponseDto[]> {
+    return this.companiesService.getPopupRotationalCompanies();
+  }
+
+  /**
    * Get companies for print placement based on active print placement ads.
    * Delegates to CompaniesService to apply ad effects.
    */

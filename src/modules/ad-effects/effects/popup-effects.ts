@@ -81,7 +81,7 @@ export class PopupRankingAdjustmentEffect implements AdEffect {
       const currentPriority = context.company.sortPriority ?? 0;
       return {
         ...context.company,
-        sortPriority: currentPriority + 100, // Boost priority significantly
+        sortPriority: currentPriority + 1, // Boost priority significantly
       };
     }
 

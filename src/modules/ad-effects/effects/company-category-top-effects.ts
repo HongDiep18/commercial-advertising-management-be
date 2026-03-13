@@ -23,11 +23,12 @@ export class CompanyCategoryTopEffect implements AdEffect {
     const hasCategoryTop = context.activeAds.some(
       (ad) => ad.packageType === AdPackageType.COMPANY_CATEGORY_TOP,
     );
+    const currentPriority = context.company.sortPriority ?? 0;
 
     if (hasCategoryTop) {
       return {
         ...context.company,
-        sortPriority: 500, // High priority for category top placement
+        sortPriority: currentPriority + 1,
       };
     }
 

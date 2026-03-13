@@ -25,10 +25,7 @@ export class FeaturedHomepageDisplayEffect implements AdEffect {
     );
 
     if (hasFeaturedDisplay) {
-      return {
-        ...context.company,
-        sortPriority: 1000, // High priority to move to top
-      };
+      return { ...context.company };
     }
 
     return { ...context.company };
@@ -54,9 +51,11 @@ export class FeaturedHighlightBoostEffect implements AdEffect {
     );
 
     if (hasHighlightBoost) {
+      const currentPriority = context.company.sortPriority ?? 0;
       return {
         ...context.company,
         featuredHighlight: true,
+        sortPriority: currentPriority + 1,
       };
     }
 

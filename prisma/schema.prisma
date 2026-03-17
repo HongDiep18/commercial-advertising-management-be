@@ -97,20 +97,20 @@ model CompanyProfileRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email          String @db.VarChar(255)
-  companyNameVi  String @db.VarChar(255)
-  companyNameCn  String @db.VarChar(255)
-  phone          String @db.VarChar(32)
-  taxId          String @db.VarChar(64)
-  contactName    String @map("contact_name") @db.VarChar(255)
-  contactPhone   String @db.VarChar(32)
-  companyAddress String @db.VarChar(512)
-  country        String @db.VarChar(128)
-  region         String? @db.VarChar(128)
-  industry       String @db.VarChar(128)
-  website        String @db.VarChar(2048)
-  introduction   String @db.Text
-  captcha        String? @db.VarChar(32)
+  email          String         @db.VarChar(255)
+  companyNameVi  String         @db.VarChar(255)
+  companyNameCn  String         @db.VarChar(255)
+  phone          String         @db.VarChar(32)
+  taxId          String         @db.VarChar(64)
+  contactName    String         @map("contact_name") @db.VarChar(255)
+  contactPhone   String         @db.VarChar(32)
+  companyAddress String         @db.VarChar(512)
+  country        String         @db.VarChar(128)
+  region         String?        @db.VarChar(128)
+  industry       String         @db.VarChar(128)
+  website        String         @db.VarChar(2048)
+  introduction   String         @db.Text
+  captcha        String?        @db.VarChar(32)
   membershipTier MembershipTier @default(BRONZE)
 
   status CompanyProfileRequestStatus @default(PENDING)
@@ -137,16 +137,17 @@ model User {
   loyaltyPoints  Int            @default(0)
   totalSpending  BigInt         @default(0) @map("total_spending")
 
-  companyId String? @map("company_id") @db.Uuid
-  setPasswordToken         String?   @db.VarChar(255)
+  companyId                 String?   @map("company_id") @db.Uuid
+  setPasswordToken          String?   @db.VarChar(255)
   setPasswordTokenExpiresAt DateTime?
-  deletedAt DateTime? @map("deleted_at")
-  lastLoginAt DateTime? @map("last_login_at")
+  deletedAt                 DateTime? @map("deleted_at")
+  lastLoginAt               DateTime? @map("last_login_at")
 
-  company            Company?             @relation(fields: [companyId], references: [id])
+  company            Company?            @relation(fields: [companyId], references: [id])
   adOrders           AdOrder[]
-  auditLogs          AuditLog[]           @relation("AuditLogActor")
+  auditLogs          AuditLog[]          @relation("AuditLogActor")
   pointsTransactions PointsTransaction[]
+  chatSession        ChatSession?
 
   @@index([email])
   @@index([role])
@@ -159,11 +160,11 @@ model PointsTransaction {
   id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
 
-  userId      String @map("user_id") @db.Uuid
-  user        User   @relation(fields: [userId], references: [id])
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  points      Int    // Can be positive (earned) or negative (deducted)
-  balance     Int    // Running balance after this transaction
+  points      Int // Can be positive (earned) or negative (deducted)
+  balance     Int // Running balance after this transaction
   source      String @db.VarChar(64) // REGISTRATION, LOGO_UPLOAD, AD_PURCHASE, etc.
   description String @db.VarChar(512)
   metadata    Json?  @db.JsonB // Additional data (order ID, etc.)
@@ -249,24 +250,24 @@ enum AdOrderStatus {
 }
 
 model Company {
-  id     String   @id @default(uuid()) @db.Uuid
-  email  String   @unique @db.VarChar(255)
-  phone  String   @db.VarChar(50)
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique @db.VarChar(255)
+  phone       String   @db.VarChar(50)
   industry    String   @db.VarChar(255)
   address     String   @db.VarChar(255)
   description String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Profile fields (consolidated from UserProfile)
-  logoUrl        String? @map("logo_url") @db.VarChar(2048)
-  companyNameVi  String? @map("company_name_vi") @db.VarChar(255)
-  companyNameCn  String? @map("company_name_cn") @db.VarChar(255)
-  taxId          String? @map("tax_id") @db.VarChar(64)
-  country        String? @db.VarChar(128)
-  region         String? @db.VarChar(128)
-  website        String? @db.VarChar(2048)
-  contactName    String? @map("contact_name") @db.VarChar(255)
-  contactPhone   String? @map("contact_phone") @db.VarChar(32)
+  logoUrl       String? @map("logo_url") @db.VarChar(2048)
+  companyNameVi String? @map("company_name_vi") @db.VarChar(255)
+  companyNameCn String? @map("company_name_cn") @db.VarChar(255)
+  taxId         String? @map("tax_id") @db.VarChar(64)
+  country       String? @db.VarChar(128)
+  region        String? @db.VarChar(128)
+  website       String? @db.VarChar(2048)
+  contactName   String? @map("contact_name") @db.VarChar(255)
+  contactPhone  String? @map("contact_phone") @db.VarChar(32)
 
   users     User[]
   adOrders  AdOrder[]
@@ -419,9 +420,9 @@ model ActiveAd {
   approvedAt DateTime @default(now()) @map("approved_at")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  company   Company     @relation(fields: [companyId], references: [id])
-  order     AdOrder?    @relation(fields: [orderId], references: [id])
-  orderItem AdOrderItem? @relation(fields: [orderItemId], references: [id])
+  company   Company          @relation(fields: [companyId], references: [id])
+  order     AdOrder?         @relation(fields: [orderId], references: [id])
+  orderItem AdOrderItem?     @relation(fields: [orderItemId], references: [id])
   pricing   AdPackagePricing @relation(fields: [pricingId], references: [id])
   assets    ActiveAdAsset[]
 
@@ -446,4 +447,47 @@ model ActiveAdAsset {
 
   @@index([activeAdId], map: "idx_active_ad_assets_active_ad")
   @@map("active_ad_assets")
+}
+
+// ─── Chatbot ──────────────────────────────────────────────────────────────────
+
+// Tracks per-page content hash to detect changes and skip re-embedding unchanged pages
+model CrawledPage {
+  id          String   @id @default(uuid()) @db.Uuid
+  sourceUrl   String   @unique @map("source_url") @db.VarChar(512)
+  pageTitle   String   @map("page_title") @db.VarChar(255)
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  crawledAt   DateTime @default(now()) @map("crawled_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("crawled_pages")
+}
+
+// Stores embedded page chunks for vector similarity search (RAG)
+// id has DB-level DEFAULT gen_random_uuid() — PGVectorStore inserts without providing id
+// sourceUrl and pageTitle are stored in metadata JSONB by PGVectorStore
+model DocumentChunk {
+  id        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content   String                      @db.Text
+  embedding Unsupported("vector(1536)")
+  metadata  Json                        @default("{}") @db.JsonB
+  crawledAt DateTime                    @default(now()) @map("crawled_at")
+
+  @@map("document_chunks")
+}
+
+// Stores conversation history per user (logged-in) or per guest (localStorage UUID)
+model ChatSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String?   @unique @map("user_id") @db.Uuid
+  guestId   String?   @map("guest_id") @db.VarChar(255)
+  messages  Json      @default("[]") @db.JsonB
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  expiresAt DateTime? @map("expires_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([guestId])
+  @@map("chat_sessions")
 }

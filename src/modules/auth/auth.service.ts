@@ -26,6 +26,11 @@ import { assertUserActive } from './auth.utils';
 
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import type {
+  AdminListUsersQueryDto,
+  AdminListUsersResponseDto,
+  AdminUserStatus,
+} from './dto/admin-list-users.dto';
 
 export type AuthUser = {
   id: string;
@@ -143,6 +148,11 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() } as unknown as Prisma.UserUpdateInput,
+      select: { id: true },
+    });
     const payload = {
       userId: user.id,
       email: user.email,
@@ -477,6 +487,151 @@ export class AuthService {
       newValue: 'deleted',
     });
     return updated;
+  }
+
+  async adminListUsers(
+    query: AdminListUsersQueryDto,
+  ): Promise<AdminListUsersResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const search = query.search?.trim();
+    const role = query.role?.trim();
+    const status = query.status;
+
+    const where: Prisma.UserWhereInput = {};
+
+    if (role) {
+      where.role = role;
+    }
+
+    if (status === 'active') {
+      where.isActive = true;
+      where.deletedAt = null;
+    } else if (status === 'suspended') {
+      where.isActive = false;
+      where.deletedAt = null;
+    } else if (status === 'deleted') {
+      where.deletedAt = { not: null };
+    }
+
+    if (search) {
+      const searchOr: Prisma.UserWhereInput[] = [
+        { email: { contains: search, mode: 'insensitive' } },
+        {
+          company: {
+            OR: [
+              { contactName: { contains: search, mode: 'insensitive' } },
+              { companyNameVi: { contains: search, mode: 'insensitive' } },
+              { companyNameCn: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ];
+      const existingAnd: Prisma.UserWhereInput[] = [];
+      if (where.AND) {
+        if (Array.isArray(where.AND)) existingAnd.push(...where.AND);
+        else existingAnd.push(where.AND);
+      }
+      where.AND = [...existingAnd, { OR: searchOr }];
+    }
+
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+
+    let orderBy:
+      | Prisma.UserOrderByWithRelationInput
+      | Prisma.UserOrderByWithRelationInput[] = { createdAt: 'desc' };
+
+    if (sortBy === 'lastLoginAt') {
+      orderBy = {
+        lastLoginAt: sortOrder,
+      } as unknown as Prisma.UserOrderByWithRelationInput;
+    } else if (sortBy === 'email') {
+      orderBy = { email: sortOrder };
+    } else if (sortBy === 'createdAt') {
+      orderBy = { createdAt: sortOrder };
+    } else if (sortBy === 'companyName') {
+      orderBy = [{ company: { companyNameVi: sortOrder } }, { email: 'asc' }];
+    } else if (sortBy === 'status') {
+      orderBy =
+        sortOrder === 'asc'
+          ? [{ deletedAt: 'desc' }, { isActive: 'asc' }]
+          : [{ deletedAt: 'asc' }, { isActive: 'desc' }];
+    }
+
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          deletedAt: true,
+          lastLoginAt: true,
+          companyId: true,
+          company: {
+            select: {
+              contactName: true,
+              companyNameVi: true,
+              companyNameCn: true,
+            },
+          },
+        } as unknown as Prisma.UserSelect,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    type AdminListUserRow = {
+      id: string;
+      email: string;
+      role: string;
+      isActive: boolean;
+      deletedAt: Date | null;
+      lastLoginAt: Date | null;
+      companyId: string | null;
+      company: {
+        contactName: string | null;
+        companyNameVi: string | null;
+        companyNameCn: string | null;
+      } | null;
+    };
+
+    const rows = (users as unknown as AdminListUserRow[]).map((u) => {
+      const statusVal: AdminUserStatus =
+        u.deletedAt != null ? 'deleted' : u.isActive ? 'active' : 'suspended';
+      const company = u.company;
+      return {
+        userId: u.id,
+        companyId: u.companyId,
+        contactName: company?.contactName ?? null,
+        email: u.email,
+        companyNameVi: company?.companyNameVi ?? null,
+        companyNameCn: company?.companyNameCn ?? null,
+        role: u.role,
+        lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+        status: statusVal,
+        isActive: u.isActive,
+        deletedAt: u.deletedAt ? u.deletedAt.toISOString() : null,
+      };
+    });
+
+    return {
+      users: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   private async saveCompanyProfile(input: {

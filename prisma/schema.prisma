@@ -140,6 +140,7 @@ model User {
   setPasswordToken         String?   @db.VarChar(255)
   setPasswordTokenExpiresAt DateTime?
   deletedAt DateTime? @map("deleted_at")
+  lastLoginAt DateTime? @map("last_login_at")
 
   company   Company?    @relation(fields: [companyId], references: [id])
   adOrders  AdOrder[]

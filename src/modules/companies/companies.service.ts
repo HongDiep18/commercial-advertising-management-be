@@ -405,11 +405,20 @@ export class CompaniesService {
         { companyNameCn: { contains: search, mode: 'insensitive' } },
         { industry: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { region: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    if (industry) {
-      where.industry = { contains: industry, mode: 'insensitive' };
+    if (industry && industry.length > 0) {
+      const existingOr: Prisma.CompanyWhereInput[] = [];
+      if (where.OR) {
+        if (Array.isArray(where.OR)) existingOr.push(...where.OR);
+        else existingOr.push(where.OR);
+      }
+      const industryOr: Prisma.CompanyWhereInput[] = industry.map((i) => ({
+        industry: { contains: i, mode: 'insensitive' },
+      }));
+      where.OR = [...existingOr, ...industryOr];
     }
 
     // Get total count
@@ -425,6 +434,8 @@ export class CompaniesService {
       orderBy.companyNameVi = sortOrder;
     } else if (sortBy === 'industry') {
       orderBy.industry = sortOrder;
+    } else if (sortBy === 'region') {
+      orderBy.region = sortOrder;
     } else {
       orderBy.createdAt = sortOrder;
     }

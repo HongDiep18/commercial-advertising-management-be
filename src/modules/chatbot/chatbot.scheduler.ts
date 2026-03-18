@@ -32,7 +32,13 @@ export class ChatbotScheduler implements OnModuleInit {
         'chatbot.crawlCron',
         '0 3 * * 0',
       );
-      const crawlJob = new CronJob(crawlCron, () => void this.runCrawl());
+      const crawlJob = new CronJob(crawlCron, async () => {
+        try {
+          await this.runCrawl();
+        } catch (err) {
+          this.logger.error('[cron] chatbot-crawl failed', (err as Error).stack);
+        }
+      });
       this.schedulerRegistry.addCronJob('chatbot-crawl', crawlJob);
       crawlJob.start();
       this.logger.log(`Chatbot crawl scheduled: ${crawlCron}`);
@@ -43,7 +49,13 @@ export class ChatbotScheduler implements OnModuleInit {
       'chatbot.sessionCleanupCron',
       '0 2 * * *',
     );
-    const cleanupJob = new CronJob(cleanupCron, () => void this.cleanupExpiredSessions());
+    const cleanupJob = new CronJob(cleanupCron, async () => {
+      try {
+        await this.cleanupExpiredSessions();
+      } catch (err) {
+        this.logger.error('[cron] chatbot-session-cleanup failed', (err as Error).stack);
+      }
+    });
     this.schedulerRegistry.addCronJob('chatbot-session-cleanup', cleanupJob);
     cleanupJob.start();
     this.logger.log(`Chatbot session cleanup scheduled: ${cleanupCron}`);

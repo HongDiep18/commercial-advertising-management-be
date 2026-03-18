@@ -10,13 +10,15 @@ import { VECTOR_STORE } from './vectorstore.provider';
 const CRAWL_WHITELIST = [
   '/',
   '/about',
+  '/directory',
+  '/store',
+  '/news',
+  '/property',
   '/contact',
   '/login',
   '/register',
-  '/directory',
-  '/news',
-  '/property',
-  '/store',
+  '/forgot-password',
+  '/set-password',
 ];
 
 
@@ -51,7 +53,7 @@ export class CrawlerService {
         chunksUpserted += result.chunksUpserted;
         pagesProcessed++;
       } catch (err) {
-        this.logger.error(`Failed to crawl ${url}: ${String(err)}`);
+        this.logger.error(`Failed to crawl ${url}`, (err as Error).stack);
       }
     }
 
@@ -68,11 +70,22 @@ export class CrawlerService {
       this.config.get<string>('chatbot.crawl4aiUrl') ?? 'http://crawl4ai:11235';
     const sdkUrl = crawl4aiUrl.replace(':11235', ':11236');
 
-    const response = await fetch(`${sdkUrl}/crawl`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${sdkUrl}/crawl`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'TimeoutError') {
+        throw new Error(`Crawl SDK timed out after 30s for ${url}`);
+      }
+      throw new Error(
+        `Crawl SDK network error for ${url}: ${(err as Error).message}`,
+      );
+    }
 
     if (!response.ok) {
       throw new Error(`Crawl SDK responded ${response.status} for ${url}`);
@@ -112,13 +125,18 @@ export class CrawlerService {
       return null;
     }
 
-    // Delete old chunks for this URL then upsert new ones
-    await this.prisma.$executeRaw`
-      DELETE FROM document_chunks WHERE metadata->>'sourceUrl' = ${url}
-    `;
-
+    // Build and embed new chunks before touching stored data — keeps old chunks
+    // live until the new ones are confirmed, so a transient embedding error
+    // never leaves the page with an empty chunk set.
     const docs = await this.buildDocuments(markdown, url, pageTitle);
-    await this.vectorStore.addDocuments(docs);
+    const newIds = await this.vectorStore.addDocuments(docs);
+
+    // New chunks are in the store — delete only the old ones by excluding the just-inserted IDs
+    await this.prisma.$executeRaw`
+      DELETE FROM document_chunks
+      WHERE metadata->>'sourceUrl' = ${url}
+        AND id != ALL(${newIds}::uuid[])
+    `;
 
     await this.prisma.crawledPage.upsert({
       where: { sourceUrl: url },

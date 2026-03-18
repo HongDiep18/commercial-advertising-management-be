@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,8 +15,9 @@ export class ChatbotApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const configured = this.configService.get<string>('chatbot.apiKey');
 
-    // If no key is configured, skip guard (useful in dev without the key set)
-    if (!configured) return true;
+    if (!configured) {
+      throw new InternalServerErrorException('CHATBOT_API_KEY is not configured');
+    }
 
     const request = context.switchToHttp().getRequest<Request>();
     const provided = (

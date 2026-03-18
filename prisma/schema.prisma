@@ -135,6 +135,7 @@ model User {
   isActive       Boolean        @default(true)
   membershipTier MembershipTier @default(BRONZE)
   loyaltyPoints  Int            @default(0)
+  totalSpending  BigInt         @default(0) @map("total_spending")
 
   companyId String? @map("company_id") @db.Uuid
   setPasswordToken         String?   @db.VarChar(255)
@@ -142,13 +143,34 @@ model User {
   deletedAt DateTime? @map("deleted_at")
   lastLoginAt DateTime? @map("last_login_at")
 
-  company   Company?    @relation(fields: [companyId], references: [id])
-  adOrders  AdOrder[]
-  auditLogs AuditLog[]  @relation("AuditLogActor")
+  company            Company?             @relation(fields: [companyId], references: [id])
+  adOrders           AdOrder[]
+  auditLogs          AuditLog[]           @relation("AuditLogActor")
+  pointsTransactions PointsTransaction[]
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+// ─── Points Transactions ──────────────────────────────────────────────────────
+
+model PointsTransaction {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId      String @map("user_id") @db.Uuid
+  user        User   @relation(fields: [userId], references: [id])
+
+  points      Int    // Can be positive (earned) or negative (deducted)
+  balance     Int    // Running balance after this transaction
+  source      String @db.VarChar(64) // REGISTRATION, LOGO_UPLOAD, AD_PURCHASE, etc.
+  description String @db.VarChar(512)
+  metadata    Json?  @db.JsonB // Additional data (order ID, etc.)
+
+  @@index([userId, createdAt])
+  @@index([source])
+  @@map("points_transactions")
 }
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────

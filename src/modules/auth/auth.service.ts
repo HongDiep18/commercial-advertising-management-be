@@ -18,7 +18,12 @@ import { randomBytes } from 'node:crypto';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { Role } from '../../common/enums/role.enum';
+import {
+  PointsSource,
+  POINTS_VALUES,
+} from '../../common/enums/points-source.enum';
 import { PrismaService } from '../../database/prisma.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
 
@@ -127,6 +132,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly mailService: MailService,
     private readonly auditService: AuditService,
+    private readonly loyaltyService: LoyaltyService,
   ) {}
 
   async validateUser(
@@ -353,6 +359,7 @@ export class AuthService {
       companyId: user.companyId,
       profileData,
     });
+
     return {
       id: user.id,
       email: user.email,
@@ -840,7 +847,7 @@ export class AuthService {
       10,
     );
 
-    await this.prisma.user.create({
+    const createdUser = await this.prisma.user.create({
       data: {
         email: normalizedEmail,
         password: placeholderPassword,
@@ -850,6 +857,22 @@ export class AuthService {
         setPasswordTokenExpiresAt: expiresAt,
       } as Prisma.UserUncheckedCreateInput,
     });
+
+    // Award loyalty points for registration
+    try {
+      const registrationPoints = POINTS_VALUES[PointsSource.REGISTRATION];
+      if (typeof registrationPoints === 'number') {
+        await this.loyaltyService.awardPoints({
+          userId: createdUser.id,
+          points: registrationPoints,
+          source: PointsSource.REGISTRATION,
+          description: 'Registration bonus - Welcome to VN Buyer',
+        });
+      }
+    } catch (error) {
+      // Log error but don't fail the approval process
+      console.error('Failed to award registration bonus:', error);
+    }
 
     await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
   }

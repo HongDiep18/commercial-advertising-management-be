@@ -12,8 +12,12 @@ import {
   Prisma,
 } from '@prisma/client';
 import { Readable } from 'stream';
+import {
+  PointsSource,
+} from '../../common/enums/points-source.enum';
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
@@ -87,6 +91,7 @@ export class AdOrdersService {
     private readonly prisma: PrismaService,
     private readonly fileGeneratingService: FileGeneratingService,
     private readonly mailService: MailService,
+    private readonly loyaltyService: LoyaltyService,
   ) {}
 
   /**
@@ -832,7 +837,7 @@ export class AdOrdersService {
     adminUserId: string,
     dto: AdminApproveOrderDto,
   ): Promise<{ id: string; status: AdOrderStatus; message: string }> {
-    const { result } = await this.prisma.$transaction(async (tx) => {
+    const { result, orderData } = await this.prisma.$transaction(async (tx) => {
       // Check if order exists and is in PENDING status
       const order = await tx.adOrder.findUnique({
         where: { id: orderId },
@@ -889,8 +894,44 @@ export class AdOrdersService {
           status: updatedOrder.status,
           message: 'Order approved successfully and ads activated',
         },
+        orderData: {
+          userId: order.userId,
+          subtotal: order.subtotal,
+        },
       };
     });
+
+    // Award loyalty points and update totalSpending
+    try {
+      // AD_PURCHASE uses DYNAMIC points: 1 VND = 1 point
+      const pointsAmount = Number(orderData.subtotal);
+
+      await this.loyaltyService.awardPoints({
+        userId: orderData.userId,
+        points: pointsAmount,
+        source: PointsSource.AD_PURCHASE,
+        description: `Ad order #${result.id.slice(0, 8)} approved`,
+        metadata: {
+          orderId: result.id,
+          subtotal: orderData.subtotal.toString(),
+          approvedBy: adminUserId,
+        },
+      });
+
+      // Update totalSpending for tier calculation
+      await this.prisma.user.update({
+        where: { id: orderData.userId },
+        data: {
+          totalSpending: { increment: orderData.subtotal },
+        },
+      });
+
+      // Recalculate tier again after totalSpending is updated
+      await this.loyaltyService.recalculateTier(orderData.userId);
+    } catch (error) {
+      // Log error but don't fail the approval (order is already approved)
+      console.error('Failed to award ad purchase points:', error);
+    }
 
     await this.mailService.sendAdOrderDecisionEmail(orderId, true, dto.reason);
     return result;

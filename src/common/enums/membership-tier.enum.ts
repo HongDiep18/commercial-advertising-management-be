@@ -1,14 +1,14 @@
-export enum MembershipTier {
-  NONE = 'NONE',
-  BRONZE = 'BRONZE',
-  SILVER = 'SILVER',
-  GOLD = 'GOLD',
-  DIAMOND = 'DIAMOND',
-}
+// Re-export Prisma's MembershipTier to avoid type conflicts
+export { MembershipTier } from '@prisma/client';
+import { MembershipTier } from '@prisma/client';
 
-export const REGISTRATION_MEMBERSHIP_LEVELS: MembershipTier[] = Object.values(
-  MembershipTier,
-) as MembershipTier[];
+export const REGISTRATION_MEMBERSHIP_LEVELS: MembershipTier[] = [
+  MembershipTier.NONE,
+  MembershipTier.BRONZE,
+  MembershipTier.SILVER,
+  MembershipTier.GOLD,
+  MembershipTier.DIAMOND,
+];
 
 export const TIER_THRESHOLDS = {
   [MembershipTier.BRONZE]: { points: 50_000, spending: 0 },

@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuditModule } from '../audit/audit.module';
 import { FileUploadModule } from '../file-upload/file-upload.module';
+import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -15,6 +16,7 @@ import { AuthService } from './auth.service';
   imports: [
     AuditModule,
     FileUploadModule,
+    LoyaltyModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

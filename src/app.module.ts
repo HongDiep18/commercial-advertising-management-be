@@ -22,6 +22,7 @@ import { AdsModule } from './modules/ads/ads.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { HealthModule } from './modules/health/health.module';
+import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { NewsModule } from './modules/news/news.module';
 
 @Module({
@@ -49,6 +50,7 @@ import { NewsModule } from './modules/news/news.module';
     MailModule,
     AuthModule,
     HealthModule,
+    LoyaltyModule,
     NewsModule,
     AdsModule,
     AdOrdersModule,

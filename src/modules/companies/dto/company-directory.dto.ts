@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CompanyDirectoryQueryDto {
@@ -12,12 +13,32 @@ export class CompanyDirectoryQueryDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by industry',
-    example: 'Manufacturing',
+    description:
+      'Filter by industry (single value, repeated query params, or comma-separated list)',
+    examples: [
+      'Manufacturing',
+      'Manufacturing&industry=Logistics',
+      'Manufacturing,Logistics',
+    ],
   })
   @IsOptional()
-  @IsString()
-  industry?: string;
+  @Transform(({ value }) => {
+    if (value == null) return undefined;
+    if (Array.isArray(value)) {
+      return value
+        .filter((v): v is string => typeof v === 'string')
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+    }
+    return undefined;
+  })
+  industry?: string[];
 
   @ApiPropertyOptional({
     description: 'Page number (1-based)',
@@ -47,13 +68,13 @@ export class CompanyDirectoryQueryDto {
 
   @ApiPropertyOptional({
     description: 'Sort field',
-    enum: ['name', 'industry', 'createdAt'],
+    enum: ['name', 'industry', 'region', 'createdAt'],
     default: 'name',
     example: 'name',
   })
   @IsOptional()
   @IsString()
-  sortBy?: 'name' | 'industry' | 'createdAt' = 'name';
+  sortBy?: 'name' | 'industry' | 'region' | 'createdAt' = 'name';
 
   @ApiPropertyOptional({
     description: 'Sort order',

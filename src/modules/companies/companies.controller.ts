@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -13,6 +13,7 @@ import {
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
 } from './dto/company-directory.dto';
+import { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 
@@ -104,5 +105,20 @@ export class CompaniesController {
   })
   async getFeaturedCompanies(): Promise<CompanyWithAdsResponseDto[]> {
     return this.companiesService.getFeaturedCompanies();
+  }
+
+  @Get(':id')
+  @Public()
+  @ApiOperation({ summary: 'Get company detail' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company detail',
+    type: CompanyDetailResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async getCompanyDetail(
+    @Param('id') id: string,
+  ): Promise<CompanyDetailResponseDto> {
+    return this.companiesService.getCompanyDetail(id);
   }
 }

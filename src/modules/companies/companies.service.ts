@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AdPackageType, type Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
@@ -12,6 +12,7 @@ import type {
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
 } from './dto/company-directory.dto';
+import type { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import type { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
 
@@ -57,6 +58,31 @@ export class CompaniesService {
       },
     });
 
+    return company;
+  }
+
+  async getCompanyDetail(companyId: string): Promise<CompanyDetailResponseDto> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        logoUrl: true,
+        companyNameVi: true,
+        companyNameCn: true,
+        industry: true,
+        email: true,
+        phone: true,
+        address: true,
+        description: true,
+        taxId: true,
+        region: true,
+        website: true,
+        contactName: true,
+      },
+    });
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
     return company;
   }
 

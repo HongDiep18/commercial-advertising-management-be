@@ -21,15 +21,21 @@ export class ContextRetrievalService {
   async vectorRetrieve(query: string): Promise<string> {
     const vectorDocs = await this.vectorStore.similaritySearch(query, 5);
 
-    const keywordQuery = query.slice(0, 80);
-    const keywordDocs = await this.prisma.$queryRaw<
-      { content: string; metadata: Record<string, string> }[]
-    >`
-      SELECT content, metadata
-      FROM document_chunks
-      WHERE content ILIKE ${'%' + keywordQuery + '%'}
-      LIMIT 3
-    `;
+    const keywordDocs =
+      vectorDocs.length >= 3
+        ? []
+        : await this.prisma.$queryRaw<
+            { content: string; metadata: Record<string, string> }[]
+          >`
+            SELECT content, metadata
+            FROM document_chunks
+            WHERE content ILIKE ${'%' + query.slice(0, 80) + '%'}
+            LIMIT 3
+          `;
+
+    this.logger.log(
+      `[vectorRetrieve] vector=${vectorDocs.length} keyword=${keywordDocs.length}`,
+    );
 
     const allDocs = [
       ...vectorDocs.map((d) => ({
@@ -50,30 +56,22 @@ export class ContextRetrievalService {
       return true;
     });
 
-    this.logger.log(`[vectorRetrieve] docs=${unique.length}`);
     return unique.map((d) => d.content).join('\n\n---\n\n');
   }
 
-  async dbRetrieve(query: string): Promise<string> {
-    const q = query.toLowerCase();
-    this.logger.log(`[dbRetrieve] query="${q.slice(0, 80)}"`);
+  async dbRetrieve(query: string, intent: 'ads' | 'news'): Promise<string> {
+    this.logger.log(`[dbRetrieve] intent="${intent}" query="${query.slice(0, 80)}"`);
 
-    if (/news|article|latest|tin tức|新聞|最新/.test(q)) {
-      this.logger.log('[dbRetrieve] → news redirect');
+    if (intent === 'news') {
       return 'For the latest news, please visit the News page at /news on our platform.';
     }
 
-    if (/advertis|ad package|sponsor|quảng cáo|廣告/.test(q)) {
-      this.logger.log('[dbRetrieve] → ad packages lookup');
-      const categories = await this.prisma.adPackageCategory.findMany({
-        where: { isActive: true },
-        orderBy: { sortOrder: 'asc' },
-        select: AD_CATEGORY_SELECT,
-      });
-      return this.formatAdPackages(categories);
-    }
-
-    return 'No live data is available for this query. Answer based on your general knowledge of the platform only.';
+    const categories = await this.prisma.adPackageCategory.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: AD_CATEGORY_SELECT,
+    });
+    return this.formatAdPackages(categories);
   }
 
   private formatAdPackages(categories: AdCategoryWithPackages[]): string {

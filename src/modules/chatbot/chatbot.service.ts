@@ -74,20 +74,37 @@ export class ChatbotService {
       }
     }
 
-    try {
-      if (fullReply.trim()) {
-        await this.sessionService.append(opts, message, fullReply);
-      }
-    } catch (err) {
-      // LangGraph checkpoint already written — chat_sessions is now diverged for this turn.
-      // The LLM retains memory but UI history will be missing this exchange until the next
-      // successful append overwrites it.
-      this.logger.error(
-        `[chat] DIVERGENCE: checkpoint written but chat_sessions append failed for threadId=${threadId}. ` +
-        `UI history is stale for this turn. Error: ${(err as Error).message}`,
-        (err as Error).stack,
-      );
+    if (fullReply.trim()) {
+      await this.appendWithRetry(opts, message, fullReply, threadId);
     }
+  }
+
+  private async appendWithRetry(
+    opts: { userId?: string; guestId?: string },
+    message: string,
+    fullReply: string,
+    threadId: string,
+    maxAttempts = 3,
+  ): Promise<void> {
+    let lastErr: Error | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.sessionService.append(opts, message, fullReply);
+        return;
+      } catch (err) {
+        lastErr = err as Error;
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 200 * attempt));
+        }
+      }
+    }
+    // All retries exhausted — LangGraph checkpoint is written but chat_sessions is stale.
+    // The LLM retains memory but UI history will be missing this exchange.
+    this.logger.error(
+      `[chat] DIVERGENCE: chat_sessions append failed after ${maxAttempts} attempts for threadId=${threadId}. ` +
+        `UI history is stale for this turn. Error: ${lastErr?.message}`,
+      lastErr?.stack,
+    );
   }
 
   getSessionMessages(opts: { userId?: string; guestId?: string }) {
@@ -149,10 +166,8 @@ export class ChatbotService {
     );
 
     return {
-      messages: [
-        ...toSummarize.map((m) => new RemoveMessage({ id: m.id! })),
-        new HumanMessage(`[Conversation summary — earlier context]\n${summaryText}`),
-      ],
+      summary: summaryText,
+      messages: toSummarize.map((m) => new RemoveMessage({ id: m.id! })),
     };
   }
 
@@ -172,9 +187,11 @@ export class ChatbotService {
           'Detected language: "Traditional Chinese", "Vietnamese", or "English"',
         ),
       intent: z
-        .enum(['static', 'data'])
+        .enum(['static', 'ads', 'news'])
         .describe(
-          '"static" for how-to, navigation, registration, general platform questions. "data" for anything about advertising packages, ad pricing, sponsorship options, or latest news — these require live database lookup.',
+          '"static" for how-to, navigation, registration, membership tiers, or any general platform question. ' +
+          '"ads" for anything about advertising packages, ad pricing, sponsorship, or promotion options — requires live database lookup. ' +
+          '"news" for requests about latest news, articles, or recent updates — will redirect to the news page.',
         ),
     });
 
@@ -187,7 +204,7 @@ export class ChatbotService {
       return { lang: result.lang, intent: result.intent };
     } catch (err) {
       this.logger.error('[classify] Failed, falling back to static intent', (err as Error).stack);
-      return { intent: 'static', lang: '' };
+      return { intent: 'static' as const, lang: '' };
     }
   }
 
@@ -203,15 +220,20 @@ export class ChatbotService {
   private async dbRetrieveNode(state: ChatState): Promise<Partial<ChatState>> {
     const context = await this.contextService.dbRetrieve(
       this.lastMessageText(state),
+      state.intent as 'ads' | 'news',
     );
     return { context };
   }
 
   private async generateNode(state: ChatState): Promise<Partial<ChatState>> {
     const systemPrompt = [
-      SYSTEM_GUARDRAILS,
+      SYSTEM_GUARDRAILS.replace('{BASE_URL}', this.baseUrl),
       `\nPlatform base URL: ${this.baseUrl} — always use full URLs when linking to pages (e.g. ${this.baseUrl}/register), never bare paths.`,
+      `\nCurrent date: ${new Date().toISOString().slice(0, 10)}.`,
       `\nRespond in: ${state.lang || 'the same language as the user'}.`,
+      state.summary
+        ? `\n[Earlier conversation summary]\n${state.summary}`
+        : '',
     ].join('\n');
 
     // Context is injected as a human-turn message, not inside the system prompt,

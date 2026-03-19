@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  HttpException,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -21,6 +22,7 @@ import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guar
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
 import { ChatbotService } from './chatbot.service';
 import { CrawlerService } from './crawler.service';
+import { SpamDetectorService } from './spam-detector.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { SessionQueryDto } from './dto/session-query.dto';
 
@@ -30,6 +32,7 @@ export class ChatbotController {
   constructor(
     private readonly chatbotService: ChatbotService,
     private readonly crawlerService: CrawlerService,
+    private readonly spamDetector: SpamDetectorService,
   ) {}
 
   @Post('message')
@@ -42,6 +45,19 @@ export class ChatbotController {
     @CurrentUser() user: UserPayload | undefined,
     @Res() res: Response,
   ): Promise<void> {
+    const identity = user?.userId
+      ? `user:${user.userId}`
+      : `guest:${dto.guestId ?? 'anon'}`;
+
+    const spamResult = this.spamDetector.check(identity, dto.message);
+    if (spamResult) {
+      const retryAfterSec = Math.ceil(spamResult.retryAfterMs / 1000);
+      throw new HttpException(
+        `Spam detected. Please wait ${retryAfterSec} seconds before sending again.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -52,13 +68,18 @@ export class ChatbotController {
         userId: user?.userId,
         guestId: dto.guestId,
       })) {
+        if (!res.writable) break;
         res.write(`data: ${JSON.stringify({ token })}\n\n`);
       }
     } catch {
-      res.write(`data: ${JSON.stringify({ error: 'An error occurred. Please try again.' })}\n\n`);
+      if (res.writable) {
+        res.write(`data: ${JSON.stringify({ error: 'An error occurred. Please try again.' })}\n\n`);
+      }
     } finally {
-      res.write('data: [DONE]\n\n');
-      res.end();
+      if (res.writable) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
     }
   }
 

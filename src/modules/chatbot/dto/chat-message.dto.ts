@@ -8,10 +8,10 @@ import {
 } from 'class-validator';
 
 export class ChatMessageDto {
-  @ApiProperty({ example: 'How do I register?', maxLength: 500 })
+  @ApiProperty({ example: 'How do I register?', maxLength: 200 })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(200)
   message: string;
 
   @ApiPropertyOptional({ description: 'Guest session UUID from localStorage' })

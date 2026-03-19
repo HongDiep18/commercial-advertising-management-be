@@ -4,8 +4,15 @@ import { PGVectorStore } from '@langchain/community/vectorstores/pgvector';
 import { Document } from '@langchain/core/documents';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { createHash } from 'crypto';
+import { z } from 'zod';
 import { PrismaService } from '../../database/prisma.service';
 import { VECTOR_STORE } from './vectorstore.provider';
+
+const CrawlResponseSchema = z.object({
+  markdown: z.string(),
+  title: z.string(),
+  success: z.boolean(),
+});
 
 const CRAWL_WHITELIST = [
   '/',
@@ -70,32 +77,49 @@ export class CrawlerService {
       this.config.get<string>('chatbot.crawl4aiUrl') ?? 'http://crawl4ai:11235';
     const sdkUrl = crawl4aiUrl.replace(':11235', ':11236');
 
-    let response: Response;
-    try {
-      response = await fetch(`${sdkUrl}/crawl`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'TimeoutError') {
-        throw new Error(`Crawl SDK timed out after 30s for ${url}`);
+    const maxAttempts = 3;
+    let lastErr: Error | undefined;
+    let response: Response | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        response = await fetch(`${sdkUrl}/crawl`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        break;
+      } catch (err) {
+        lastErr = err as Error;
+        const isTimeout =
+          err instanceof DOMException && err.name === 'TimeoutError';
+        if (isTimeout || attempt === maxAttempts) {
+          throw new Error(
+            isTimeout
+              ? `Crawl SDK timed out after 30s for ${url}`
+              : `Crawl SDK network error for ${url} after ${maxAttempts} attempts: ${lastErr.message}`,
+          );
+        }
+        this.logger.warn(
+          `[crawl] attempt ${attempt} failed for ${url}, retrying in ${200 * attempt}ms`,
+        );
+        await new Promise((r) => setTimeout(r, 200 * attempt));
       }
+    }
+
+    if (!response!.ok) {
+      throw new Error(`Crawl SDK responded ${response!.status} for ${url}`);
+    }
+
+    let data: z.infer<typeof CrawlResponseSchema>;
+    try {
+      data = CrawlResponseSchema.parse(await response!.json());
+    } catch (err) {
       throw new Error(
-        `Crawl SDK network error for ${url}: ${(err as Error).message}`,
+        `Crawl SDK returned unexpected response for ${url}: ${(err as Error).message}`,
       );
     }
-
-    if (!response.ok) {
-      throw new Error(`Crawl SDK responded ${response.status} for ${url}`);
-    }
-
-    const data = (await response.json()) as {
-      markdown: string;
-      title: string;
-      success: boolean;
-    };
 
     if (!data.success || !data.markdown) {
       this.logger.warn(`No content from crawl SDK for ${url}`);

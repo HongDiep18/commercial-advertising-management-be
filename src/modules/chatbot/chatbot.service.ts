@@ -47,7 +47,7 @@ export class ChatbotService {
   ): AsyncGenerator<string> {
     const threadId = opts.userId
       ? `user:${opts.userId}`
-      : `guest:${opts.guestId}`;
+      : `guest:${opts.guestId ?? 'anon'}`;
 
     this.logger.log(
       `[chat] threadId=${threadId} message="${message.slice(0, 120)}"`,

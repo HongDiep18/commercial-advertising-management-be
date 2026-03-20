@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -45,6 +46,10 @@ export class ChatbotController {
     @CurrentUser() user: UserPayload | undefined,
     @Res() res: Response,
   ): Promise<void> {
+    if (!user?.userId && !dto.guestId) {
+      throw new BadRequestException('guestId is required for unauthenticated requests');
+    }
+
     const identity = user?.userId
       ? `user:${user.userId}`
       : `guest:${dto.guestId ?? 'anon'}`;
@@ -91,6 +96,9 @@ export class ChatbotController {
     @Query() query: SessionQueryDto,
     @CurrentUser() user?: UserPayload,
   ) {
+    if (!user?.userId && !query.guestId) {
+      throw new BadRequestException('guestId is required for unauthenticated requests');
+    }
     return this.chatbotService.getSessionMessages({
       userId: user?.userId,
       guestId: query.guestId,
@@ -106,6 +114,9 @@ export class ChatbotController {
     @Body() body: SessionQueryDto,
     @CurrentUser() user?: UserPayload,
   ) {
+    if (!user?.userId && !body?.guestId) {
+      throw new BadRequestException('guestId is required for unauthenticated requests');
+    }
     await this.chatbotService.clearSession({
       userId: user?.userId,
       guestId: body?.guestId,

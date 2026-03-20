@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { NewsTranslatorService } from './news-translator.service';
+import { NewsService } from './news.service';
 import { RssCrawlerService } from './rss-crawler.service';
+
+const PUBLISHED_RETENTION_DAYS = 90;
+const DRAFT_RETENTION_DAYS = 7;
 
 @Injectable()
 export class NewsSchedulerService implements OnModuleInit {
@@ -15,6 +19,7 @@ export class NewsSchedulerService implements OnModuleInit {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly crawlerService: RssCrawlerService,
     private readonly translatorService: NewsTranslatorService,
+    private readonly newsService: NewsService,
   ) {}
 
   onModuleInit() {
@@ -41,10 +46,31 @@ export class NewsSchedulerService implements OnModuleInit {
     this.schedulerRegistry.addCronJob('news-pipeline', job);
     job.start();
     this.logger.log(`News pipeline scheduled: ${cronExpr}`);
+
+    // Weekly cleanup every Sunday at 03:00 — delete old published (90d) and stale draft (7d) articles
+    const cleanupJob = new CronJob('0 0 3 * * 0', () => void this.runCleanup());
+    this.schedulerRegistry.addCronJob('news-cleanup', cleanupJob);
+    cleanupJob.start();
+    this.logger.log('News cleanup scheduled: weekly on Sunday at 03:00');
   }
 
   async runNow() {
     return this.runPipeline();
+  }
+
+  private async runCleanup() {
+    try {
+      const result = await this.newsService.deleteOldArticles(
+        PUBLISHED_RETENTION_DAYS,
+        DRAFT_RETENTION_DAYS,
+      );
+      this.logger.log(
+        `News cleanup: deletedPublished=${result.deletedPublished} deletedDrafts=${result.deletedDrafts}`,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`News cleanup failed: ${msg}`);
+    }
   }
 
   private async runPipeline() {

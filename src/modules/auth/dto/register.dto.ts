@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -24,6 +25,9 @@ export class RegisterDto {
   @IsString()
   @MinLength(1)
   @MaxLength(32)
+  @Matches(/^[+\d\s()-]+$/, {
+    message: 'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
+  })
   phone: string;
 
   @IsNotEmpty()
@@ -42,6 +46,9 @@ export class RegisterDto {
   @IsString()
   @MinLength(1)
   @MaxLength(32)
+  @Matches(/^[+\d\s()-]+$/, {
+    message: 'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
+  })
   contact_phone: string;
 
   @IsNotEmpty()
@@ -76,6 +83,9 @@ export class RegisterDto {
   @IsString()
   @MinLength(1)
   @MaxLength(2048)
+  @Matches(/^https?:\/\/[^\s]+$/, {
+    message: 'Website must be a valid HTTP or HTTPS URL',
+  })
   website: string;
 
   @IsNotEmpty()

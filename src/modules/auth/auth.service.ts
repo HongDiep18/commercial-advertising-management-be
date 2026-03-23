@@ -47,6 +47,7 @@ export type AuthUser = {
 
 export type LoginResult = {
   accessToken: string;
+  refreshToken: string;
   user: { id: string; email: string; role: Role };
 };
 
@@ -164,15 +165,80 @@ export class AuthService {
       email: user.email,
       role: user.role as Role,
     };
-    const accessToken = this.jwtService.sign(payload);
+
+    // Generate access token (2h, sent in response body)
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.config.get('jwt.accessTokenSecret'),
+      expiresIn: this.config.get('jwt.accessTokenExpiresIn') || '2h',
+    });
+
+    // Generate refresh token (7d, will be stored in httpOnly cookie)
+    const refreshToken = this.jwtService.sign(
+      { userId: user.id, type: 'refresh' },
+      {
+        secret: this.config.get('jwt.refreshTokenSecret'),
+        expiresIn: this.config.get('jwt.refreshTokenExpiresIn') || '7d',
+      },
+    );
+
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
         role: user.role as Role,
       },
     };
+  }
+
+  async refresh(refreshToken: string): Promise<{ accessToken: string }> {
+    try {
+      // Verify refresh token with refresh secret
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.config.get('jwt.refreshTokenSecret'),
+      });
+
+      // Verify it's a refresh token (prevent access token substitution)
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+
+      // Verify user still exists and is active
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          deletedAt: true,
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      assertUserActive(user);
+
+      // Generate new access token
+      const newAccessToken = this.jwtService.sign(
+        {
+          userId: user.id,
+          email: user.email,
+          role: user.role as Role,
+        },
+        {
+          secret: this.config.get('jwt.accessTokenSecret'),
+          expiresIn: this.config.get('jwt.accessTokenExpiresIn') || '2h',
+        },
+      );
+
+      return { accessToken: newAccessToken };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   async register(data: RegisterDto): Promise<{

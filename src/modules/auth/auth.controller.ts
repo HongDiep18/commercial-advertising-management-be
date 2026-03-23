@@ -16,10 +16,14 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
+  UnauthorizedException,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -62,7 +66,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly fileUploadService: FileUploadService,
-  ) {}
+  ) { }
 
   @Post('login')
   @Public()
@@ -73,8 +77,57 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Account not approved' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   @ApiBody({ type: LoginDto, description: 'Email and password credentials' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.password);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } = await this.authService.login(
+      loginDto.email,
+      loginDto.password,
+    );
+
+    // Store refresh token in secure HTTP-only cookie (per protect.md lines 23-28)
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
+      // secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      sameSite: 'lax', // CSRF protection
+      path: '/api/proxy/auth', // Restrict to auth endpoints
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Send access token in response body
+    return { accessToken, user };
+  }
+
+  @Post('refresh')
+  @Public()
+  @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })
+  @ApiResponse({ status: 200, description: 'Returns new access token' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refresh(@Req() req: Request): Promise<{ accessToken: string }> {
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not found');
+    }
+
+    return this.authService.refresh(refreshToken);
+  }
+
+  @Post('logout')
+  @Public()
+  @ApiOperation({ summary: 'Logout and clear refresh token cookie' })
+  @ApiResponse({ status: 200, description: 'Logout successful' })
+  async logout(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string }> {
+    // Clear the refresh token cookie
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      path: '/api/proxy/auth',
+    });
+
+    return { message: 'Logout successful' };
   }
 
   @Post('register')

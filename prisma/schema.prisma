@@ -11,6 +11,25 @@ enum NewsArticleStatus {
   PUBLISHED
 }
 
+enum PropertyType {
+  LAND
+  FACTORY
+  WAREHOUSE
+  HOUSE
+  OFFICE
+}
+
+enum PropertyPublicationStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+}
+
+enum PropertyAvailabilityStatus {
+  AVAILABLE
+  SOLD
+}
+
 // ─── News Categories ──────────────────────────────────────────────────────────
 
 model NewsCategory {
@@ -490,4 +509,68 @@ model ChatSession {
 
   @@index([guestId])
   @@map("chat_sessions")
+}
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+
+model Property {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+  title              String                     @db.VarChar(255)
+  price              String                     @db.VarChar(128)
+  type               PropertyType
+  province           String                     @db.VarChar(128)
+  provinceName       String                     @map("province_name") @db.VarChar(255)
+  fullAddress        String                     @map("full_address") @db.VarChar(512)
+  latitude           Decimal?                   @db.Decimal(10, 7)
+  longitude          Decimal?                   @db.Decimal(10, 7)
+  areaValue          Decimal                    @map("area_value") @db.Decimal(12, 2)
+  areaUnit           String                     @map("area_unit") @db.VarChar(32)
+  description        String                     @db.Text
+  images             String[]                   @default([])
+  features           String[]                   @default([])
+  publicationStatus  PropertyPublicationStatus  @default(DRAFT) @map("publication_status")
+  publishedAt        DateTime?                  @map("published_at")
+  availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE) @map("availability_status")
+  soldAt             DateTime?                  @map("sold_at")
+  views              Int                        @default(0)
+
+  legalDocuments PropertyLegalDocument[]
+  contactInquiries PropertyContactInquiry[]
+
+  @@index([type])
+  @@index([province])
+  @@index([publicationStatus])
+  @@index([availabilityStatus])
+  @@map("properties")
+}
+
+model PropertyLegalDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  fileUrl    String   @map("file_url") @db.VarChar(2048)
+  fileName   String   @map("file_name") @db.VarChar(255)
+  mimeType   String?  @map("mime_type") @db.VarChar(128)
+  fileSizeKb Int?     @map("file_size_kb")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@map("property_legal_documents")
+}
+
+model PropertyContactInquiry {
+  id         String   @id @default(uuid()) @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  propertyId String   @map("property_id") @db.Uuid
+  name       String   @db.VarChar(255)
+  email      String   @db.VarChar(255)
+  message    String?  @db.Text
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@map("property_contact_inquiries")
 }

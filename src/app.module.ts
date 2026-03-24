@@ -26,6 +26,7 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { HealthModule } from './modules/health/health.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { NewsModule } from './modules/news/news.module';
+import { PropertiesModule } from './modules/properties/properties.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { NewsModule } from './modules/news/news.module';
     LoyaltyModule,
     NewsModule,
     ChatbotModule,
+    PropertiesModule,
     AdsModule,
     AdOrdersModule,
     CompaniesModule,

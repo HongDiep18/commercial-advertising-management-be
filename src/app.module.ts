@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import {
   appConfig,
+  chatbotConfig,
   databaseConfig,
   jwtConfig,
   mailConfig,
@@ -19,6 +20,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { ActiveAdsModule } from './modules/active-ads/active-ads.module';
 import { AdOrdersModule } from './modules/ad-orders/ad-orders.module';
 import { AdsModule } from './modules/ads/ads.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { HealthModule } from './modules/health/health.module';
@@ -31,6 +33,7 @@ import { NewsModule } from './modules/news/news.module';
       isGlobal: true,
       load: [
         appConfig,
+        chatbotConfig,
         databaseConfig,
         jwtConfig,
         mailConfig,
@@ -52,6 +55,7 @@ import { NewsModule } from './modules/news/news.module';
     HealthModule,
     LoyaltyModule,
     NewsModule,
+    ChatbotModule,
     AdsModule,
     AdOrdersModule,
     CompaniesModule,

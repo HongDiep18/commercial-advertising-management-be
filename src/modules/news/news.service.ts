@@ -226,6 +226,35 @@ export class NewsService {
     });
   }
 
+  async deleteOldArticles(_publishedRetentionDays: number, draftRetentionDays: number) {
+    const now = new Date();
+
+    // const publishedCutoff = new Date(now);
+    // publishedCutoff.setDate(publishedCutoff.getDate() - publishedRetentionDays);
+
+    const draftCutoff = new Date(now);
+    draftCutoff.setDate(draftCutoff.getDate() - draftRetentionDays);
+
+    const [publishedResult, draftResult] = await Promise.all([
+      // TODO: re-enable once retention policy is confirmed
+      // this.prisma.newsArticle.deleteMany({
+      //   where: {
+      //     status: NewsArticleStatus.PUBLISHED,
+      //     publishedAt: { lt: publishedCutoff },
+      //   },
+      // }),
+      Promise.resolve({ count: 0 }),
+      this.prisma.newsArticle.deleteMany({
+        where: {
+          status: NewsArticleStatus.DRAFT,
+          createdAt: { lt: draftCutoff },
+        },
+      }),
+    ]);
+
+    return { deletedPublished: publishedResult.count, deletedDrafts: draftResult.count };
+  }
+
   async getPublishedById(id: string) {
     const article = await this.prisma.newsArticle.findFirst({
       where: { id, status: NewsArticleStatus.PUBLISHED },

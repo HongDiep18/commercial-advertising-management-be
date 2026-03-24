@@ -29,5 +29,6 @@ coverage/
 
 docs/
 CLAUDE.md
+tasks/
 
 /generated/prisma

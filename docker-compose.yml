@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: vn-buyer-guide-db
     restart: unless-stopped
     environment:
@@ -92,6 +92,23 @@ services:
       start_period: 15s
     profiles:
       - prod
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: vn-buyer-guide-crawl4ai
+    restart: unless-stopped
+    ports:
+      - '11236:11236'
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN}
+    volumes:
+      - ./scripts:/app/scripts:ro
+    command: python3 /app/scripts/crawl_server.py
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:11236/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   pgdata:

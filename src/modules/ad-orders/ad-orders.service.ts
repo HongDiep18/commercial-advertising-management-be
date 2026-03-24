@@ -10,6 +10,7 @@ import {
   DurationUnit,
   PricingModel,
   Prisma,
+  AdPackageType as AdPackageTypeEnum,
 } from '@prisma/client';
 import { Readable } from 'stream';
 import { PointsSource } from '../../common/enums/points-source.enum';
@@ -20,6 +21,13 @@ import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AdOrdersErrors } from './ad-orders.errors';
+
+const SENTINEL_DATE = new Date('2999-12-31T00:00:00.000Z');
+
+const SLOT_CAPACITY: Partial<Record<AdPackageType, number>> = {
+  [AdPackageTypeEnum.POPUP_PRIORITY_SLOT]: 1,
+  [AdPackageTypeEnum.POPUP_ROTATION_SLOT]: 4,
+};
 import type {
   AdminListOrdersQueryDto,
   AdminOrderDto,
@@ -122,6 +130,9 @@ export class AdOrdersService {
         isActive: true,
         deletedAt: null,
       },
+      include: {
+        package: { select: { type: true } },
+      },
     });
     if (pricingList.length !== dto.items.length) {
       throw new BadRequestException(AdOrdersErrors.INVALID_PRICING_SET);
@@ -137,6 +148,31 @@ export class AdOrdersService {
     });
     if (!user) {
       throw new NotFoundException(AdOrdersErrors.USER_NOT_FOUND);
+    }
+
+    // Check slot availability for slot-limited package types
+    for (const item of dto.items) {
+      const pricing = pricingById.get(item.pricingId);
+      if (!pricing) continue;
+      const packageType = pricing.package.type;
+      if (!SLOT_CAPACITY[packageType]) continue;
+
+      const startDate = new Date(item.startDate);
+      const projectedEndDate =
+        pricing.pricingModel === PricingModel.DURATION && pricing.durationUnit
+          ? this.calculateEndDate(
+              startDate,
+              pricing.durationValue ?? 0,
+              pricing.durationUnit,
+            )
+          : null;
+
+      await this.checkSlotAvailability(
+        this.prisma,
+        packageType,
+        startDate,
+        projectedEndDate,
+      );
     }
 
     let subtotal = BigInt(0);
@@ -885,6 +921,30 @@ export class AdOrdersService {
         throw new BadRequestException(AdOrdersErrors.ORDER_COMPANY_REQUIRED);
       }
       const companyId: string = order.companyId;
+
+      // Check slot availability for each slot-limited item before activating
+      for (const item of order.items) {
+        const packageType = item.pricing.package.type;
+        if (!SLOT_CAPACITY[packageType]) continue;
+
+        const projectedEndDate =
+          item.pricing.pricingModel === PricingModel.DURATION &&
+          item.pricing.durationUnit
+            ? this.calculateEndDate(
+                item.startDate,
+                item.pricing.durationValue ?? 0,
+                item.pricing.durationUnit,
+              )
+            : null;
+
+        await this.checkSlotAvailability(
+          tx,
+          packageType,
+          item.startDate,
+          projectedEndDate,
+        );
+      }
+
       // Update order status
       const updatedOrder = await tx.adOrder.update({
         where: { id: orderId },
@@ -1122,6 +1182,36 @@ export class AdOrdersService {
           pricingModel: pricing.pricingModel,
         },
       });
+    }
+  }
+
+  /**
+   * Throws SLOT_NOT_AVAILABLE if the slot-limited package type is at capacity
+   * for the requested [startDate, endDate] range.
+   * Accepts either PrismaService or a transaction client.
+   */
+  private async checkSlotAvailability(
+    db: { activeAd: PrismaService['activeAd'] },
+    packageType: AdPackageType,
+    startDate: Date,
+    endDate: Date | null,
+  ): Promise<void> {
+    const capacity = SLOT_CAPACITY[packageType];
+    if (!capacity) return;
+
+    const effectiveEndDate = endDate ?? SENTINEL_DATE;
+
+    const occupiedCount = await db.activeAd.count({
+      where: {
+        packageType,
+        isActive: true,
+        startDate: { lt: effectiveEndDate },
+        OR: [{ endDate: null }, { endDate: { gt: startDate } }],
+      },
+    });
+
+    if (occupiedCount >= capacity) {
+      throw new BadRequestException(AdOrdersErrors.SLOT_NOT_AVAILABLE);
     }
   }
 

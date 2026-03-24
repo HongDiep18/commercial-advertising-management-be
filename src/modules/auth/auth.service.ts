@@ -450,7 +450,9 @@ export class AuthService {
       entityType: AUDIT_ENTITY.USER,
       entityId: userId,
       actorId: userId,
-      metadata: { fields_updated: Object.keys(data).filter(k => data[k] !== undefined) },
+      metadata: {
+        fields_updated: Object.keys(data).filter((k) => data[k] !== undefined),
+      },
     });
 
     return {
@@ -917,10 +919,22 @@ export class AuthService {
           companyNameVi: request.companyNameVi,
         },
       });
-      await this.onProfileRequestApproved(
-        request.email,
-        request.membershipTier,
-      );
+      await this.onProfileRequestApproved({
+        email: request.email,
+        membershipTier: request.membershipTier,
+        companyNameVi: request.companyNameVi,
+        companyNameCn: request.companyNameCn,
+        phone: request.phone,
+        taxId: request.taxId,
+        contactName: request.contactName,
+        contactPhone: request.contactPhone,
+        companyAddress: request.companyAddress,
+        country: request.country,
+        region: request.region,
+        industry: request.industry,
+        website: request.website,
+        introduction: request.introduction,
+      });
     }
     if (status === CompanyProfileRequestStatus.REJECTED) {
       await this.auditService.record({
@@ -942,10 +956,9 @@ export class AuthService {
   }
 
   private async onProfileRequestApproved(
-    email: string,
-    membershipTier: MembershipTier,
+    request: ProfileRequestForCompany & { membershipTier: MembershipTier },
   ): Promise<void> {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = request.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true },
@@ -965,15 +978,29 @@ export class AuthService {
       10,
     );
 
-    const createdUser = await this.prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        password: placeholderPassword,
-        role: Role.MEMBER,
-        membershipTier,
-        setPasswordToken: token,
-        setPasswordTokenExpiresAt: expiresAt,
-      } as Prisma.UserUncheckedCreateInput,
+    const createdUser = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          password: placeholderPassword,
+          role: Role.MEMBER,
+          membershipTier: request.membershipTier,
+          setPasswordToken: token,
+          setPasswordTokenExpiresAt: expiresAt,
+        } as Prisma.UserUncheckedCreateInput,
+      });
+      const companyData =
+        AuthService.companyCreateInputFromProfileRequest(request);
+      const company = await tx.company.create({
+        data: companyData,
+        select: { id: true },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { companyId: company.id },
+        select: { id: true },
+      });
+      return user;
     });
 
     // Award loyalty points for registration
@@ -1069,29 +1096,6 @@ export class AuthService {
       actorId: user.id,
       newValue: 'password_set',
     });
-
-    if (!user.companyId) {
-      const approvedRequest = await this.prisma.companyProfileRequest.findFirst(
-        {
-          where: {
-            email: user.email,
-            status: CompanyProfileRequestStatus.APPROVED,
-          },
-        },
-      );
-      if (approvedRequest) {
-        const companyData =
-          AuthService.companyCreateInputFromProfileRequest(approvedRequest);
-        const company = await this.prisma.company.create({
-          data: companyData,
-          select: { id: true },
-        });
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { companyId: company.id },
-        });
-      }
-    }
 
     return { message: 'Password set successfully. You can sign in now.' };
   }

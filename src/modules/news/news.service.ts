@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NewsArticleStatus, Prisma } from '@prisma/client';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -29,6 +29,8 @@ const articleInclude = {
 
 @Injectable()
 export class NewsService {
+  private readonly logger = new Logger(NewsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async ingestMany(articles: IngestInput[]) {
@@ -134,21 +136,37 @@ export class NewsService {
         continue;
       }
 
-      await this.prisma.newsArticle.update({
-        where: { id: existing.id },
-        data: {
-          categoryId: input.categoryId ?? null,
-          subcategoryId: input.subcategoryId ?? null,
-          guid: input.guid ?? null,
-          url: input.url,
-          title: input.title,
-          publishedAt: new Date(input.publishedAt),
-          thumbnailUrl: input.thumbnailUrl ?? null,
-          language: input.language ?? 'vi',
-          summaryVi: input.summaryVi ?? null,
-        },
-      });
-      updated += 1;
+      // If the URL changed, make sure it isn't already owned by a different article
+      const urlConflict =
+        input.url !== existing.url && existingByUrl.has(input.url);
+      if (urlConflict) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        await this.prisma.newsArticle.update({
+          where: { id: existing.id },
+          data: {
+            categoryId: input.categoryId ?? null,
+            subcategoryId: input.subcategoryId ?? null,
+            guid: input.guid ?? null,
+            url: input.url,
+            title: input.title,
+            publishedAt: new Date(input.publishedAt),
+            thumbnailUrl: input.thumbnailUrl ?? null,
+            language: input.language ?? 'vi',
+            summaryVi: input.summaryVi ?? null,
+          },
+        });
+        updated += 1;
+      } catch (e) {
+        if (isDuplicateUrl(e)) {
+          skipped += 1;
+        } else {
+          throw e;
+        }
+      }
     }
 
     return { created, updated, skipped };
@@ -181,6 +199,19 @@ export class NewsService {
       });
     } catch (e) {
       if (isNotFound(e)) throw new NotFoundException('Article not found');
+      if (isDuplicateUrl(e)) {
+        // Another article already owns this URL — this is a stale duplicate DRAFT.
+        // Delete it so it is not retried on every cron run.
+        this.logger.warn(
+          `Deleting duplicate DRAFT article ${articleId} — URL already exists in another record`,
+        );
+        await this.prisma.newsArticle
+          .delete({ where: { id: articleId } })
+          .catch(() => {});
+        throw new ConflictException(
+          `Article ${articleId} is a duplicate URL — removed duplicate draft`,
+        );
+      }
       throw e;
     }
   }

@@ -35,7 +35,7 @@ The retrieved context is provided to you above. Use it to answer the user's ques
     /                 — Home
     /about            — About Us
     /directory        — Company Directory
-    /store            — Online Store
+    /store            — Online Store (redirects to https://vn-buyer-guide.myshopify.com/)
     /news             — Latest News
     /property         — Property / Real Estate
     /contact          — Contact & Advertising

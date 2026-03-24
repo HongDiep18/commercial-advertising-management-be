@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AdPackageType, type Prisma } from '@prisma/client';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
+import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
-import { AuditService } from '../audit/audit.service';
-import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import type {
   ActiveAdInfo,
   CompanyData,
@@ -17,6 +22,42 @@ import type {
 import type { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import type { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
+
+type CompanyAuditSnapshot = {
+  id: string;
+  email: string;
+  logoUrl: string | null;
+  companyNameVi: string | null;
+  companyNameCn: string | null;
+  phone: string;
+  industry: string;
+  address: string;
+  description: string;
+  taxId: string | null;
+  country: string | null;
+  region: string | null;
+  website: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+};
+
+const ADMIN_AUDIT_COMPANY_SELECT = {
+  id: true,
+  email: true,
+  logoUrl: true,
+  companyNameVi: true,
+  companyNameCn: true,
+  phone: true,
+  address: true,
+  description: true,
+  taxId: true,
+  country: true,
+  region: true,
+  industry: true,
+  website: true,
+  contactName: true,
+  contactPhone: true,
+} as const;
 
 type CompanyWithActiveAdsRecord = {
   id: string;
@@ -89,9 +130,11 @@ export class CompaniesService {
         address: true,
         description: true,
         taxId: true,
+        country: true,
         region: true,
         website: true,
         contactName: true,
+        contactPhone: true,
       },
     });
     if (!company) {
@@ -582,5 +625,114 @@ export class CompaniesService {
         count: item._count._all,
       }));
     return { categories };
+  }
+
+  async adminUpdateCompany(
+    adminUserId: string,
+    companyId: string,
+    data: UpdateProfileDto,
+  ): Promise<CompanyDetailResponseDto> {
+    const companyExists = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+    if (!companyExists) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const updateData = this.toAdminCompanyUpdateData(data);
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('No valid company fields provided');
+    }
+
+    const companyBefore = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: ADMIN_AUDIT_COMPANY_SELECT,
+    });
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: updateData,
+      select: { id: true },
+    });
+
+    const companyAfter = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: ADMIN_AUDIT_COMPANY_SELECT,
+    });
+
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.COMPANY,
+      action: AUDIT_ACTION.COMPANY_UPDATED_BY_ADMIN,
+      entityId: companyId,
+      actorId: adminUserId,
+      oldValue: CompaniesService.serializeCompanyAuditPayload(companyBefore),
+      newValue: CompaniesService.serializeCompanyAuditPayload(companyAfter),
+    });
+
+    const company = await this.getCompanyDetail(companyId);
+    return company;
+  }
+
+  private static serializeCompanyAuditPayload(
+    company: CompanyAuditSnapshot | null | undefined,
+  ): string {
+    const companyPayload = company
+      ? {
+          id: company.id,
+          email: company.email,
+          logoUrl: company.logoUrl,
+          companyNameVi: company.companyNameVi,
+          companyNameCn: company.companyNameCn,
+          phone: company.phone,
+          address: company.address,
+          description: company.description,
+          taxId: company.taxId,
+          country: company.country,
+          region: company.region,
+          industry: company.industry,
+          website: company.website,
+          contactName: company.contactName,
+          contactPhone: company.contactPhone,
+        }
+      : null;
+    return JSON.stringify({ company: companyPayload });
+  }
+
+  private toAdminCompanyUpdateData(
+    data: UpdateProfileDto,
+  ): Prisma.CompanyUpdateInput {
+    const updateData: Prisma.CompanyUpdateInput = {};
+    type Mapper = {
+      from: keyof UpdateProfileDto;
+      to: keyof Prisma.CompanyUpdateInput;
+      transform?: (value: string) => string;
+    };
+    const mappers: readonly Mapper[] = [
+      { from: 'upload_logo', to: 'logoUrl' },
+      { from: 'company_name_vi', to: 'companyNameVi' },
+      { from: 'company_name_cn', to: 'companyNameCn' },
+      { from: 'phone', to: 'phone' },
+      { from: 'tax_id', to: 'taxId' },
+      { from: 'contact_person', to: 'contactName' },
+      { from: 'contact_phone', to: 'contactPhone' },
+      { from: 'company_address', to: 'address' },
+      { from: 'email', to: 'email', transform: (value) => value.toLowerCase() },
+      { from: 'country', to: 'country' },
+      { from: 'region', to: 'region' },
+      { from: 'industry', to: 'industry' },
+      { from: 'website', to: 'website' },
+      { from: 'introduction', to: 'description' },
+    ];
+
+    for (const mapper of mappers) {
+      const raw = data[mapper.from];
+      if (raw === undefined) continue;
+      const normalized = raw.trim();
+      (updateData as Record<string, unknown>)[mapper.to] = mapper.transform
+        ? mapper.transform(normalized)
+        : normalized;
+    }
+
+    return updateData;
   }
 }

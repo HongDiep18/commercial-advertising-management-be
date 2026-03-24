@@ -6,6 +6,9 @@ import { PrismaService } from '../../database/prisma.service';
 const isNotFound = (e: unknown) =>
   e instanceof Error && 'code' in e && e.code === 'P2025';
 
+const isDuplicateUrl = (e: unknown) =>
+  e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
+
 type IngestInput = {
   sourceSite: string;
   categoryId?: string;
@@ -93,22 +96,30 @@ export class NewsService {
           : undefined) ?? existingByUrl.get(input.url);
 
       if (!existing) {
-        await this.prisma.newsArticle.create({
-          data: {
-            sourceSite: input.sourceSite,
-            categoryId: input.categoryId ?? null,
-            subcategoryId: input.subcategoryId ?? null,
-            guid: input.guid ?? null,
-            url: input.url,
-            title: input.title,
-            publishedAt: new Date(input.publishedAt),
-            thumbnailUrl: input.thumbnailUrl ?? null,
-            language: input.language ?? 'vi',
-            summaryVi: input.summaryVi ?? null,
-            status: NewsArticleStatus.DRAFT,
-          },
-        });
-        created += 1;
+        try {
+          await this.prisma.newsArticle.create({
+            data: {
+              sourceSite: input.sourceSite,
+              categoryId: input.categoryId ?? null,
+              subcategoryId: input.subcategoryId ?? null,
+              guid: input.guid ?? null,
+              url: input.url,
+              title: input.title,
+              publishedAt: new Date(input.publishedAt),
+              thumbnailUrl: input.thumbnailUrl ?? null,
+              language: input.language ?? 'vi',
+              summaryVi: input.summaryVi ?? null,
+              status: NewsArticleStatus.DRAFT,
+            },
+          });
+          created += 1;
+        } catch (e) {
+          if (isDuplicateUrl(e)) {
+            skipped += 1;
+          } else {
+            throw e;
+          }
+        }
         continue;
       }
 

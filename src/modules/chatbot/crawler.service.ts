@@ -18,12 +18,10 @@ const CRAWL_WHITELIST = [
   '/',
   '/about',
   '/directory',
-  '/store',
   '/news',
   '/property',
   '/contact',
   '/login',
-  '/register',
   '/forgot-password',
   '/set-password',
 ];

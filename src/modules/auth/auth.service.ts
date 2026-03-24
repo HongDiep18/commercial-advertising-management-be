@@ -263,13 +263,25 @@ export class AuthService {
     }
 
     const createData = AuthService.toCompanyProfileRequestCreateInput(data);
-    await this.prisma.companyProfileRequest.create({
+    const request = await this.prisma.companyProfileRequest.create({
       data: {
         ...createData,
         email,
         status: CompanyProfileRequestStatus.PENDING,
       },
     });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROFILE_REQUEST_CREATED,
+      entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+      entityId: request.id,
+      metadata: {
+        email,
+        companyNameVi: data.company_name_vi,
+        industry: data.industry,
+      },
+    });
+
     return {
       message: 'Request submitted. We will email you after approval.',
       status: CompanyProfileRequestStatus.PENDING,
@@ -424,6 +436,14 @@ export class AuthService {
       userEmail: user.email,
       companyId: user.companyId,
       profileData,
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.USER_PROFILE_UPDATED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: userId,
+      actorId: userId,
+      metadata: { fields_updated: Object.keys(data).filter(k => data[k] !== undefined) },
     });
 
     return {
@@ -875,12 +895,32 @@ export class AuthService {
     });
 
     if (status === CompanyProfileRequestStatus.APPROVED) {
+      await this.auditService.record({
+        action: AUDIT_ACTION.PROFILE_REQUEST_APPROVED,
+        entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+        entityId: id,
+        actorId: actorId ?? null,
+        metadata: {
+          email: request.email,
+          companyNameVi: request.companyNameVi,
+        },
+      });
       await this.onProfileRequestApproved(
         request.email,
         request.membershipTier,
       );
     }
     if (status === CompanyProfileRequestStatus.REJECTED) {
+      await this.auditService.record({
+        action: AUDIT_ACTION.PROFILE_REQUEST_REJECTED,
+        entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+        entityId: id,
+        actorId: actorId ?? null,
+        metadata: {
+          email: request.email,
+          companyNameVi: request.companyNameVi,
+        },
+      });
       await this.mailService.sendAccountRejectedEmail(
         request.email.trim().toLowerCase(),
       );
@@ -1008,6 +1048,14 @@ export class AuthService {
       entityType: AUDIT_ENTITY.USER,
       entityId: user.id,
       metadata: { by: 'token' },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.USER_PASSWORD_CHANGED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: user.id,
+      actorId: user.id,
+      newValue: 'password_set',
     });
 
     if (!user.companyId) {

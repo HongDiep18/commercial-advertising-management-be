@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { AdPackagePricing, PricingModel, type Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import type { AdminCreatePricingDto } from './dto/admin-create-pricing.dto';
 import type {
   AdminPricingListQueryDto,
@@ -15,7 +17,10 @@ import type { AdminUpdatePricingDto } from './dto/admin-update-pricing.dto';
 
 @Injectable()
 export class AdPackagePricingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Create a new pricing option for an ad package
@@ -23,6 +28,7 @@ export class AdPackagePricingService {
   async createPricing(
     packageId: string,
     dto: AdminCreatePricingDto,
+    adminUserId?: string,
   ): Promise<AdminPricingResponseDto> {
     // Verify the package exists
     const adPackage = await this.prisma.adPackage.findUnique({
@@ -71,6 +77,19 @@ export class AdPackagePricingService {
             type: true,
           },
         },
+      },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_PRICING_CREATED,
+      entityType: AUDIT_ENTITY.AD_PRICING,
+      entityId: pricing.id,
+      actorId: adminUserId ?? null,
+      metadata: {
+        packageId,
+        packageName: adPackage.name,
+        pricingModel: dto.pricingModel,
+        finalPrice: finalPrice.toString(),
       },
     });
 
@@ -170,6 +189,7 @@ export class AdPackagePricingService {
   async updatePricing(
     pricingId: string,
     dto: AdminUpdatePricingDto,
+    adminUserId?: string,
   ): Promise<AdminPricingResponseDto> {
     const existingPricing = await this.prisma.adPackagePricing.findUnique({
       where: { id: pricingId },
@@ -245,6 +265,17 @@ export class AdPackagePricingService {
       },
     });
 
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_PRICING_UPDATED,
+      entityType: AUDIT_ENTITY.AD_PRICING,
+      entityId: pricingId,
+      actorId: adminUserId ?? null,
+      metadata: {
+        updatedFields: Object.keys(dto).filter(k => dto[k] !== undefined),
+        packageName: pricing.package.name,
+      },
+    });
+
     return this.mapToResponseDto(pricing);
   }
 
@@ -252,10 +283,10 @@ export class AdPackagePricingService {
    * Delete a pricing option (soft delete).
    * Sets deletedAt so the row is kept for referential integrity with orders/active ads.
    */
-  async deletePricing(pricingId: string): Promise<{ message: string }> {
+  async deletePricing(pricingId: string, adminUserId?: string): Promise<{ message: string }> {
     const pricing = await this.prisma.adPackagePricing.findUnique({
       where: { id: pricingId },
-      select: { id: true, deletedAt: true },
+      select: { id: true, deletedAt: true, package: { select: { name: true } } },
     });
 
     if (!pricing) {
@@ -272,6 +303,16 @@ export class AdPackagePricingService {
     await this.prisma.adPackagePricing.update({
       where: { id: pricingId },
       data: { deletedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_PRICING_DELETED,
+      entityType: AUDIT_ENTITY.AD_PRICING,
+      entityId: pricingId,
+      actorId: adminUserId ?? null,
+      metadata: {
+        packageName: pricing.package.name,
+      },
     });
 
     return { message: 'Pricing option deleted successfully' };

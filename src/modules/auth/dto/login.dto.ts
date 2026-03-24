@@ -17,7 +17,7 @@ export class LoginDto {
   })
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters' })
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/, {
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d\s!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]*$/, {
     message: 'Password must contain at least one letter and one number',
   })
   password!: string;

@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AdPackagePricingService } from './ad-package-pricing.service';
@@ -61,8 +62,9 @@ export class AdPackagePricingAdminController {
   async createPricing(
     @Param('packageId') packageId: string,
     @Body() dto: AdminCreatePricingDto,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<AdminPricingResponseDto> {
-    return this.adPackagePricingService.createPricing(packageId, dto);
+    return this.adPackagePricingService.createPricing(packageId, dto, adminUserId);
   }
 
   @Get('pricing')
@@ -135,8 +137,9 @@ export class AdPackagePricingAdminController {
   async updatePricing(
     @Param('pricingId') pricingId: string,
     @Body() dto: AdminUpdatePricingDto,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<AdminPricingResponseDto> {
-    return this.adPackagePricingService.updatePricing(pricingId, dto);
+    return this.adPackagePricingService.updatePricing(pricingId, dto, adminUserId);
   }
 
   @Delete('pricing/:pricingId')
@@ -173,7 +176,8 @@ export class AdPackagePricingAdminController {
   })
   async deletePricing(
     @Param('pricingId') pricingId: string,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<{ message: string }> {
-    return this.adPackagePricingService.deletePricing(pricingId);
+    return this.adPackagePricingService.deletePricing(pricingId, adminUserId);
   }
 }

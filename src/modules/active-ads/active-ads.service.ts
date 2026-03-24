@@ -7,6 +7,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CompaniesService } from '../companies/companies.service';
+import { AuditService } from '../audit/audit.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import type { CompanyWithAdsResponseDto } from '../companies/dto/company-with-ads-response.dto';
 import { ActiveAdsErrors } from './active-ads.errors';
 import type { AdminManualActiveAdResponseDto } from './dto/admin-manual-activate-ad.dto';
@@ -51,6 +53,7 @@ export class ActiveAdsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly companiesService: CompaniesService,
+    private readonly auditService: AuditService,
   ) {}
 
   async addAssetsToActiveAd(input: {
@@ -339,6 +342,19 @@ export class ActiveAdsService {
     } as const;
 
     const activeAd = await this.prisma.activeAd.create(createArgs);
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.ACTIVE_AD_MANUALLY_CREATED,
+      entityType: AUDIT_ENTITY.ACTIVE_AD,
+      entityId: activeAd.id,
+      actorId: adminUserId,
+      metadata: {
+        companyId,
+        packageType: pricing.package.type,
+        pricingModel: pricing.pricingModel,
+        packageName: pricing.package.name,
+      },
+    });
 
     const response: AdminManualActiveAdResponseDto = {
       id: activeAd.id,

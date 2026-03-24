@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AdPackageType, type Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
+import { AuditService } from '../audit/audit.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import type {
   ActiveAdInfo,
   CompanyData,
@@ -43,9 +45,10 @@ export class CompaniesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adEffectsRegistry: AdEffectsRegistryService,
+    private readonly auditService: AuditService,
   ) {}
 
-  async createCompany(dto: CreateCompanyDto) {
+  async createCompany(dto: CreateCompanyDto, userId?: string) {
     const company = await this.prisma.company.create({
       data: {
         companyNameVi: dto.name,
@@ -55,6 +58,17 @@ export class CompaniesService {
         industry: dto.industry,
         address: dto.address,
         description: dto.description,
+      },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.COMPANY_CREATED,
+      entityType: AUDIT_ENTITY.COMPANY,
+      entityId: company.id,
+      actorId: userId ?? null,
+      metadata: {
+        name: dto.name,
+        industry: dto.industry,
       },
     });
 

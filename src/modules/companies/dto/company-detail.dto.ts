@@ -32,6 +32,9 @@ export class CompanyDetailResponseDto {
   taxId!: string | null;
 
   @ApiPropertyOptional()
+  country!: string | null;
+
+  @ApiPropertyOptional()
   region!: string | null;
 
   @ApiPropertyOptional()
@@ -39,4 +42,7 @@ export class CompanyDetailResponseDto {
 
   @ApiPropertyOptional()
   contactName!: string | null;
+
+  @ApiPropertyOptional()
+  contactPhone!: string | null;
 }

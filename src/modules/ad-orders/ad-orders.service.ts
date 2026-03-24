@@ -12,9 +12,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { Readable } from 'stream';
-import {
-  PointsSource,
-} from '../../common/enums/points-source.enum';
+import { PointsSource } from '../../common/enums/points-source.enum';
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -614,7 +612,8 @@ export class AdOrdersService {
       }),
     ]);
 
-    const currentMonthRevenueBigInt = currentMonthRevenueAgg._sum.subtotal ?? 0n;
+    const currentMonthRevenueBigInt =
+      currentMonthRevenueAgg._sum.subtotal ?? 0n;
     const lastMonthRevenueBigInt = lastMonthRevenueAgg._sum.subtotal ?? 0n;
 
     const currentMonthRevenue = Number(currentMonthRevenueBigInt);

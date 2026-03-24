@@ -380,6 +380,13 @@ export class AuthService {
     userId: string,
     data: UpdateProfileDto,
   ): Promise<ProfileResponse> {
+    return this.applyProfileDataToUser(userId, data);
+  }
+
+  async applyProfileDataToUser(
+    userId: string,
+    data: UpdateProfileDto,
+  ): Promise<ProfileResponse> {
     let user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -471,18 +478,22 @@ export class AuthService {
     const approvedEmails = requests
       .filter((r) => r.status === CompanyProfileRequestStatus.APPROVED)
       .map((r) => r.email.trim().toLowerCase());
-    const userByEmail = new Map<string, { id: string; isActive: boolean }>();
+    const userByEmail = new Map<
+      string,
+      { id: string; companyId: string | null; isActive: boolean }
+    >();
     if (approvedEmails.length > 0) {
       const users = await this.prisma.user.findMany({
         where: {
           email: { in: [...new Set(approvedEmails)] },
           deletedAt: null,
         },
-        select: { id: true, email: true, isActive: true },
+        select: { id: true, email: true, companyId: true, isActive: true },
       });
       for (const u of users) {
         userByEmail.set(u.email.trim().toLowerCase(), {
           id: u.id,
+          companyId: u.companyId,
           isActive: u.isActive,
         });
       }
@@ -503,6 +514,7 @@ export class AuthService {
         return {
           ...r,
           userId: user?.id ?? null,
+          companyId: user?.companyId ?? null,
           isActive: user?.isActive ?? null,
         };
       });

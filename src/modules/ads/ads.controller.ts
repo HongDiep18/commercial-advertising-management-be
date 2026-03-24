@@ -1,14 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
 import type { AdPackageCategoryItem } from './ads.service';
 import { AdsService } from './ads.service';
 
 @ApiTags('Ads')
-@ApiBearerAuth()
 @Controller()
 export class AdsController {
   constructor(private readonly adsService: AdsService) {}
 
+  @Public()
   @Get('ad-packages')
   @ApiOperation({
     summary: 'Get available ad packages and pricing for purchase',

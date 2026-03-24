@@ -1,7 +1,7 @@
 export const AUDIT_ENTITY = {
   COMPANY_PROFILE_REQUEST: 'CompanyProfileRequest',
-  USER: 'User',
   COMPANY: 'Company',
+  USER: 'User',
   AD_ORDER: 'AdOrder',
   AD_PRICING: 'AdPackagePricing',
   ACTIVE_AD: 'ActiveAd',
@@ -45,4 +45,6 @@ export const AUDIT_ACTION = {
   LOYALTY_POINTS_DEDUCTED: 'loyalty.points_deducted',
   LOYALTY_TIER_CHANGED: 'loyalty.tier_changed',
   LOYALTY_TIER_RECALCULATED: 'loyalty.tier_recalculated',
+
+  COMPANY_UPDATED_BY_ADMIN: 'company.updated_by_admin',
 } as const;

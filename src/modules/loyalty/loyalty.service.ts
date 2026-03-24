@@ -5,10 +5,15 @@ import { calculateTier, MembershipTier, TIER_THRESHOLDS } from '../../common/enu
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { ListPointsHistoryQueryDto } from './dto/list-points-history-query.dto';
 import { TierInfoResponseDto } from './dto/tier-info-response.dto';
+import { AuditService } from '../audit/audit.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 
 @Injectable()
 export class LoyaltyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Award points to a user
@@ -64,6 +69,19 @@ export class LoyaltyService {
     // Recalculate tier
     await this.recalculateTier(userId);
 
+    await this.auditService.record({
+      action: AUDIT_ACTION.LOYALTY_POINTS_AWARDED,
+      entityType: AUDIT_ENTITY.LOYALTY_TRANSACTION,
+      entityId: transaction.id,
+      actorId: userId,
+      newValue: points.toString(),
+      metadata: {
+        source,
+        balance: newBalance.toString(),
+        description,
+      },
+    });
+
     return transaction;
   }
 
@@ -80,13 +98,28 @@ export class LoyaltyService {
     const { userId, points, reason, metadata } = params;
 
     // Use negative points for deduction
-    return this.awardPoints({
+    const transaction = await this.awardPoints({
       userId,
       points: -points,
       source: PointsSource.ADMIN_DEDUCTION,
       description: reason,
       metadata,
     });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.LOYALTY_POINTS_DEDUCTED,
+      entityType: AUDIT_ENTITY.LOYALTY_TRANSACTION,
+      entityId: transaction.id,
+      actorId: userId,
+      oldValue: (transaction.balance + points).toString(),
+      newValue: transaction.balance.toString(),
+      metadata: {
+        pointsDeducted: points.toString(),
+        reason,
+      },
+    });
+
+    return transaction;
   }
 
   /**
@@ -210,7 +243,7 @@ export class LoyaltyService {
    * Updates User.membershipTier if tier changed
    * @returns New tier
    */
-  async recalculateTier(userId: string): Promise<MembershipTier> {
+  async recalculateTier(userId: string, adminUserId?: string): Promise<MembershipTier> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -226,11 +259,39 @@ export class LoyaltyService {
 
     const newTier = calculateTier(user.loyaltyPoints, Number(user.totalSpending));
 
+    // Log tier recalculation (always)
+    await this.auditService.record({
+      action: AUDIT_ACTION.LOYALTY_TIER_RECALCULATED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: userId,
+      actorId: adminUserId ?? userId,
+      metadata: {
+        loyaltyPoints: user.loyaltyPoints.toString(),
+        totalSpending: user.totalSpending.toString(),
+        calculatedTier: newTier,
+        previousTier: user.membershipTier,
+      },
+    });
+
     // Only update if tier changed
     if (user.membershipTier !== newTier) {
       await this.prisma.user.update({
         where: { id: userId },
         data: { membershipTier: newTier },
+      });
+
+      // Log tier change
+      await this.auditService.record({
+        action: AUDIT_ACTION.LOYALTY_TIER_CHANGED,
+        entityType: AUDIT_ENTITY.USER,
+        entityId: userId,
+        actorId: adminUserId ?? userId,
+        oldValue: user.membershipTier,
+        newValue: newTier,
+        metadata: {
+          loyaltyPoints: user.loyaltyPoints.toString(),
+          totalSpending: user.totalSpending.toString(),
+        },
       });
     }
 

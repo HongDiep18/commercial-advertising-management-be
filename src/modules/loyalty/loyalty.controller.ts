@@ -130,8 +130,11 @@ export class LoyaltyController {
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Manually recalculate user tier (Admin only)' })
   @ApiOkResponse({ type: TierInfoResponseDto })
-  async recalculateTier(@Param('userId') userId: string) {
-    await this.loyaltyService.recalculateTier(userId);
+  async recalculateTier(
+    @Param('userId') userId: string,
+    @CurrentUser('userId') adminUserId: string,
+  ) {
+    await this.loyaltyService.recalculateTier(userId, adminUserId);
     return this.loyaltyService.getTierInfo(userId);
   }
 }

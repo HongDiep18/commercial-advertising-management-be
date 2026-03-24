@@ -19,6 +19,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
+import { AuditService } from '../audit/audit.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
   AdminListOrdersQueryDto,
@@ -92,6 +94,7 @@ export class AdOrdersService {
     private readonly fileGeneratingService: FileGeneratingService,
     private readonly mailService: MailService,
     private readonly loyaltyService: LoyaltyService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -277,6 +280,17 @@ export class AdOrdersService {
           return finalOrder;
         },
       );
+
+      await this.auditService.record({
+        action: AUDIT_ACTION.AD_ORDER_CREATED,
+        entityType: AUDIT_ENTITY.AD_ORDER,
+        entityId: updatedOrder.id,
+        actorId: userId,
+        metadata: {
+          subtotal: updatedOrder.subtotal.toString(),
+          itemCount: updatedOrder.items.length,
+        },
+      });
 
       return this.mapOrderToSummary(updatedOrder);
     } catch (err) {
@@ -933,6 +947,19 @@ export class AdOrdersService {
       console.error('Failed to award ad purchase points:', error);
     }
 
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_ORDER_APPROVED,
+      entityType: AUDIT_ENTITY.AD_ORDER,
+      entityId: orderId,
+      actorId: adminUserId,
+      oldValue: AdOrderStatus.PENDING,
+      newValue: AdOrderStatus.APPROVED,
+      metadata: {
+        subtotal: orderData.subtotal.toString(),
+        reason: dto.reason,
+      },
+    });
+
     await this.mailService.sendAdOrderDecisionEmail(orderId, true, dto.reason);
     return result;
   }
@@ -968,6 +995,18 @@ export class AdOrdersService {
         status: AdOrderStatus.REJECTED,
         lastUpdatedBy: adminUserId,
         lastUpdatedAt: new Date(),
+        reason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_ORDER_REJECTED,
+      entityType: AUDIT_ENTITY.AD_ORDER,
+      entityId: orderId,
+      actorId: adminUserId,
+      oldValue: AdOrderStatus.PENDING,
+      newValue: AdOrderStatus.REJECTED,
+      metadata: {
         reason: dto.reason,
       },
     });
@@ -1069,6 +1108,21 @@ export class AdOrdersService {
           })),
         });
       }
+
+      // Audit log for each active ad created from order
+      await this.auditService.record({
+        action: AUDIT_ACTION.ACTIVE_AD_CREATED,
+        entityType: AUDIT_ENTITY.ACTIVE_AD,
+        entityId: activeAd.id,
+        actorId: approvedBy,
+        metadata: {
+          orderId: order.id,
+          orderItemId: item.id,
+          companyId: order.companyId,
+          packageType: pricing.package.type,
+          pricingModel: pricing.pricingModel,
+        },
+      });
     }
   }
 

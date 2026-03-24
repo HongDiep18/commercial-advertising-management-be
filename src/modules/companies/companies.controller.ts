@@ -7,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CompaniesService } from './companies.service';
 import {
   CompanyCategoriesResponseDto,
@@ -35,8 +36,9 @@ export class CompaniesController {
   @ApiBearerAuth()
   async createCompany(
     @Body() dto: CreateCompanyDto,
+    @CurrentUser('userId') userId: string,
   ): Promise<CompanyWithAdsResponseDto> {
-    const company = await this.companiesService.createCompany(dto);
+    const company = await this.companiesService.createCompany(dto, userId);
     const name =
       company.companyNameVi ?? company.companyNameCn ?? company.email;
     return {

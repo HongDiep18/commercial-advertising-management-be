@@ -26,6 +26,12 @@ const CRAWL_WHITELIST = [
   '/set-password',
 ];
 
+// Shopify online store — password-protected (free plan). Enable once store is public.
+// const SHOPIFY_WHITELIST = [
+//   'https://vn-buyer-guide.myshopify.com/',
+//   'https://vn-buyer-guide.myshopify.com/collections',
+// ];
+
 
 @Injectable()
 export class CrawlerService {

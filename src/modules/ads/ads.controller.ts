@@ -1,8 +1,9 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
-import type { AdPackageCategoryItem } from './ads.service';
+import type { AdPackageCategoryItem, BookedDatesResult } from './ads.service';
 import { AdsService } from './ads.service';
+import { GetBookedDatesQueryDto } from './dto/get-booked-dates-query.dto';
 
 @ApiTags('Ads')
 @Controller()
@@ -18,5 +19,20 @@ export class AdsController {
   })
   async getAvailableAdPackages(): Promise<AdPackageCategoryItem[]> {
     return this.adsService.getAvailableAdPackages();
+  }
+
+  @Public()
+  @Get('ads/booked-dates')
+  @ApiOperation({
+    summary: 'Get fully-booked date ranges for a slot-limited ad package type',
+    description:
+      'Returns date ranges where the slot is at full capacity. ' +
+      'Use this to grey out unavailable start dates in the calendar picker. ' +
+      'Only relevant for POPUP_PRIORITY_SLOT and POPUP_ROTATION_SLOT.',
+  })
+  async getBookedDates(
+    @Query() query: GetBookedDatesQueryDto,
+  ): Promise<BookedDatesResult> {
+    return this.adsService.getBookedDates(query.packageType);
   }
 }

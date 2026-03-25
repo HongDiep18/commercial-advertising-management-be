@@ -7,7 +7,31 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
+  registerDecorator,
+  ValidationOptions,
 } from 'class-validator';
+
+function IsNotPastDate(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isNotPastDate',
+      target: (object as { constructor: Function }).constructor,
+      propertyName,
+      options: {
+        message: 'startDate must not be in the past',
+        ...validationOptions,
+      },
+      validator: {
+        validate(value: unknown) {
+          if (typeof value !== 'string') return false;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return new Date(value) >= today;
+        },
+      },
+    });
+  };
+}
 
 export class CreateAdOrderItemDto {
   @ApiProperty({
@@ -38,6 +62,7 @@ export class CreateAdOrderItemDto {
     example: '2026-03-10',
   })
   @IsDateString()
+  @IsNotPastDate()
   startDate!: string;
 }
 

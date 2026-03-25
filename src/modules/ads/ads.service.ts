@@ -12,9 +12,21 @@ import type {
 } from '@prisma/client';
 import { AdCategoryType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { SENTINEL_DATE, SLOT_CAPACITY } from './ads.constants';
 import { AdsErrors } from './ads.errors';
 import type { AdminCreateAdPackageCategoryDto } from './dto/admin-create-ad-package-category.dto';
 import type { AdminUpdateAdPackageCategoryDto } from './dto/admin-update-ad-package-category.dto';
+
+export type BookedDateRange = {
+  startDate: string; // ISO string
+  endDate: string | null; // null = indefinite (ONE_TIME ads)
+};
+
+export type BookedDatesResult = {
+  packageType: AdPackageType;
+  capacity: number;
+  fullyBookedRanges: BookedDateRange[];
+};
 
 // ─── Member-facing DTOs ──────────────────────────────────────────────────────
 // Note: exported types are referenced by the controller for strong typing.
@@ -93,9 +105,6 @@ export class AdsService {
   /**
    * Create a new ad package category.
    */
-  /**
-   * Create a new ad package category.
-   */
   async createAdminCategory(
     dto: AdminCreateAdPackageCategoryDto,
   ): Promise<AdPackageCategory> {
@@ -144,6 +153,109 @@ export class AdsService {
       select: { id: true, isActive: true },
     });
     return updated;
+  }
+
+  /**
+   * Return fully-booked date ranges for a slot-limited package type.
+   * Used by the frontend calendar to grey out unavailable start dates.
+   */
+  async getBookedDates(packageType: AdPackageType): Promise<BookedDatesResult> {
+    const capacity = SLOT_CAPACITY[packageType];
+    if (!capacity) {
+      // DTO validation should prevent this; guard here as defence-in-depth.
+      throw new BadRequestException(
+        `${packageType} is not a slot-limited package type`,
+      );
+    }
+
+    const now = new Date();
+    const activeAds = await this.prisma.activeAd.findMany({
+      where: {
+        packageType,
+        isActive: true,
+        OR: [{ endDate: null }, { endDate: { gte: now } }],
+      },
+      select: { startDate: true, endDate: true },
+    });
+
+    const rawRanges = this.computeFullyBookedRanges(activeAds, capacity);
+
+    // Trim ranges to only return present/future portions for the calendar picker.
+    // Ranges that ended in the past are dropped; ranges that started in the past
+    // are clamped to the start of today (midnight UTC) so the frontend receives a
+    // clean day boundary rather than a millisecond-precision request timestamp.
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+
+    const fullyBookedRanges = rawRanges
+      .filter((r) => r.endDate === null || new Date(r.endDate) > today)
+      .map((r) => ({
+        ...r,
+        startDate:
+          new Date(r.startDate) < today ? today.toISOString() : r.startDate,
+      }));
+
+    return { packageType, capacity, fullyBookedRanges };
+  }
+
+  /**
+   * Sweep through ad date ranges and return sub-ranges where occupancy >= capacity.
+   * Uses an event-based sweep: START events increment count, END events decrement.
+   * Transitions from < capacity to >= capacity mark the start of a fully-booked range,
+   * and transitions back mark the end.
+   */
+  private computeFullyBookedRanges(
+    ads: { startDate: Date; endDate: Date | null }[],
+    capacity: number,
+  ): BookedDateRange[] {
+    if (ads.length === 0) return [];
+
+    type SweepEvent = { date: Date; type: 'start' | 'end' };
+    const events: SweepEvent[] = [];
+
+    for (const ad of ads) {
+      events.push({ date: ad.startDate, type: 'start' });
+      events.push({ date: ad.endDate ?? SENTINEL_DATE, type: 'end' });
+    }
+
+    // Sort by date; on same date process END before START so a slot freed on day T
+    // is available for a new ad also starting on day T.
+    events.sort((a, b) => {
+      const diff = a.date.getTime() - b.date.getTime();
+      if (diff !== 0) return diff;
+      if (a.type === 'end' && b.type === 'start') return -1;
+      if (a.type === 'start' && b.type === 'end') return 1;
+      return 0;
+    });
+
+    const ranges: BookedDateRange[] = [];
+    let count = 0;
+    let fullStart: Date | null = null;
+
+    for (const event of events) {
+      const prevCount = count;
+      count += event.type === 'start' ? 1 : -1;
+
+      if (prevCount < capacity && count >= capacity) {
+        // Slot just became fully booked
+        fullStart = event.date;
+      } else if (prevCount >= capacity && count < capacity) {
+        // Slot just freed up — close the fully-booked range
+        const isSentinel = event.date.getTime() === SENTINEL_DATE.getTime();
+        ranges.push({
+          startDate: fullStart!.toISOString(),
+          endDate: isSentinel ? null : event.date.toISOString(),
+        });
+        fullStart = null;
+      }
+    }
+
+    // If still at capacity after all events (e.g., ONE_TIME ads with no endDate)
+    if (count >= capacity && fullStart !== null) {
+      ranges.push({ startDate: fullStart.toISOString(), endDate: null });
+    }
+
+    return ranges;
   }
 
   /**

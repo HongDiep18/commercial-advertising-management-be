@@ -19,6 +19,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { SENTINEL_DATE, SLOT_CAPACITY } from '../ads/ads.constants';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
   AdminListOrdersQueryDto,
@@ -122,6 +123,9 @@ export class AdOrdersService {
         isActive: true,
         deletedAt: null,
       },
+      include: {
+        package: { select: { type: true } },
+      },
     });
     if (pricingList.length !== dto.items.length) {
       throw new BadRequestException(AdOrdersErrors.INVALID_PRICING_SET);
@@ -137,6 +141,31 @@ export class AdOrdersService {
     });
     if (!user) {
       throw new NotFoundException(AdOrdersErrors.USER_NOT_FOUND);
+    }
+
+    // Check slot availability for slot-limited package types
+    for (const item of dto.items) {
+      const pricing = pricingById.get(item.pricingId);
+      if (!pricing) continue;
+      const packageType = pricing.package.type;
+      if (!SLOT_CAPACITY[packageType]) continue;
+
+      const startDate = new Date(item.startDate);
+      const projectedEndDate =
+        pricing.pricingModel === PricingModel.DURATION && pricing.durationUnit
+          ? this.calculateEndDate(
+              startDate,
+              pricing.durationValue ?? 0,
+              pricing.durationUnit,
+            )
+          : null;
+
+      await this.checkSlotAvailability(
+        this.prisma,
+        packageType,
+        startDate,
+        projectedEndDate,
+      );
     }
 
     let subtotal = BigInt(0);
@@ -727,6 +756,7 @@ export class AdOrdersService {
       submittedAt: order.submittedAt ?? undefined,
       items: order.items.map((item) => ({
         id: item.id,
+        pricingId: item.pricingId,
         packageName: item.pricing.package.name,
         pricingName: `${item.pricing.durationValue || 'N/A'} ${
           item.pricing.durationUnit || ''
@@ -734,6 +764,8 @@ export class AdOrdersService {
         price: Number(item.unitPrice),
         designServiceRequired: item.designServiceRequired,
         startDate: item.startDate,
+        durationValue: item.pricing.durationValue,
+        durationUnit: item.pricing.durationUnit,
         adLinkUrl: item.adLinkUrl ?? undefined,
         assetsCount: item.assets.length,
       })),
@@ -885,6 +917,30 @@ export class AdOrdersService {
         throw new BadRequestException(AdOrdersErrors.ORDER_COMPANY_REQUIRED);
       }
       const companyId: string = order.companyId;
+
+      // Check slot availability for each slot-limited item before activating
+      for (const item of order.items) {
+        const packageType = item.pricing.package.type;
+        if (!SLOT_CAPACITY[packageType]) continue;
+
+        const projectedEndDate =
+          item.pricing.pricingModel === PricingModel.DURATION &&
+          item.pricing.durationUnit
+            ? this.calculateEndDate(
+                item.startDate,
+                item.pricing.durationValue ?? 0,
+                item.pricing.durationUnit,
+              )
+            : null;
+
+        await this.checkSlotAvailability(
+          tx,
+          packageType,
+          item.startDate,
+          projectedEndDate,
+        );
+      }
+
       // Update order status
       const updatedOrder = await tx.adOrder.update({
         where: { id: orderId },
@@ -1126,6 +1182,42 @@ export class AdOrdersService {
   }
 
   /**
+   * Throws SLOT_NOT_AVAILABLE if the slot-limited package type is at capacity
+   * for the requested [startDate, endDate] range.
+   * Accepts either PrismaService or a transaction client.
+   *
+   * Intentional design: only approved (isActive: true) ads are counted.
+   * PENDING orders are not reserved against slot capacity — slots are confirmed
+   * at approval time. In a low-volume, admin-driven flow this is acceptable;
+   * the admin simply rejects the second order if the slot is taken by the time
+   * they approve it.
+   */
+  private async checkSlotAvailability(
+    db: { activeAd: PrismaService['activeAd'] },
+    packageType: AdPackageType,
+    startDate: Date,
+    endDate: Date | null,
+  ): Promise<void> {
+    const capacity = SLOT_CAPACITY[packageType];
+    if (!capacity) return;
+
+    const effectiveEndDate = endDate ?? SENTINEL_DATE;
+
+    const occupiedCount = await db.activeAd.count({
+      where: {
+        packageType,
+        isActive: true,
+        startDate: { lt: effectiveEndDate },
+        OR: [{ endDate: null }, { endDate: { gt: startDate } }],
+      },
+    });
+
+    if (occupiedCount >= capacity) {
+      throw new BadRequestException(AdOrdersErrors.SLOT_NOT_AVAILABLE);
+    }
+  }
+
+  /**
    * Calculate end date based on duration
    */
   private calculateEndDate(
@@ -1142,12 +1234,24 @@ export class AdOrdersService {
       case DurationUnit.WEEK:
         end.setDate(end.getDate() + value * 7);
         break;
-      case DurationUnit.MONTH:
-        end.setMonth(end.getMonth() + value);
+      case DurationUnit.MONTH: {
+        const targetMonth = end.getMonth() + value;
+        end.setMonth(targetMonth);
+        if (end.getMonth() !== ((targetMonth % 12) + 12) % 12) {
+          end.setDate(0); // clamp to last day of target month
+        }
         break;
-      case DurationUnit.YEAR:
-        end.setFullYear(end.getFullYear() + value);
+      }
+      case DurationUnit.YEAR: {
+        const targetYear = end.getFullYear() + value;
+        const origDay = end.getDate();
+        end.setFullYear(targetYear);
+        // Feb 29 on a non-leap year overflows to Mar 1 — clamp back
+        if (end.getDate() !== origDay) {
+          end.setDate(0);
+        }
         break;
+      }
     }
 
     return end;

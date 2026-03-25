@@ -65,6 +65,10 @@ export const AdOrdersErrors = {
     code: 'AD_ORDER_COMPANY_REQUIRED',
     message: 'Order must be associated with a company to activate ads',
   },
+  SLOT_NOT_AVAILABLE: {
+    code: 'AD_ORDER_SLOT_NOT_AVAILABLE',
+    message: 'This ad slot is fully booked for the requested date range',
+  },
 } as const;
 
 export type AdOrdersErrorKey = keyof typeof AdOrdersErrors;

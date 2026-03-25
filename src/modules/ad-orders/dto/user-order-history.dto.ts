@@ -58,6 +58,9 @@ export class UserOrderItemDto {
   id: string;
 
   @ApiPropertyOptional()
+  pricingId: string;
+
+  @ApiPropertyOptional()
   packageName: string;
 
   @ApiPropertyOptional()
@@ -71,6 +74,12 @@ export class UserOrderItemDto {
 
   @ApiPropertyOptional()
   startDate: Date;
+
+  @ApiPropertyOptional()
+  durationValue: number | null;
+
+  @ApiPropertyOptional({ enum: ['DAY', 'WEEK', 'MONTH', 'YEAR'] })
+  durationUnit: string | null;
 
   @ApiPropertyOptional()
   adLinkUrl?: string;

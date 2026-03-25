@@ -756,6 +756,7 @@ export class AdOrdersService {
       submittedAt: order.submittedAt ?? undefined,
       items: order.items.map((item) => ({
         id: item.id,
+        pricingId: item.pricingId,
         packageName: item.pricing.package.name,
         pricingName: `${item.pricing.durationValue || 'N/A'} ${
           item.pricing.durationUnit || ''
@@ -763,6 +764,8 @@ export class AdOrdersService {
         price: Number(item.unitPrice),
         designServiceRequired: item.designServiceRequired,
         startDate: item.startDate,
+        durationValue: item.pricing.durationValue,
+        durationUnit: item.pricing.durationUnit,
         adLinkUrl: item.adLinkUrl ?? undefined,
         assetsCount: item.assets.length,
       })),

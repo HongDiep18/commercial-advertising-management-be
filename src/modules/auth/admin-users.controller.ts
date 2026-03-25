@@ -24,9 +24,10 @@ export class AdminUsersController {
 
   @Get()
   @ApiOperation({
-    summary: 'List users for admin table',
+    summary: 'List staff users for admin table',
     description:
-      'Returns users with company info, role, last login, status, plus ids for actions.',
+      'Returns only users with role ADMIN or SUPER_ADMIN ' +
+      'Includes company info, last login, status, plus ids for actions.',
   })
   @ApiResponse({
     status: 200,

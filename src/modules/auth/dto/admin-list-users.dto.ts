@@ -10,11 +10,6 @@ export class AdminListUsersQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by role (e.g. MEMBER, ADMIN)' })
-  @IsOptional()
-  @IsString()
-  role?: string;
-
   @ApiPropertyOptional({
     description: 'Filter by status',
     enum: ['active', 'suspended', 'deleted'],

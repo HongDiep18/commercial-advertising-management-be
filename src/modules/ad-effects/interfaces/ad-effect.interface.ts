@@ -14,6 +14,7 @@ export interface CompanyData {
   description: string;
   featuredHighlight?: boolean;
   companyInfoHighlight?: boolean;
+  showDetailsButton?: boolean;
   adLinkUrl?: string;
   metadata?: Record<string, unknown>;
   sortPriority?: number;

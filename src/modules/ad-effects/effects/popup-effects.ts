@@ -32,7 +32,7 @@ export class PopupSlotEffect implements AdEffect {
 
 /**
  * Effect for POPUP_VIEW_DETAILS_LINK
- * Adds ad_link_url to company data if the company has this ad active
+ * Enables details button and adds ad_link_url when available
  */
 export class PopupViewDetailsLinkEffect implements AdEffect {
   readonly packageType = AdPackageType.POPUP_VIEW_DETAILS_LINK;
@@ -48,14 +48,22 @@ export class PopupViewDetailsLinkEffect implements AdEffect {
       (ad) => ad.packageType === AdPackageType.POPUP_VIEW_DETAILS_LINK,
     );
 
-    if (viewDetailsAd?.adLinkUrl) {
+    if (!viewDetailsAd) {
+      return { ...context.company };
+    }
+
+    if (viewDetailsAd.adLinkUrl) {
       return {
         ...context.company,
+        showDetailsButton: true,
         adLinkUrl: viewDetailsAd.adLinkUrl,
       };
     }
 
-    return { ...context.company };
+    return {
+      ...context.company,
+      showDetailsButton: true,
+    };
   }
 }
 

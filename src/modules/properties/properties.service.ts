@@ -5,6 +5,8 @@ import {
   PropertyPublicationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { CreatePropertyContactInquiryDto } from './dto/create-property-contact-inquiry.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -83,6 +85,56 @@ type PropertyAdminDetailRecord = Prisma.PropertyGetPayload<{
   select: typeof propertyAdminDetailSelect;
 }>;
 
+type PropertyLegalDocumentRecord = Prisma.PropertyLegalDocumentGetPayload<{
+  select: typeof propertyLegalDocumentSelect;
+}>;
+
+type PropertyContactInquiryRecord = Prisma.PropertyContactInquiryGetPayload<{
+  select: typeof propertyContactInquirySelect;
+}>;
+
+type PropertyAuditSnapshot = {
+  id: string;
+  title: string;
+  price: string;
+  type: string;
+  province: string;
+  provinceName: string;
+  fullAddress: string;
+  latitude: string | null;
+  longitude: string | null;
+  areaValue: string;
+  areaUnit: string;
+  description: string;
+  images: string[];
+  features: string[];
+  publicationStatus: string;
+  publishedAt: string | null;
+  availabilityStatus: string;
+  soldAt: string | null;
+  views: number;
+  legalDocuments: PropertyLegalDocumentAuditSnapshot[];
+};
+
+type PropertyLegalDocumentAuditSnapshot = {
+  id: string;
+  propertyId: string;
+  fileUrl: string;
+  fileName: string;
+  mimeType: string | null;
+  fileSizeKb: number | null;
+  createdAt: string;
+};
+
+type PropertyContactInquiryAuditSnapshot = {
+  id: string;
+  propertyId: string;
+  name: string;
+  email: string;
+  hasMessage: boolean;
+  createdAt: string;
+};
+
 /**
  * Provides CRUD and legal document operations for properties.
  */
@@ -91,15 +143,30 @@ export class PropertiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileUploadService: FileUploadService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
    * Creates a new property.
    */
-  async createProperty(dto: CreatePropertyDto): Promise<PropertyResponseDto> {
+  async createProperty(
+    dto: CreatePropertyDto,
+    adminUserId?: string,
+  ): Promise<PropertyResponseDto> {
     const property = await this.prisma.property.create({
       data: this.buildCreateInput(dto),
       select: propertySelect,
+    });
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_CREATED,
+      entityType: AUDIT_ENTITY.PROPERTY,
+      entityId: property.id,
+      actorId: adminUserId ?? null,
+      newValue: PropertiesService.serializePropertyAuditPayload(property),
+      metadata: {
+        propertyId: property.id,
+        propertyTitle: property.title,
+      },
     });
     return this.mapProperty(property);
   }
@@ -166,6 +233,7 @@ export class PropertiesService {
       },
       select: {
         id: true,
+        title: true,
       },
     });
     if (!existingProperty) {
@@ -179,6 +247,17 @@ export class PropertiesService {
         message: dto.message ?? null,
       },
       select: propertyContactInquirySelect,
+    });
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_CONTACT_INQUIRY_CREATED,
+      entityType: AUDIT_ENTITY.PROPERTY_CONTACT_INQUIRY,
+      entityId: inquiry.id,
+      actorId: null,
+      newValue: PropertiesService.serializeContactInquiryAuditPayload(inquiry),
+      metadata: {
+        propertyId,
+        propertyTitle: existingProperty.title,
+      },
     });
     return this.mapContactInquiry(inquiry);
   }
@@ -205,12 +284,31 @@ export class PropertiesService {
   async updateProperty(
     id: string,
     dto: UpdatePropertyDto,
+    adminUserId?: string,
   ): Promise<PropertyResponseDto> {
-    await this.ensurePropertyExists(id);
+    const propertyBefore = await this.prisma.property.findUnique({
+      where: { id },
+      select: propertySelect,
+    });
+    if (!propertyBefore) {
+      throw new NotFoundException('Property not found');
+    }
     const property = await this.prisma.property.update({
       where: { id },
       data: this.buildUpdateInput(dto),
       select: propertySelect,
+    });
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_UPDATED,
+      entityType: AUDIT_ENTITY.PROPERTY,
+      entityId: property.id,
+      actorId: adminUserId ?? null,
+      oldValue: PropertiesService.serializePropertyAuditPayload(propertyBefore),
+      newValue: PropertiesService.serializePropertyAuditPayload(property),
+      metadata: {
+        propertyId: property.id,
+        propertyTitle: property.title,
+      },
     });
     return this.mapProperty(property);
   }
@@ -218,10 +316,30 @@ export class PropertiesService {
   /**
    * Deletes a property.
    */
-  async deleteProperty(id: string): Promise<{ message: string }> {
-    await this.ensurePropertyExists(id);
+  async deleteProperty(
+    id: string,
+    adminUserId?: string,
+  ): Promise<{ message: string }> {
+    const property = await this.prisma.property.findUnique({
+      where: { id },
+      select: propertySelect,
+    });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
     await this.prisma.property.delete({
       where: { id },
+    });
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_DELETED,
+      entityType: AUDIT_ENTITY.PROPERTY,
+      entityId: id,
+      actorId: adminUserId ?? null,
+      oldValue: PropertiesService.serializePropertyAuditPayload(property),
+      metadata: {
+        propertyId: id,
+        propertyTitle: property.title,
+      },
     });
     return { message: 'Property deleted successfully' };
   }
@@ -232,8 +350,18 @@ export class PropertiesService {
   async uploadLegalDocuments(
     propertyId: string,
     files: Express.Multer.File[],
+    adminUserId?: string,
   ): Promise<PropertyLegalDocumentResponseDto[]> {
-    await this.ensurePropertyExists(propertyId);
+    const existingProperty = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
     const uploadedFiles = await Promise.all(
       files.map((file) =>
         this.fileUploadService.uploadFile(file, 'properties/legal-documents'),
@@ -253,6 +381,18 @@ export class PropertiesService {
         }),
       ),
     );
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_LEGAL_DOCUMENT_UPLOADED,
+      entityType: AUDIT_ENTITY.PROPERTY_LEGAL_DOCUMENT,
+      entityId: propertyId,
+      actorId: adminUserId ?? null,
+      metadata: {
+        propertyId,
+        propertyTitle: existingProperty.title,
+        uploadedCount: createdDocuments.length,
+        documentIds: createdDocuments.map((document) => document.id),
+      },
+    });
     return createdDocuments.map((document) => this.mapLegalDocument(document));
   }
 
@@ -262,7 +402,18 @@ export class PropertiesService {
   async deleteLegalDocument(
     propertyId: string,
     documentId: string,
+    adminUserId?: string,
   ): Promise<{ message: string }> {
+    const existingProperty = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+    if (!existingProperty) {
+      throw new NotFoundException('Property not found');
+    }
     const document = await this.prisma.propertyLegalDocument.findFirst({
       where: {
         id: documentId,
@@ -280,6 +431,17 @@ export class PropertiesService {
     await this.prisma.propertyLegalDocument.delete({
       where: {
         id: documentId,
+      },
+    });
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROPERTY_LEGAL_DOCUMENT_DELETED,
+      entityType: AUDIT_ENTITY.PROPERTY_LEGAL_DOCUMENT,
+      entityId: documentId,
+      actorId: adminUserId ?? null,
+      oldValue: PropertiesService.serializeLegalDocumentAuditPayload(document),
+      metadata: {
+        propertyId,
+        propertyTitle: existingProperty.title,
       },
     });
     return { message: 'Property legal document deleted successfully' };
@@ -484,9 +646,7 @@ export class PropertiesService {
   }
 
   private mapLegalDocument(
-    document: Prisma.PropertyLegalDocumentGetPayload<{
-      select: typeof propertyLegalDocumentSelect;
-    }>,
+    document: PropertyLegalDocumentRecord,
   ): PropertyLegalDocumentResponseDto {
     return {
       id: document.id,
@@ -500,9 +660,7 @@ export class PropertiesService {
   }
 
   private mapContactInquiry(
-    inquiry: Prisma.PropertyContactInquiryGetPayload<{
-      select: typeof propertyContactInquirySelect;
-    }>,
+    inquiry: PropertyContactInquiryRecord,
   ): PropertyContactInquiryResponseDto {
     return {
       id: inquiry.id,
@@ -514,16 +672,6 @@ export class PropertiesService {
     };
   }
 
-  private async ensurePropertyExists(id: string): Promise<void> {
-    const property = await this.prisma.property.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!property) {
-      throw new NotFoundException('Property not found');
-    }
-  }
-
   private extractObjectNameFromUrl(fileUrl: string): string | null {
     try {
       const url = new URL(fileUrl);
@@ -533,5 +681,71 @@ export class PropertiesService {
     } catch {
       return null;
     }
+  }
+
+  private static serializePropertyAuditPayload(
+    property: PropertyRecord,
+  ): string {
+    const propertyPayload: PropertyAuditSnapshot = {
+      id: property.id,
+      title: property.title,
+      price: property.price,
+      type: property.type,
+      province: property.province,
+      provinceName: property.provinceName,
+      fullAddress: property.fullAddress,
+      latitude: property.latitude ? property.latitude.toString() : null,
+      longitude: property.longitude ? property.longitude.toString() : null,
+      areaValue: property.areaValue.toString(),
+      areaUnit: property.areaUnit,
+      description: property.description,
+      images: property.images,
+      features: property.features,
+      publicationStatus: property.publicationStatus,
+      publishedAt: property.publishedAt?.toISOString() ?? null,
+      availabilityStatus: property.availabilityStatus,
+      soldAt: property.soldAt?.toISOString() ?? null,
+      views: property.views,
+      legalDocuments: property.legalDocuments.map((document) =>
+        PropertiesService.toLegalDocumentAuditSnapshot(document),
+      ),
+    };
+    return JSON.stringify({ property: propertyPayload });
+  }
+
+  private static serializeLegalDocumentAuditPayload(
+    document: PropertyLegalDocumentRecord,
+  ): string {
+    const documentPayload =
+      PropertiesService.toLegalDocumentAuditSnapshot(document);
+    return JSON.stringify({ legalDocument: documentPayload });
+  }
+
+  private static serializeContactInquiryAuditPayload(
+    inquiry: PropertyContactInquiryRecord,
+  ): string {
+    const inquiryPayload: PropertyContactInquiryAuditSnapshot = {
+      id: inquiry.id,
+      propertyId: inquiry.propertyId,
+      name: inquiry.name,
+      email: inquiry.email,
+      hasMessage: Boolean(inquiry.message),
+      createdAt: inquiry.createdAt.toISOString(),
+    };
+    return JSON.stringify({ contactInquiry: inquiryPayload });
+  }
+
+  private static toLegalDocumentAuditSnapshot(
+    document: PropertyLegalDocumentRecord,
+  ): PropertyLegalDocumentAuditSnapshot {
+    return {
+      id: document.id,
+      propertyId: document.propertyId,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      mimeType: document.mimeType ?? null,
+      fileSizeKb: document.fileSizeKb ?? null,
+      createdAt: document.createdAt.toISOString(),
+    };
   }
 }

@@ -2,6 +2,7 @@ type FormatterContext = {
   readonly userLabelById: ReadonlyMap<string, string>;
   readonly profileRequestLabelById: ReadonlyMap<string, string>;
   readonly loyaltyLabelById: ReadonlyMap<string, string>;
+  readonly propertyLabelById: ReadonlyMap<string, string>;
 };
 
 export type AuditLogRow = {
@@ -26,6 +27,7 @@ type ContentContext = {
   readonly shortEntityId: string;
   readonly profileSubject: string;
   readonly companySubject: string;
+  readonly propertySubject: string;
   readonly userAccountLabel: string;
 };
 
@@ -53,6 +55,12 @@ const TITLE_BY_ACTION: Record<string, string> = {
   'loyalty.points_deducted': 'Loyalty points deducted',
   'loyalty.tier_changed': 'Loyalty tier changed',
   'loyalty.tier_recalculated': 'Loyalty tier recalculated',
+  'property.created': 'Property created',
+  'property.updated': 'Property updated',
+  'property.deleted': 'Property deleted',
+  'property.legal_document_uploaded': 'Property legal documents uploaded',
+  'property.legal_document_deleted': 'Property legal document deleted',
+  'property.contact_inquiry_created': 'Property contact inquiry created',
 };
 
 const ACTION_CONTENT_HANDLERS: Record<string, (c: ContentContext) => string> = {
@@ -78,6 +86,25 @@ const ACTION_CONTENT_HANDLERS: Record<string, (c: ContentContext) => string> = {
   'ad_order.approved': (c) => `Approved ad order ${c.shortEntityId}.`,
   'ad_order.rejected': (c) => `Rejected ad order ${c.shortEntityId}.`,
   'ad_order.created': (c) => `Created ad order ${c.shortEntityId}.`,
+  'property.created': (c) => `Created property ${c.propertySubject}.`,
+  'property.updated': (c) => `Updated property ${c.propertySubject}.`,
+  'property.deleted': (c) => `Deleted property ${c.propertySubject}.`,
+  'property.legal_document_uploaded': (c) => {
+    const uploadedCount = readNumberFromMetadata(c.metadata, ['uploadedCount']);
+    if (uploadedCount && uploadedCount > 0) {
+      return `Uploaded ${uploadedCount} legal document(s) for ${c.propertySubject}.`;
+    }
+    return `Uploaded legal document(s) for ${c.propertySubject}.`;
+  },
+  'property.legal_document_deleted': (c) => {
+    const legalDocumentName = resolveLegalDocumentNameFromContext(c);
+    if (legalDocumentName) {
+      return `Deleted legal document ${legalDocumentName} from ${c.propertySubject}.`;
+    }
+    return `Deleted legal document from ${c.propertySubject}.`;
+  },
+  'property.contact_inquiry_created': (c) =>
+    `Created contact inquiry for ${c.propertySubject}.`,
 };
 
 const ENTITY_CONTENT_HANDLERS: Partial<
@@ -97,6 +124,11 @@ const PRIMARY_LABEL_RESOLVERS: Array<(c: ContentContext) => string | null> = [
     c.row.entityType === 'LoyaltyTransaction' &&
     c.context.loyaltyLabelById.has(c.row.entityId)
       ? (c.context.loyaltyLabelById.get(c.row.entityId) ?? null)
+      : null,
+  (c) =>
+    c.row.entityType === 'Property' &&
+    c.context.propertyLabelById.has(c.row.entityId)
+      ? (c.context.propertyLabelById.get(c.row.entityId) ?? null)
       : null,
   (c) => (c.row.entityType === 'User' && c.userLabel ? c.userLabel : null),
   (c) => c.email,
@@ -139,6 +171,69 @@ function describeGenericValueChange(
   return null;
 }
 
+function readStringFromUnknown(
+  source: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function readNumberFromMetadata(
+  source: Record<string, unknown>,
+  keys: readonly string[],
+): number | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number') {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readNestedStringFromJsonByKey(
+  payload: string | null,
+  nestedKey: string,
+  keys: readonly string[],
+): string | null {
+  if (!payload) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    const root = parsed as Record<string, unknown>;
+    const nested = root[nestedKey];
+    if (nested && typeof nested === 'object') {
+      return readStringFromUnknown(nested as Record<string, unknown>, keys);
+    }
+    return readStringFromUnknown(root, keys);
+  } catch {
+    return null;
+  }
+}
+
+function resolveLegalDocumentNameFromContext(c: ContentContext): string | null {
+  const metadataFileName = readStringFromUnknown(c.metadata, ['fileName']);
+  if (metadataFileName) {
+    return metadataFileName;
+  }
+  return (
+    readNestedStringFromJsonByKey(c.row.oldValue, 'legalDocument', [
+      'fileName',
+    ]) ??
+    readNestedStringFromJsonByKey(c.row.newValue, 'legalDocument', ['fileName'])
+  );
+}
+
 export class AuditActivityFormatter {
   static toTitle(action: string): string {
     return TITLE_BY_ACTION[action] ?? action.replaceAll('_', ' ');
@@ -179,6 +274,12 @@ export class AuditActivityFormatter {
       context.profileRequestLabelById.get(row.entityId) ??
       `request ${shortEntityId}`;
     const companySubject = companyName ?? email ?? 'company profile';
+    const propertySubject = AuditActivityFormatter.resolvePropertySubject(
+      row,
+      context,
+      metadata,
+      shortEntityId,
+    );
     const userAccountLabel = userLabel ?? 'User account';
     return {
       row,
@@ -190,6 +291,7 @@ export class AuditActivityFormatter {
       shortEntityId,
       profileSubject,
       companySubject,
+      propertySubject,
       userAccountLabel,
     };
   }
@@ -311,6 +413,48 @@ export class AuditActivityFormatter {
       }
     }
     return null;
+  }
+
+  private static resolvePropertySubject(
+    row: AuditLogRow,
+    context: FormatterContext,
+    metadata: Record<string, unknown>,
+    shortEntityId: string,
+  ): string {
+    const metadataPropertyTitle = AuditActivityFormatter.readString(metadata, [
+      'propertyTitle',
+    ]);
+    if (metadataPropertyTitle) {
+      return metadataPropertyTitle;
+    }
+    const metadataPropertyId = AuditActivityFormatter.readString(metadata, [
+      'propertyId',
+    ]);
+    if (
+      metadataPropertyId &&
+      context.propertyLabelById.has(metadataPropertyId)
+    ) {
+      return (
+        context.propertyLabelById.get(metadataPropertyId) ??
+        `property ${metadataPropertyId.slice(0, 8)}...`
+      );
+    }
+    if (
+      row.entityType === 'Property' &&
+      context.propertyLabelById.has(row.entityId)
+    ) {
+      return (
+        context.propertyLabelById.get(row.entityId) ??
+        `property ${shortEntityId}`
+      );
+    }
+    const propertyTitleFromPayload =
+      readNestedStringFromJsonByKey(row.newValue, 'property', ['title']) ??
+      readNestedStringFromJsonByKey(row.oldValue, 'property', ['title']);
+    if (propertyTitleFromPayload) {
+      return propertyTitleFromPayload;
+    }
+    return `property ${shortEntityId}`;
   }
 
   private static readNestedStringFromJson(

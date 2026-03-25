@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   AuditActivityFormatter,
   type AuditLogRow,
 } from './audit-activity-formatter';
+import { AUDIT_LOG_RECORDED_EVENT_NAME } from './audit-log-recorded-event-name.constant';
+import type { AuditLogRecordedEvent } from './audit-log-recorded.event';
 import type {
   AdminRecentActivitiesResponseDto,
   RecentActivityItemDto,
@@ -24,7 +27,10 @@ export type AuditRecordInput = {
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async record(input: AuditRecordInput): Promise<void> {
     try {
@@ -36,11 +42,37 @@ export class AuditService {
       const newValue = input.newValue ?? null;
       const metadata =
         input.metadata != null ? JSON.stringify(input.metadata) : null;
-
-      await this.prisma.$executeRaw`
-        INSERT INTO audit_logs (id, created_at, action, entity_type, entity_id, actor_id, old_value, new_value, metadata)
-        VALUES (gen_random_uuid(), NOW(), ${action}, ${entityType}, ${entityId}, ${actorId}, ${oldValue}, ${newValue}, ${metadata})
-      `;
+      const createdAuditLog = await this.prisma.auditLog.create({
+        data: {
+          action,
+          entityType,
+          entityId,
+          actorId,
+          oldValue,
+          newValue,
+          metadata,
+        },
+        select: {
+          id: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          metadata: true,
+          newValue: true,
+        },
+      });
+      const auditLogRecordedEvent: AuditLogRecordedEvent = {
+        id: createdAuditLog.id,
+        action: createdAuditLog.action,
+        entityType: createdAuditLog.entityType,
+        entityId: createdAuditLog.entityId,
+        metadata: createdAuditLog.metadata,
+        newValue: createdAuditLog.newValue,
+      };
+      this.eventEmitter.emit(
+        AUDIT_LOG_RECORDED_EVENT_NAME,
+        auditLogRecordedEvent,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -73,11 +105,13 @@ export class AuditService {
     const profileRequestLabelById =
       await this.buildProfileRequestLabelMap(rows);
     const loyaltyLabelById = await this.buildLoyaltyLabelMap(rows);
+    const propertyLabelById = await this.buildPropertyLabelMap(rows);
     const activities = rows.map((row) => {
       return this.mapRowToActivity(row, {
         userLabelById,
         profileRequestLabelById,
         loyaltyLabelById,
+        propertyLabelById,
       });
     });
     return {
@@ -97,6 +131,7 @@ export class AuditService {
       readonly userLabelById: ReadonlyMap<string, string>;
       readonly profileRequestLabelById: ReadonlyMap<string, string>;
       readonly loyaltyLabelById: ReadonlyMap<string, string>;
+      readonly propertyLabelById: ReadonlyMap<string, string>;
     },
   ): RecentActivityItemDto {
     const title = AuditActivityFormatter.toTitle(row.action);
@@ -229,6 +264,69 @@ export class AuditService {
       map.set(transaction.id, label);
     }
     return map;
+  }
+
+  private async buildPropertyLabelMap(
+    rows: readonly AuditLogRow[],
+  ): Promise<Map<string, string>> {
+    const propertyIds = new Set<string>();
+    for (const row of rows) {
+      if (row.entityType === 'Property') {
+        propertyIds.add(row.entityId);
+      }
+      const metadata = this.parseMetadata(row.metadata);
+      const metadataPropertyId = this.readString(metadata, ['propertyId']);
+      if (metadataPropertyId) {
+        propertyIds.add(metadataPropertyId);
+      }
+    }
+    if (propertyIds.size === 0) {
+      return new Map<string, string>();
+    }
+    const properties = await this.prisma.property.findMany({
+      where: {
+        id: {
+          in: [...propertyIds],
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+    const map = new Map<string, string>();
+    for (const property of properties) {
+      map.set(property.id, property.title);
+    }
+    return map;
+  }
+
+  private parseMetadata(metadata: string | null): Record<string, unknown> {
+    if (!metadata) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(metadata) as unknown;
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, unknown>;
+      }
+      return {};
+    } catch {
+      return {};
+    }
+  }
+
+  private readString(
+    source: Record<string, unknown>,
+    keys: readonly string[],
+  ): string | null {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return null;
   }
 }
 

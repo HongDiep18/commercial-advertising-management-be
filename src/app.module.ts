@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './modules/audit/audit.module';
@@ -26,6 +27,7 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { HealthModule } from './modules/health/health.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { NewsModule } from './modules/news/news.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 
 @Module({
@@ -42,6 +44,7 @@ import { PropertiesModule } from './modules/properties/properties.module';
         storageConfig,
       ],
     }),
+    EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
@@ -58,6 +61,7 @@ import { PropertiesModule } from './modules/properties/properties.module';
     NewsModule,
     ChatbotModule,
     PropertiesModule,
+    NotificationsModule,
     AdsModule,
     AdOrdersModule,
     CompaniesModule,

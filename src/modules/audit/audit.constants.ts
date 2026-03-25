@@ -6,6 +6,9 @@ export const AUDIT_ENTITY = {
   AD_PRICING: 'AdPackagePricing',
   ACTIVE_AD: 'ActiveAd',
   LOYALTY_TRANSACTION: 'LoyaltyTransaction',
+  PROPERTY: 'Property',
+  PROPERTY_LEGAL_DOCUMENT: 'PropertyLegalDocument',
+  PROPERTY_CONTACT_INQUIRY: 'PropertyContactInquiry',
 } as const;
 
 export const AUDIT_ACTION = {
@@ -45,6 +48,14 @@ export const AUDIT_ACTION = {
   LOYALTY_POINTS_DEDUCTED: 'loyalty.points_deducted',
   LOYALTY_TIER_CHANGED: 'loyalty.tier_changed',
   LOYALTY_TIER_RECALCULATED: 'loyalty.tier_recalculated',
+
+  // Property actions
+  PROPERTY_CREATED: 'property.created',
+  PROPERTY_UPDATED: 'property.updated',
+  PROPERTY_DELETED: 'property.deleted',
+  PROPERTY_LEGAL_DOCUMENT_UPLOADED: 'property.legal_document_uploaded',
+  PROPERTY_LEGAL_DOCUMENT_DELETED: 'property.legal_document_deleted',
+  PROPERTY_CONTACT_INQUIRY_CREATED: 'property.contact_inquiry_created',
 
   COMPANY_UPDATED_BY_ADMIN: 'company.updated_by_admin',
 } as const;

@@ -21,6 +21,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -85,8 +86,9 @@ export class PropertiesController {
   @ApiResponse({ status: 201, type: PropertyResponseDto })
   async createProperty(
     @Body() dto: CreatePropertyDto,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<PropertyResponseDto> {
-    return this.propertiesService.createProperty(dto);
+    return this.propertiesService.createProperty(dto, adminUserId);
   }
 
   /**
@@ -101,8 +103,9 @@ export class PropertiesController {
   async updateProperty(
     @Param('id') id: string,
     @Body() dto: UpdatePropertyDto,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<PropertyResponseDto> {
-    return this.propertiesService.updateProperty(id, dto);
+    return this.propertiesService.updateProperty(id, dto, adminUserId);
   }
 
   /**
@@ -121,8 +124,11 @@ export class PropertiesController {
       },
     },
   })
-  async deleteProperty(@Param('id') id: string): Promise<{ message: string }> {
-    return this.propertiesService.deleteProperty(id);
+  async deleteProperty(
+    @Param('id') id: string,
+    @CurrentUser('userId') adminUserId: string,
+  ): Promise<{ message: string }> {
+    return this.propertiesService.deleteProperty(id, adminUserId);
   }
 
   /**
@@ -156,11 +162,12 @@ export class PropertiesController {
   async uploadLegalDocuments(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<PropertyLegalDocumentResponseDto[]> {
     if (!files || files.length === 0) {
       throw new BadRequestException({ ...FileUploadErrors.NO_FILES });
     }
-    return this.propertiesService.uploadLegalDocuments(id, files);
+    return this.propertiesService.uploadLegalDocuments(id, files, adminUserId);
   }
 
   /**
@@ -185,8 +192,13 @@ export class PropertiesController {
   async deleteLegalDocument(
     @Param('propertyId') propertyId: string,
     @Param('documentId') documentId: string,
+    @CurrentUser('userId') adminUserId: string,
   ): Promise<{ message: string }> {
-    return this.propertiesService.deleteLegalDocument(propertyId, documentId);
+    return this.propertiesService.deleteLegalDocument(
+      propertyId,
+      documentId,
+      adminUserId,
+    );
   }
 
   /**

@@ -604,14 +604,11 @@ export class AuthService {
     const skip = (page - 1) * limit;
 
     const search = query.search?.trim();
-    const role = query.role?.trim();
     const status = query.status;
 
-    const where: Prisma.UserWhereInput = {};
-
-    if (role) {
-      where.role = role;
-    }
+    const where: Prisma.UserWhereInput = {
+      role: { in: [Role.ADMIN, Role.SUPER_ADMIN] },
+    };
 
     if (status === 'active') {
       where.isActive = true;

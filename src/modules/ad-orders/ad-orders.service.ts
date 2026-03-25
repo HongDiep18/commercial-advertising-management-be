@@ -10,7 +10,6 @@ import {
   DurationUnit,
   PricingModel,
   Prisma,
-  AdPackageType as AdPackageTypeEnum,
 } from '@prisma/client';
 import { Readable } from 'stream';
 import { PointsSource } from '../../common/enums/points-source.enum';
@@ -20,14 +19,8 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { SENTINEL_DATE, SLOT_CAPACITY } from '../ads/ads.constants';
 import { AdOrdersErrors } from './ad-orders.errors';
-
-const SENTINEL_DATE = new Date('2999-12-31T00:00:00.000Z');
-
-const SLOT_CAPACITY: Partial<Record<AdPackageType, number>> = {
-  [AdPackageTypeEnum.POPUP_PRIORITY_SLOT]: 1,
-  [AdPackageTypeEnum.POPUP_ROTATION_SLOT]: 4,
-};
 import type {
   AdminListOrdersQueryDto,
   AdminOrderDto,
@@ -1189,6 +1182,12 @@ export class AdOrdersService {
    * Throws SLOT_NOT_AVAILABLE if the slot-limited package type is at capacity
    * for the requested [startDate, endDate] range.
    * Accepts either PrismaService or a transaction client.
+   *
+   * Intentional design: only approved (isActive: true) ads are counted.
+   * PENDING orders are not reserved against slot capacity — slots are confirmed
+   * at approval time. In a low-volume, admin-driven flow this is acceptable;
+   * the admin simply rejects the second order if the slot is taken by the time
+   * they approve it.
    */
   private async checkSlotAvailability(
     db: { activeAd: PrismaService['activeAd'] },
@@ -1232,12 +1231,24 @@ export class AdOrdersService {
       case DurationUnit.WEEK:
         end.setDate(end.getDate() + value * 7);
         break;
-      case DurationUnit.MONTH:
-        end.setMonth(end.getMonth() + value);
+      case DurationUnit.MONTH: {
+        const targetMonth = end.getMonth() + value;
+        end.setMonth(targetMonth);
+        if (end.getMonth() !== ((targetMonth % 12) + 12) % 12) {
+          end.setDate(0); // clamp to last day of target month
+        }
         break;
-      case DurationUnit.YEAR:
-        end.setFullYear(end.getFullYear() + value);
+      }
+      case DurationUnit.YEAR: {
+        const targetYear = end.getFullYear() + value;
+        const origDay = end.getDate();
+        end.setFullYear(targetYear);
+        // Feb 29 on a non-leap year overflows to Mar 1 — clamp back
+        if (end.getDate() !== origDay) {
+          end.setDate(0);
+        }
         break;
+      }
     }
 
     return end;

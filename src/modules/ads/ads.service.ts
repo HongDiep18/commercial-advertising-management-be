@@ -10,19 +10,12 @@ import type {
   DurationUnit,
   PricingModel,
 } from '@prisma/client';
-import { AdCategoryType, AdPackageType as AdPackageTypeEnum } from '@prisma/client';
+import { AdCategoryType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { SENTINEL_DATE, SLOT_CAPACITY } from './ads.constants';
 import { AdsErrors } from './ads.errors';
 import type { AdminCreateAdPackageCategoryDto } from './dto/admin-create-ad-package-category.dto';
 import type { AdminUpdateAdPackageCategoryDto } from './dto/admin-update-ad-package-category.dto';
-
-const SENTINEL_DATE = new Date('2999-12-31T00:00:00.000Z');
-
-/** Max concurrent occupants per slot-limited package type */
-const SLOT_CAPACITY: Partial<Record<AdPackageType, number>> = {
-  [AdPackageTypeEnum.POPUP_PRIORITY_SLOT]: 1,
-  [AdPackageTypeEnum.POPUP_ROTATION_SLOT]: 4,
-};
 
 export type BookedDateRange = {
   startDate: string; // ISO string
@@ -169,7 +162,10 @@ export class AdsService {
   async getBookedDates(packageType: AdPackageType): Promise<BookedDatesResult> {
     const capacity = SLOT_CAPACITY[packageType];
     if (!capacity) {
-      return { packageType, capacity: 0, fullyBookedRanges: [] };
+      // DTO validation should prevent this; guard here as defence-in-depth.
+      throw new BadRequestException(
+        `${packageType} is not a slot-limited package type`,
+      );
     }
 
     const now = new Date();
@@ -182,7 +178,23 @@ export class AdsService {
       select: { startDate: true, endDate: true },
     });
 
-    const fullyBookedRanges = this.computeFullyBookedRanges(activeAds, capacity);
+    const rawRanges = this.computeFullyBookedRanges(activeAds, capacity);
+
+    // Trim ranges to only return present/future portions for the calendar picker.
+    // Ranges that ended in the past are dropped; ranges that started in the past
+    // are clamped to the start of today (midnight UTC) so the frontend receives a
+    // clean day boundary rather than a millisecond-precision request timestamp.
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+
+    const fullyBookedRanges = rawRanges
+      .filter((r) => r.endDate === null || new Date(r.endDate) > today)
+      .map((r) => ({
+        ...r,
+        startDate:
+          new Date(r.startDate) < today ? today.toISOString() : r.startDate,
+      }));
+
     return { packageType, capacity, fullyBookedRanges };
   }
 

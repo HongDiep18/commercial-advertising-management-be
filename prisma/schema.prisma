@@ -156,6 +156,11 @@ model User {
   loyaltyPoints  Int            @default(0)
   totalSpending  BigInt         @default(0) @map("total_spending")
 
+  // Industry access control
+  primaryIndustry     String?  @map("primary_industry") @db.VarChar(64)
+  selectedIndustries  String[] @default([]) @map("selected_industries")
+  industriesSelected  Boolean  @default(false) @map("industries_selected")
+
   companyId                 String?   @map("company_id") @db.Uuid
   setPasswordToken          String?   @db.VarChar(255)
   setPasswordTokenExpiresAt DateTime?

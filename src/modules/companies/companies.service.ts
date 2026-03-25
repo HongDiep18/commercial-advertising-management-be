@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   AdPackageType,
@@ -10,6 +11,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
+import { CompanyMaskingService, type MaskingContext } from './company-masking.service';
 import type {
   ActiveAdInfo,
   CompanyData,
@@ -96,7 +98,8 @@ export class CompaniesService {
     private readonly prisma: PrismaService,
     private readonly adEffectsRegistry: AdEffectsRegistryService,
     private readonly auditService: AuditService,
-  ) {}
+    private readonly maskingService: CompanyMaskingService,
+  ) { }
 
   private static normalizeCompanyEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -178,7 +181,10 @@ export class CompaniesService {
     return company;
   }
 
-  async getCompanyDetail(companyId: string): Promise<CompanyDetailResponseDto> {
+  async getCompanyDetail(
+    companyId: string,
+    maskingContext?: MaskingContext,
+  ): Promise<CompanyDetailResponseDto> {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: {
@@ -202,7 +208,52 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException('Company not found');
     }
-    return company;
+
+    // Check if user has access to this company's industry
+    if (
+      maskingContext &&
+      !this.maskingService.hasIndustryAccess(company.industry, maskingContext)
+    ) {
+      throw new ForbiddenException(
+        'You do not have access to companies in this industry',
+      );
+    }
+
+    // Apply masking if context is provided
+    if (maskingContext) {
+      const masked = this.maskingService.maskCompanyData(company, maskingContext);
+      return {
+        id: masked.id,
+        logoUrl: masked.logoUrl ?? null,
+        companyNameVi: masked.companyNameVi,
+        companyNameCn: masked.companyNameCn,
+        industry: masked.industry,
+        email: masked.email,
+        phone: masked.phone,
+        address: masked.address ?? '',
+        description: masked.description ?? '',
+        taxId: masked.taxId ?? null,
+        region: masked.region ?? null,
+        website: masked.website ?? null,
+        contactName: masked.contactName ?? null,
+      };
+    }
+
+    return {
+      id: company.id,
+      logoUrl: company.logoUrl,
+      companyNameVi: company.companyNameVi,
+      companyNameCn: company.companyNameCn,
+      industry: company.industry,
+      email: company.email,
+      phone: company.phone,
+      address: company.address,
+      description: company.description,
+      taxId: company.taxId,
+      region: company.region,
+      website: company.website,
+      contactName: company.contactName,
+    };
   }
 
   /**
@@ -490,9 +541,11 @@ export class CompaniesService {
   /**
    * Get all companies with search/filter capabilities.
    * Only applies COMPANY_CATEGORY_TOP and COMPANY_INFO_HIGHLIGHT ad effects.
+   * Applies tier-based filtering and data masking.
    */
   async getCompanyDirectory(
     query: CompanyDirectoryQueryDto,
+    maskingContext?: MaskingContext,
   ): Promise<CompanyDirectoryResponseDto> {
     const {
       search,
@@ -519,6 +572,7 @@ export class CompaniesService {
       ];
     }
 
+    // FE should pass industry filter explicitly based on user's selection
     if (industry && industry.length > 0) {
       const existingOr: Prisma.CompanyWhereInput[] = [];
       if (where.OR) {
@@ -597,19 +651,52 @@ export class CompaniesService {
     // Apply ad effects and transform to DTOs
     const companyItems: CompanyDirectoryItemDto[] = companies.map((company) => {
       const modified = this.applyEffectsToCompany(company);
+
+      // Apply masking if context is provided
+      const maskedCompany = maskingContext
+        ? this.maskingService.maskCompanyData(
+          {
+            id: company.id,
+            companyNameVi: company.companyNameVi,
+            companyNameCn: company.companyNameCn,
+            email: company.email,
+            contactName: company.contactName,
+            phone: company.phone,
+            industry: company.industry,
+            address: company.address,
+            description: company.description,
+            logoUrl: company.logoUrl,
+          },
+          maskingContext,
+        )
+        : {
+          id: company.id,
+          companyNameVi: company.companyNameVi,
+          companyNameCn: company.companyNameCn,
+          email: company.email,
+          contactName: company.contactName,
+          phone: company.phone,
+          industry: company.industry,
+          address: company.address,
+          description: company.description,
+          logoUrl: company.logoUrl,
+        };
+
       const name =
-        company.companyNameVi ?? company.companyNameCn ?? company.email;
+        maskedCompany.companyNameVi ??
+        maskedCompany.companyNameCn ??
+        maskedCompany.email;
 
       return {
-        id: company.id,
+        id: maskedCompany.id,
         name,
-        logoUrl: company.logoUrl ?? null,
-        email: company.email,
-        contactName: company.contactName ?? '',
-        phone: company.phone,
-        industry: company.industry,
-        address: company.address,
-        description: company.description,
+        logoUrl: maskedCompany.logoUrl ?? null,
+        email: maskedCompany.email,
+        contactName: maskedCompany.contactName ?? '',
+        phone: maskedCompany.phone,
+        industry: maskedCompany.industry,
+        address: maskedCompany.address ?? '',
+        description: maskedCompany.description ?? '',
         companyInfoHighlight: modified.companyInfoHighlight ?? false,
         sortPriority: modified.sortPriority ?? 0,
       };
@@ -638,7 +725,10 @@ export class CompaniesService {
     };
   }
 
-  async getCompanyCategories(): Promise<CompanyCategoriesResponseDto> {
+  async getCompanyCategories(
+    maskingContext?: MaskingContext,
+  ): Promise<CompanyCategoriesResponseDto> {
+    // Get all categories with counts
     const grouped = await this.prisma.company.groupBy({
       by: ['industry'],
       where: await this.buildDirectoryVisibleCompanyWhere(),
@@ -646,13 +736,45 @@ export class CompaniesService {
         _all: true,
       },
     });
-    const categories: CompanyCategoriesResponseDto['categories'] = grouped
+
+    const allCategories: CompanyCategoriesResponseDto['categories'] = grouped
       .filter((item) => item.industry !== null)
       .map((item) => ({
         industry: item.industry ?? '',
         count: item._count._all,
       }));
-    return { categories };
+
+    // If no masking context (guest), return all with hasAllAccess: true
+    if (!maskingContext) {
+      return {
+        categories: allCategories,
+        hasAllAccess: true,
+      };
+    }
+
+    // Check if user has access to all industries
+    const hasAllAccess = this.maskingService.hasAllIndustryAccess(maskingContext);
+
+    // If has all access (Diamond/Admin), return all categories
+    if (hasAllAccess) {
+      return {
+        categories: allCategories,
+        hasAllAccess: true,
+      };
+    }
+
+    // Filter categories based on user's accessible industries
+    const accessibleIndustries = maskingContext.userIndustries;
+    const filteredCategories = allCategories.filter((cat) =>
+      accessibleIndustries.some((ind) =>
+        cat.industry.toLowerCase().includes(ind.toLowerCase()),
+      ),
+    );
+
+    return {
+      categories: filteredCategories,
+      hasAllAccess: false,
+    };
   }
 
   async adminUpdateCompany(
@@ -706,22 +828,22 @@ export class CompaniesService {
   ): string {
     const companyPayload = company
       ? {
-          id: company.id,
-          email: company.email,
-          logoUrl: company.logoUrl,
-          companyNameVi: company.companyNameVi,
-          companyNameCn: company.companyNameCn,
-          phone: company.phone,
-          address: company.address,
-          description: company.description,
-          taxId: company.taxId,
-          country: company.country,
-          region: company.region,
-          industry: company.industry,
-          website: company.website,
-          contactName: company.contactName,
-          contactPhone: company.contactPhone,
-        }
+        id: company.id,
+        email: company.email,
+        logoUrl: company.logoUrl,
+        companyNameVi: company.companyNameVi,
+        companyNameCn: company.companyNameCn,
+        phone: company.phone,
+        address: company.address,
+        description: company.description,
+        taxId: company.taxId,
+        country: company.country,
+        region: company.region,
+        industry: company.industry,
+        website: company.website,
+        contactName: company.contactName,
+        contactPhone: company.contactPhone,
+      }
       : null;
     return JSON.stringify({ company: companyPayload });
   }

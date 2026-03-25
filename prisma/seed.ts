@@ -62,257 +62,257 @@ const subcategories: {
   nameEn: string;
   categorySlug: string;
 }[] = [
-  // NEWS
-  {
-    slug: 'tin-moi-nhat',
-    nameVi: 'Tin mới nhất',
-    nameZhTw: '最新消息',
-    nameEn: 'Latest News',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'thoi-su',
-    nameVi: 'Thời sự',
-    nameZhTw: '時事',
-    nameEn: 'Current Affairs',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'the-gioi',
-    nameVi: 'Thế giới',
-    nameZhTw: '世界',
-    nameEn: 'World',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'phap-luat',
-    nameVi: 'Pháp luật',
-    nameZhTw: '法律',
-    nameEn: 'Law',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'giao-duc',
-    nameVi: 'Giáo dục',
-    nameZhTw: '教育',
-    nameEn: 'Education',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'the-thao',
-    nameVi: 'Thể thao',
-    nameZhTw: '體育',
-    nameEn: 'Sports',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'xa-hoi',
-    nameVi: 'Xã hội',
-    nameZhTw: '社會',
-    nameEn: 'Society',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'viet-nam',
-    nameVi: 'Việt Nam',
-    nameZhTw: '越南',
-    nameEn: 'Vietnam',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'tin-moi-nhat',
-    nameVi: 'Tin mới nhất',
-    nameZhTw: '最新消息',
-    nameEn: 'Latest News',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'thoi-su',
-    nameVi: 'Thời sự',
-    nameZhTw: '時事',
-    nameEn: 'Current Affairs',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'the-gioi',
-    nameVi: 'Thế giới',
-    nameZhTw: '世界',
-    nameEn: 'World',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'phap-luat',
-    nameVi: 'Pháp luật',
-    nameZhTw: '法律',
-    nameEn: 'Law',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'giao-duc',
-    nameVi: 'Giáo dục',
-    nameZhTw: '教育',
-    nameEn: 'Education',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'the-thao',
-    nameVi: 'Thể thao',
-    nameZhTw: '體育',
-    nameEn: 'Sports',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'xa-hoi',
-    nameVi: 'Xã hội',
-    nameZhTw: '社會',
-    nameEn: 'Society',
-    categorySlug: 'NEWS',
-  },
-  {
-    slug: 'viet-nam',
-    nameVi: 'Việt Nam',
-    nameZhTw: '越南',
-    nameEn: 'Vietnam',
-    categorySlug: 'NEWS',
-  },
-  // BUSINESS
-  {
-    slug: 'kinh-doanh',
-    nameVi: 'Kinh doanh',
-    nameZhTw: '商業',
-    nameEn: 'Business',
-    categorySlug: 'BUSINESS',
-  },
-  {
-    slug: 'bat-dong-san',
-    nameVi: 'Bất động sản',
-    nameZhTw: '房地產',
-    nameEn: 'Real Estate',
-    categorySlug: 'BUSINESS',
-  },
-  {
-    slug: 'kinh-te',
-    nameVi: 'Kinh tế',
-    nameZhTw: '經濟',
-    nameEn: 'Economy',
-    categorySlug: 'BUSINESS',
-  },
-  {
-    slug: 'vi-mo',
-    nameVi: 'Vĩ mô',
-    nameZhTw: '宏觀經濟',
-    nameEn: 'Macroeconomics',
-    categorySlug: 'BUSINESS',
-  },
-  // TECH
-  {
-    slug: 'so-hoa',
-    nameVi: 'Số hóa',
-    nameZhTw: '數位化',
-    nameEn: 'Digital',
-    categorySlug: 'TECH',
-  },
-  {
-    slug: 'khoa-hoc',
-    nameVi: 'Khoa học',
-    nameZhTw: '科學',
-    nameEn: 'Science',
-    categorySlug: 'TECH',
-  },
-  {
-    slug: 'cong-nghe',
-    nameVi: 'Công nghệ',
-    nameZhTw: '科技',
-    nameEn: 'Technology',
-    categorySlug: 'TECH',
-  },
-  {
-    slug: 'xe',
-    nameVi: 'Xe',
-    nameZhTw: '汽車',
-    nameEn: 'Automotive',
-    categorySlug: 'TECH',
-  },
-  {
-    slug: 'oto-xe-may',
-    nameVi: 'Ô tô - Xe máy',
-    nameZhTw: '汽機車',
-    nameEn: 'Automotive',
-    categorySlug: 'TECH',
-  },
-  // ENTERTAINMENT
-  {
-    slug: 'giai-tri',
-    nameVi: 'Giải trí',
-    nameZhTw: '娛樂',
-    nameEn: 'Entertainment',
-    categorySlug: 'ENTERTAINMENT',
-  },
-  {
-    slug: 'van-hoa',
-    nameVi: 'Văn hóa',
-    nameZhTw: '文化',
-    nameEn: 'Culture',
-    categorySlug: 'ENTERTAINMENT',
-  },
-  // LIFESTYLE
-  {
-    slug: 'doi-song',
-    nameVi: 'Đời sống',
-    nameZhTw: '生活',
-    nameEn: 'Lifestyle',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'suc-khoe',
-    nameVi: 'Sức khỏe',
-    nameZhTw: '健康',
-    nameEn: 'Health',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'du-lich',
-    nameVi: 'Du lịch',
-    nameZhTw: '旅遊',
-    nameEn: 'Travel',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'y-kien',
-    nameVi: 'Ý kiến',
-    nameZhTw: '觀點',
-    nameEn: 'Opinion',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'tam-su',
-    nameVi: 'Tâm sự',
-    nameZhTw: '心情',
-    nameEn: 'Personal',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'cuoi',
-    nameVi: 'Cười',
-    nameZhTw: '搞笑',
-    nameEn: 'Humor',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'nhip-song-tre',
-    nameVi: 'Nhịp sống trẻ',
-    nameZhTw: '年輕生活',
-    nameEn: 'Youth Life',
-    categorySlug: 'LIFESTYLE',
-  },
-  {
-    slug: 'ban-doc',
-    nameVi: 'Bạn đọc',
-    nameZhTw: '讀者',
-    nameEn: 'Readers',
-    categorySlug: 'LIFESTYLE',
-  },
-];
+    // NEWS
+    {
+      slug: 'tin-moi-nhat',
+      nameVi: 'Tin mới nhất',
+      nameZhTw: '最新消息',
+      nameEn: 'Latest News',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'thoi-su',
+      nameVi: 'Thời sự',
+      nameZhTw: '時事',
+      nameEn: 'Current Affairs',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'the-gioi',
+      nameVi: 'Thế giới',
+      nameZhTw: '世界',
+      nameEn: 'World',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'phap-luat',
+      nameVi: 'Pháp luật',
+      nameZhTw: '法律',
+      nameEn: 'Law',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'giao-duc',
+      nameVi: 'Giáo dục',
+      nameZhTw: '教育',
+      nameEn: 'Education',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'the-thao',
+      nameVi: 'Thể thao',
+      nameZhTw: '體育',
+      nameEn: 'Sports',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'xa-hoi',
+      nameVi: 'Xã hội',
+      nameZhTw: '社會',
+      nameEn: 'Society',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'viet-nam',
+      nameVi: 'Việt Nam',
+      nameZhTw: '越南',
+      nameEn: 'Vietnam',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'tin-moi-nhat',
+      nameVi: 'Tin mới nhất',
+      nameZhTw: '最新消息',
+      nameEn: 'Latest News',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'thoi-su',
+      nameVi: 'Thời sự',
+      nameZhTw: '時事',
+      nameEn: 'Current Affairs',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'the-gioi',
+      nameVi: 'Thế giới',
+      nameZhTw: '世界',
+      nameEn: 'World',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'phap-luat',
+      nameVi: 'Pháp luật',
+      nameZhTw: '法律',
+      nameEn: 'Law',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'giao-duc',
+      nameVi: 'Giáo dục',
+      nameZhTw: '教育',
+      nameEn: 'Education',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'the-thao',
+      nameVi: 'Thể thao',
+      nameZhTw: '體育',
+      nameEn: 'Sports',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'xa-hoi',
+      nameVi: 'Xã hội',
+      nameZhTw: '社會',
+      nameEn: 'Society',
+      categorySlug: 'NEWS',
+    },
+    {
+      slug: 'viet-nam',
+      nameVi: 'Việt Nam',
+      nameZhTw: '越南',
+      nameEn: 'Vietnam',
+      categorySlug: 'NEWS',
+    },
+    // BUSINESS
+    {
+      slug: 'kinh-doanh',
+      nameVi: 'Kinh doanh',
+      nameZhTw: '商業',
+      nameEn: 'Business',
+      categorySlug: 'BUSINESS',
+    },
+    {
+      slug: 'bat-dong-san',
+      nameVi: 'Bất động sản',
+      nameZhTw: '房地產',
+      nameEn: 'Real Estate',
+      categorySlug: 'BUSINESS',
+    },
+    {
+      slug: 'kinh-te',
+      nameVi: 'Kinh tế',
+      nameZhTw: '經濟',
+      nameEn: 'Economy',
+      categorySlug: 'BUSINESS',
+    },
+    {
+      slug: 'vi-mo',
+      nameVi: 'Vĩ mô',
+      nameZhTw: '宏觀經濟',
+      nameEn: 'Macroeconomics',
+      categorySlug: 'BUSINESS',
+    },
+    // TECH
+    {
+      slug: 'so-hoa',
+      nameVi: 'Số hóa',
+      nameZhTw: '數位化',
+      nameEn: 'Digital',
+      categorySlug: 'TECH',
+    },
+    {
+      slug: 'khoa-hoc',
+      nameVi: 'Khoa học',
+      nameZhTw: '科學',
+      nameEn: 'Science',
+      categorySlug: 'TECH',
+    },
+    {
+      slug: 'cong-nghe',
+      nameVi: 'Công nghệ',
+      nameZhTw: '科技',
+      nameEn: 'Technology',
+      categorySlug: 'TECH',
+    },
+    {
+      slug: 'xe',
+      nameVi: 'Xe',
+      nameZhTw: '汽車',
+      nameEn: 'Automotive',
+      categorySlug: 'TECH',
+    },
+    {
+      slug: 'oto-xe-may',
+      nameVi: 'Ô tô - Xe máy',
+      nameZhTw: '汽機車',
+      nameEn: 'Automotive',
+      categorySlug: 'TECH',
+    },
+    // ENTERTAINMENT
+    {
+      slug: 'giai-tri',
+      nameVi: 'Giải trí',
+      nameZhTw: '娛樂',
+      nameEn: 'Entertainment',
+      categorySlug: 'ENTERTAINMENT',
+    },
+    {
+      slug: 'van-hoa',
+      nameVi: 'Văn hóa',
+      nameZhTw: '文化',
+      nameEn: 'Culture',
+      categorySlug: 'ENTERTAINMENT',
+    },
+    // LIFESTYLE
+    {
+      slug: 'doi-song',
+      nameVi: 'Đời sống',
+      nameZhTw: '生活',
+      nameEn: 'Lifestyle',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'suc-khoe',
+      nameVi: 'Sức khỏe',
+      nameZhTw: '健康',
+      nameEn: 'Health',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'du-lich',
+      nameVi: 'Du lịch',
+      nameZhTw: '旅遊',
+      nameEn: 'Travel',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'y-kien',
+      nameVi: 'Ý kiến',
+      nameZhTw: '觀點',
+      nameEn: 'Opinion',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'tam-su',
+      nameVi: 'Tâm sự',
+      nameZhTw: '心情',
+      nameEn: 'Personal',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'cuoi',
+      nameVi: 'Cười',
+      nameZhTw: '搞笑',
+      nameEn: 'Humor',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'nhip-song-tre',
+      nameVi: 'Nhịp sống trẻ',
+      nameZhTw: '年輕生活',
+      nameEn: 'Youth Life',
+      categorySlug: 'LIFESTYLE',
+    },
+    {
+      slug: 'ban-doc',
+      nameVi: 'Bạn đọc',
+      nameZhTw: '讀者',
+      nameEn: 'Readers',
+      categorySlug: 'LIFESTYLE',
+    },
+  ];
 
 async function main() {
   console.log('Seeding news categories...');
@@ -404,9 +404,14 @@ async function main() {
       address: '123 Đường Bronze, Quận 1, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
-      industry: 'Manufacturing',
+      industry: 'textile', // Maps to Industry.TEXTILE
       website: 'https://bronze.example.com',
       description: 'Công ty chuyên sản xuất và xuất khẩu.',
+      primaryIndustry: 'textile', // Bronze user's primary industry
+      selectedIndustries: [], // Bronze tier doesn't select additional industries
+      industriesSelected: false, // Bronze doesn't need to select
+      loyaltyPoints: 75000, // Above Bronze threshold (50,000)
+      totalSpending: 25000, // Bronze doesn't require spending
     },
     {
       email: 'silver@example.com',
@@ -422,9 +427,14 @@ async function main() {
       address: '456 Đường Silver, Quận 3, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
-      industry: 'Trading',
+      industry: 'electronics', // Maps to Industry.ELECTRONICS
       website: 'https://silver.example.com',
       description: 'Công ty thương mại quốc tế.',
+      primaryIndustry: 'electronics', // Silver user's primary industry
+      selectedIndustries: [], // Silver tier doesn't select additional industries
+      industriesSelected: false, // Silver doesn't need to select
+      loyaltyPoints: 200000, // Above Silver threshold (150,000)
+      totalSpending: 100000, // Above Silver spending threshold (80,000)
     },
     {
       email: 'gold@example.com',
@@ -440,9 +450,14 @@ async function main() {
       address: '789 Đường Gold, Quận 7, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
-      industry: 'Logistics',
+      industry: 'logistics', // Maps to Industry.LOGISTICS
       website: 'https://gold.example.com',
       description: 'Dịch vụ logistics và vận tải quốc tế.',
+      primaryIndustry: 'logistics', // Gold user's primary industry
+      selectedIndustries: ['furniture', 'machinery', 'agriculture'], // Gold tier selects 3 additional industries
+      industriesSelected: true, // Gold has already selected
+      loyaltyPoints: 400000, // Above Gold threshold (300,000)
+      totalSpending: 300000, // Above Gold spending threshold (230,000)
     },
     {
       email: 'diamond@example.com',
@@ -458,9 +473,14 @@ async function main() {
       address: '100 Đường Diamond, Quận 2, TP.HCM',
       country: 'Vietnam',
       region: 'Ho Chi Minh City',
-      industry: 'Technology',
+      industry: 'electronics', // Maps to Industry.ELECTRONICS
       website: 'https://diamond.example.com',
       description: 'Công ty công nghệ và xuất nhập khẩu hàng đầu.',
+      primaryIndustry: 'electronics', // Diamond user's primary industry (though they have access to all)
+      selectedIndustries: [], // Diamond tier has access to ALL industries
+      industriesSelected: false, // Diamond doesn't need to select
+      loyaltyPoints: 750000, // Above Diamond threshold (600,000)
+      totalSpending: 600000, // Above Diamond spending threshold (530,000)
     },
   ];
 
@@ -515,6 +535,11 @@ async function main() {
         role: 'MEMBER',
         membershipTier: u.tier,
         companyId: company.id,
+        primaryIndustry: u.primaryIndustry,
+        selectedIndustries: u.selectedIndustries,
+        industriesSelected: u.industriesSelected,
+        loyaltyPoints: u.loyaltyPoints,
+        totalSpending: u.totalSpending,
       },
     });
     console.log(`  ✓ Created ${u.tier} company user with company: ${u.email}`);
@@ -533,7 +558,7 @@ async function seedDefaultCompany(): Promise<string> {
     update: {
       contactName: 'Corporate Communications',
       phone: '+86-571-8502-2088',
-      industry: 'E-commerce and Technology',
+      industry: 'electronics',
       address:
         '969 West Wen Yi Road, Yuhang District, Hangzhou, Zhejiang, China',
       description:
@@ -548,7 +573,7 @@ async function seedDefaultCompany(): Promise<string> {
       email: companyEmail,
       contactName: 'Corporate Communications',
       phone: '+86-571-8502-2088',
-      industry: 'E-commerce and Technology',
+      industry: 'electronics',
       address:
         '969 West Wen Yi Road, Yuhang District, Hangzhou, Zhejiang, China',
       description:
@@ -606,37 +631,37 @@ async function seedAdPackages(): Promise<void> {
     nameZh: string | null;
     sortOrder: number;
   }[] = [
-    {
-      type: AdCategoryType.HOMEPAGE_POPUP,
-      name: 'Homepage Popup Advertising',
-      nameZh: '首頁彈窗廣告',
-      sortOrder: 1,
-    },
-    {
-      type: AdCategoryType.FEATURED_COMPANY,
-      name: 'Featured Company Exposure',
-      nameZh: '精選企業曝光',
-      sortOrder: 2,
-    },
-    {
-      type: AdCategoryType.COMPANY_DIRECTORY,
-      name: 'Company Name Advertising',
-      nameZh: '企業名錄廣告',
-      sortOrder: 3,
-    },
-    {
-      type: AdCategoryType.PLATFORM_PRINT,
-      name: 'Platform Advertising Rate Card',
-      nameZh: null,
-      sortOrder: 4,
-    },
-    {
-      type: AdCategoryType.PRODUCT_LISTING,
-      name: 'Product Listing Packages',
-      nameZh: null,
-      sortOrder: 5,
-    },
-  ];
+      {
+        type: AdCategoryType.HOMEPAGE_POPUP,
+        name: 'Homepage Popup Advertising',
+        nameZh: '首頁彈窗廣告',
+        sortOrder: 1,
+      },
+      {
+        type: AdCategoryType.FEATURED_COMPANY,
+        name: 'Featured Company Exposure',
+        nameZh: '精選企業曝光',
+        sortOrder: 2,
+      },
+      {
+        type: AdCategoryType.COMPANY_DIRECTORY,
+        name: 'Company Name Advertising',
+        nameZh: '企業名錄廣告',
+        sortOrder: 3,
+      },
+      {
+        type: AdCategoryType.PLATFORM_PRINT,
+        name: 'Platform Advertising Rate Card',
+        nameZh: null,
+        sortOrder: 4,
+      },
+      {
+        type: AdCategoryType.PRODUCT_LISTING,
+        name: 'Product Listing Packages',
+        nameZh: null,
+        sortOrder: 5,
+      },
+    ];
 
   const categoryIdByType = new Map<AdCategoryType, string>();
 

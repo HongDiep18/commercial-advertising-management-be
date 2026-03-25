@@ -233,9 +233,11 @@ export class CompaniesService {
         address: masked.address ?? '',
         description: masked.description ?? '',
         taxId: masked.taxId ?? null,
+        country: masked.country ?? null,
         region: masked.region ?? null,
         website: masked.website ?? null,
         contactName: masked.contactName ?? null,
+        contactPhone: masked.contactPhone ?? null,
       };
     }
 
@@ -250,9 +252,11 @@ export class CompaniesService {
       address: company.address,
       description: company.description,
       taxId: company.taxId,
+      country: company.country,
       region: company.region,
       website: company.website,
       contactName: company.contactName,
+      contactPhone: company.contactPhone,
     };
   }
 

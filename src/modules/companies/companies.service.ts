@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -7,7 +8,7 @@ import {
 import {
   AdPackageType,
   CompanyProfileRequestStatus,
-  type Prisma,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
@@ -799,11 +800,21 @@ export class CompaniesService {
       where: { id: companyId },
       select: ADMIN_AUDIT_COMPANY_SELECT,
     });
-    await this.prisma.company.update({
-      where: { id: companyId },
-      data: updateData,
-      select: { id: true },
-    });
+    try {
+      await this.prisma.company.update({
+        where: { id: companyId },
+        data: updateData,
+        select: { id: true },
+      });
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Cannot update duplicate email');
+      }
+      throw error;
+    }
 
     const companyAfter = await this.prisma.company.findUnique({
       where: { id: companyId },

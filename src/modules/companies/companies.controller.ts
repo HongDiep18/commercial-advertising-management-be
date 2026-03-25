@@ -17,6 +17,7 @@ import {
 import { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
+import { CompanyDirectoryStatsResponseDto } from './dto/company-stats.dto';
 
 @ApiTags('Companies')
 @Controller('companies')
@@ -90,6 +91,23 @@ export class CompaniesController {
   async getCompanyCategories(): Promise<CompanyCategoriesResponseDto> {
     const result = await this.companiesService.getCompanyCategories();
     return result;
+  }
+
+  @Get('stats')
+  @Public()
+  @ApiOperation({
+    summary: 'Company directory stats',
+    description:
+      'Returns total companies in the database and how many qualify for the public directory ' +
+      '(approved profile request, matching company email, at least one active non-deleted user).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Total and directory-visible company counts',
+    type: CompanyDirectoryStatsResponseDto,
+  })
+  getCompanyDirectoryStats(): Promise<CompanyDirectoryStatsResponseDto> {
+    return this.companiesService.getCompanyDirectoryStats();
   }
 
   @Get('featured')

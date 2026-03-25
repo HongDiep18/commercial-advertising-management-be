@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AdPackageType, type Prisma } from '@prisma/client';
+import {
+  AdPackageType,
+  CompanyProfileRequestStatus,
+  type Prisma,
+} from '@prisma/client';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -89,11 +93,64 @@ export class CompaniesService {
     private readonly auditService: AuditService,
   ) {}
 
+  private static normalizeCompanyEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private async loadApprovedCompanyEmails(): Promise<string[]> {
+    const rows = await this.prisma.companyProfileRequest.findMany({
+      where: { status: CompanyProfileRequestStatus.APPROVED },
+      select: { email: true },
+    });
+    return [
+      ...new Set(
+        rows.map((r) => CompaniesService.normalizeCompanyEmail(r.email)),
+      ),
+    ];
+  }
+
+  private async buildDirectoryVisibleCompanyWhere(): Promise<Prisma.CompanyWhereInput> {
+    const approvedEmails = await this.loadApprovedCompanyEmails();
+    const usersFilter: Prisma.CompanyWhereInput = {
+      users: {
+        some: {
+          isActive: true,
+          deletedAt: null,
+        },
+      },
+    };
+    if (approvedEmails.length === 0) {
+      return { AND: [usersFilter, { id: { in: [] } }] };
+    }
+    return {
+      AND: [
+        usersFilter,
+        {
+          email: {
+            in: approvedEmails,
+          },
+        },
+      ],
+    };
+  }
+
+  async getCompanyDirectoryStats(): Promise<{
+    total: number;
+    directoryCount: number;
+  }> {
+    const directoryWhere = await this.buildDirectoryVisibleCompanyWhere();
+    const [total, directoryCount] = await Promise.all([
+      this.prisma.company.count(),
+      this.prisma.company.count({ where: directoryWhere }),
+    ]);
+    return { total, directoryCount };
+  }
+
   async createCompany(dto: CreateCompanyDto, userId?: string) {
     const company = await this.prisma.company.create({
       data: {
         companyNameVi: dto.name,
-        email: dto.email,
+        email: CompaniesService.normalizeCompanyEmail(dto.email),
         contactName: dto.contactName,
         phone: dto.phone,
         industry: dto.industry,
@@ -479,8 +536,9 @@ export class CompaniesService {
 
     const now = new Date();
 
-    // Build where clause
-    const where: Prisma.CompanyWhereInput = {};
+    const where: Prisma.CompanyWhereInput = {
+      ...(await this.buildDirectoryVisibleCompanyWhere()),
+    };
 
     if (search) {
       where.OR = [
@@ -614,6 +672,7 @@ export class CompaniesService {
   async getCompanyCategories(): Promise<CompanyCategoriesResponseDto> {
     const grouped = await this.prisma.company.groupBy({
       by: ['industry'],
+      where: await this.buildDirectoryVisibleCompanyWhere(),
       _count: {
         _all: true,
       },

@@ -178,4 +178,10 @@ export class CompanyCategoryItemDto {
 export class CompanyCategoriesResponseDto {
   @ApiProperty({ type: [CompanyCategoryItemDto] })
   categories!: CompanyCategoryItemDto[];
+
+  @ApiProperty({
+    description: 'Whether user has access to all industries (Guest/Diamond/Admin)',
+    example: true,
+  })
+  hasAllAccess!: boolean;
 }

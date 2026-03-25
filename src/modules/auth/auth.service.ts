@@ -48,7 +48,15 @@ export type AuthUser = {
 export type LoginResult = {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; role: Role };
+  user: {
+    id: string;
+    email: string;
+    role: Role;
+    membershipTier: MembershipTier;
+    primaryIndustry?: string | null;
+    selectedIndustries: string[];
+    companyId?: string | null;
+  };
 };
 
 const PROFILE_SELECT_KEYS = [
@@ -134,36 +142,58 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly auditService: AuditService,
     private readonly loyaltyService: LoyaltyService,
-  ) {}
-
-  async validateUser(
-    email: string,
-    password: string,
-  ): Promise<AuthUser | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
-    });
-    if (!user) return null;
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) return null;
-    assertUserActive(user);
-    return user;
-  }
+  ) { }
 
   async login(email: string, password: string): Promise<LoginResult> {
-    const user = await this.validateUser(email, password);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Fetch user
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        role: true,
+        isActive: true,
+        membershipTier: true,
+        primaryIndustry: true,
+        selectedIndustries: true,
+        companyId: true,
+      },
+    });
+
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Check if user is active
+    assertUserActive({
+      isActive: user.isActive,
+      deletedAt: null,
+    });
+
+    // Update last login
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() } as unknown as Prisma.UserUpdateInput,
       select: { id: true },
     });
+
     const payload = {
       userId: user.id,
       email: user.email,
       role: user.role as Role,
+      membershipTier: user.membershipTier,
+      primaryIndustry: user.primaryIndustry,
+      selectedIndustries: user.selectedIndustries,
+      companyId: user.companyId,
     };
 
     // Generate access token (2h, sent in response body)
@@ -188,6 +218,10 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role as Role,
+        membershipTier: user.membershipTier,
+        primaryIndustry: user.primaryIndustry,
+        selectedIndustries: user.selectedIndustries,
+        companyId: user.companyId,
       },
     };
   }
@@ -213,6 +247,9 @@ export class AuthService {
           role: true,
           isActive: true,
           deletedAt: true,
+          membershipTier: true,
+          primaryIndustry: true,
+          selectedIndustries: true,
         },
       });
 
@@ -220,7 +257,10 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      assertUserActive(user);
+      assertUserActive({
+        isActive: user.isActive,
+        deletedAt: user.deletedAt,
+      });
 
       // Generate new access token
       const newAccessToken = this.jwtService.sign(
@@ -228,6 +268,9 @@ export class AuthService {
           userId: user.id,
           email: user.email,
           role: user.role as Role,
+          membershipTier: user.membershipTier,
+          primaryIndustry: user.primaryIndustry,
+          selectedIndustries: user.selectedIndustries,
         },
         {
           secret: this.config.get('jwt.accessTokenSecret'),
@@ -350,7 +393,14 @@ export class AuthService {
     return out;
   }
 
-  async getProfile(userId: string): Promise<ProfileResponse> {
+  async getProfile(userId: string): Promise<ProfileResponse & {
+    primaryIndustry?: string | null;
+    selectedIndustries: string[];
+    industriesSelected: boolean;
+    loyaltyPoints: number;
+    totalSpending: string;
+    companyId?: string | null;
+  }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -358,6 +408,12 @@ export class AuthService {
         email: true,
         membershipTier: true,
         role: true,
+        primaryIndustry: true,
+        selectedIndustries: true,
+        industriesSelected: true,
+        loyaltyPoints: true,
+        totalSpending: true,
+        companyId: true,
         company: { select: companyProfileSelect() },
       },
     });
@@ -372,7 +428,73 @@ export class AuthService {
       email: user.email,
       membershipTier: user.membershipTier,
       role: user.role,
+      primaryIndustry: user.primaryIndustry,
+      selectedIndustries: user.selectedIndustries,
+      industriesSelected: user.industriesSelected,
+      loyaltyPoints: user.loyaltyPoints,
+      totalSpending: user.totalSpending.toString(),
+      companyId: user.companyId,
       ...profileRest,
+    };
+  }
+
+  async updateIndustries(userId: string, selectedIndustries: string[]) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        membershipTier: true,
+        industriesSelected: true,
+        primaryIndustry: true,
+        selectedIndustries: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Only Gold tier can select industries
+    if (user.membershipTier !== MembershipTier.GOLD) {
+      throw new BadRequestException(
+        'Only Gold tier members can select additional industries',
+      );
+    }
+
+    // Check if user has already selected industries (one-time action)
+    if (user.industriesSelected) {
+      throw new BadRequestException(
+        'You have already selected your industries. This is a one-time action.',
+      );
+    }
+
+    // Validate that user has exactly 3 industries
+    if (selectedIndustries.length !== 3) {
+      throw new BadRequestException(
+        'Gold tier members must select exactly 3 industries',
+      );
+    }
+
+    // Update user with selected industries
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        selectedIndustries,
+        industriesSelected: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        membershipTier: true,
+        primaryIndustry: true,
+        selectedIndustries: true,
+        industriesSelected: true,
+      },
+    });
+
+    return {
+      message: 'Industries selected successfully',
+      user: updatedUser,
     };
   }
 
@@ -966,6 +1088,15 @@ export class AuthService {
       );
     }
 
+    // Fetch the profile request to get the industry
+    const profileRequest = await this.prisma.companyProfileRequest.findFirst({
+      where: {
+        email: normalizedEmail,
+        status: CompanyProfileRequestStatus.APPROVED,
+      },
+      select: { industry: true },
+    });
+
     const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
     const expiryDays =
       this.config.get<number>('mail.setPasswordTokenExpiryDays') ?? 7;
@@ -974,7 +1105,6 @@ export class AuthService {
       randomBytes(32).toString('hex'),
       10,
     );
-
     const createdUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -982,6 +1112,7 @@ export class AuthService {
           password: placeholderPassword,
           role: Role.MEMBER,
           membershipTier: request.membershipTier,
+          primaryIndustry: request.industry ?? null,
           setPasswordToken: token,
           setPasswordTokenExpiresAt: expiresAt,
         } as Prisma.UserUncheckedCreateInput,

@@ -5,11 +5,12 @@ import { FileUploadModule } from '../file-upload/file-upload.module';
 import { AdminCompaniesController } from './admin-companies.controller';
 import { CompaniesController } from './companies.controller';
 import { CompaniesService } from './companies.service';
+import { CompanyMaskingService } from './company-masking.service';
 
 @Module({
   imports: [AdEffectsModule, DatabaseModule, FileUploadModule],
   controllers: [CompaniesController, AdminCompaniesController],
-  providers: [CompaniesService],
-  exports: [CompaniesService],
+  providers: [CompaniesService, CompanyMaskingService],
+  exports: [CompaniesService, CompanyMaskingService],
 })
-export class CompaniesModule {}
+export class CompaniesModule { }

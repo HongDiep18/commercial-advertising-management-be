@@ -44,6 +44,7 @@ import {
 } from './dto/update-profile.dto';
 import { UpdateProfileRequestStatusDto } from './dto/update-profile-request-status.dto';
 import { UpdateUserActiveDto } from './dto/update-user-active.dto';
+import { UpdateIndustriesDto } from './dto/update-industries.dto';
 
 const UPDATE_PROFILE_MULTIPART_SCHEMA = {
   type: 'object',
@@ -211,6 +212,26 @@ export class AuthController {
       dto.upload_logo = url;
     }
     return this.authService.updateProfile(userId, dto);
+  }
+
+  @Patch('profile/industries')
+  @ApiOperation({
+    summary: 'Select industries (Gold tier only - one-time)',
+    description:
+      'Allows Gold tier members to select 3 additional industries. This is a one-time action.',
+  })
+  @ApiBody({ type: UpdateIndustriesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Industries selected successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request or already selected' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateIndustries(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: UpdateIndustriesDto,
+  ) {
+    return this.authService.updateIndustries(userId, dto.selectedIndustries);
   }
 
   @Patch('profile-requests/:id/status')

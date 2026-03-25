@@ -1,13 +1,19 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Param,
   Post,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -17,6 +23,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
+import { FileUploadService } from '../file-upload/file-upload.service';
+import { ActiveAdsErrors } from './active-ads.errors';
 import { ActiveAdsService } from './active-ads.service';
 import {
   AdminAddActiveAdAssetsDto,
@@ -33,13 +41,43 @@ import {
 @UseGuards(RolesGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class ActiveAdsAdminController {
-  constructor(private readonly activeAdsService: ActiveAdsService) {}
+  constructor(
+    private readonly activeAdsService: ActiveAdsService,
+    private readonly fileUploadService: FileUploadService,
+  ) {}
 
   @Post(':activeAdId/assets')
+  @UseInterceptors(FilesInterceptor('files', 10))
   @ApiOperation({
     summary: 'Attach assets to an active ad',
     description:
-      'Allows an admin to attach assets to an active ad. Upload files first using /files/upload, then attach the returned URLs here.',
+      'Allows an admin to upload files and attach them to an active ad in a single request.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        assetTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Asset type per uploaded file (e.g. popup_image, banner, logo). Must align with files index.',
+        },
+        notes: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional notes per uploaded file. Must align with files index if provided.',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Files to upload and attach (max 10).',
+        },
+      },
+      required: ['assetTypes', 'files'],
+    },
   })
   @ApiResponse({
     status: 201,
@@ -48,17 +86,57 @@ export class ActiveAdsAdminController {
   })
   async addAssetsToActiveAd(
     @Param('activeAdId') activeAdId: string,
-    @Body() dto: AdminAddActiveAdAssetsDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('assetTypes') assetTypesRaw?: string[] | string,
+    @Body('notes') notesRaw?: string[] | string,
   ): Promise<AdminAddActiveAdAssetsResponseDto> {
-    const activeAdsService: {
-      addAssetsToActiveAd: (input: {
-        activeAdId: string;
-        assets: AdminAddActiveAdAssetsDto['assets'];
-      }) => Promise<AdminAddActiveAdAssetsResponseDto>;
-    } = this.activeAdsService;
-    return await activeAdsService.addAssetsToActiveAd({
+    const uploadedFiles: Express.Multer.File[] = files ?? [];
+    if (uploadedFiles.length === 0) {
+      throw new BadRequestException(
+        ActiveAdsErrors.ACTIVE_AD_ASSETS_FILES_REQUIRED,
+      );
+    }
+
+    const assetTypes: string[] = Array.isArray(assetTypesRaw)
+      ? assetTypesRaw
+      : assetTypesRaw
+        ? [assetTypesRaw]
+        : [];
+    if (assetTypes.length !== uploadedFiles.length) {
+      throw new BadRequestException(
+        ActiveAdsErrors.ACTIVE_AD_ASSETS_ASSET_TYPES_LENGTH_MISMATCH,
+      );
+    }
+
+    const notes: string[] = Array.isArray(notesRaw)
+      ? notesRaw
+      : notesRaw
+        ? [notesRaw]
+        : [];
+    if (notes.length > 0 && notes.length !== uploadedFiles.length) {
+      throw new BadRequestException(
+        ActiveAdsErrors.ACTIVE_AD_ASSETS_NOTES_LENGTH_MISMATCH,
+      );
+    }
+
+    const assets: AdminAddActiveAdAssetsDto['assets'] = [];
+    for (let index = 0; index < uploadedFiles.length; index += 1) {
+      const file = uploadedFiles[index];
+      const uploaded = await this.fileUploadService.uploadFile(
+        file,
+        `active-ads/${activeAdId}`,
+      );
+      assets.push({
+        assetType: assetTypes[index],
+        fileUrl: uploaded.url,
+        fileSizeKb: uploaded.sizeKb,
+        notes: notes[index],
+      });
+    }
+
+    return await this.activeAdsService.addAssetsToActiveAd({
       activeAdId,
-      assets: dto.assets,
+      assets,
     });
   }
 

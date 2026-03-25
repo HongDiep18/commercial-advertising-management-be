@@ -8,22 +8,22 @@ import {
   CompanyProfileRequestStatus,
   type Prisma,
 } from '@prisma/client';
-import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
-import { AuditService } from '../audit/audit.service';
-import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
 import type {
   ActiveAdInfo,
   CompanyData,
 } from '../ad-effects/interfaces/ad-effect.interface';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
+import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
+import type { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import type {
   CompanyCategoriesResponseDto,
   CompanyDirectoryItemDto,
   CompanyDirectoryQueryDto,
   CompanyDirectoryResponseDto,
 } from './dto/company-directory.dto';
-import type { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import type { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
 
@@ -72,6 +72,7 @@ type CompanyWithActiveAdsRecord = {
   contactName: string | null;
   phone: string;
   industry: string;
+  country: string | null;
   address: string;
   description: string;
   activeAds: Array<{
@@ -80,8 +81,12 @@ type CompanyWithActiveAdsRecord = {
     packageType: AdPackageType;
     orderItemId: string | null;
     adLinkUrl: string | null;
+    assets: Array<{ fileUrl: string | null; assetType: string }>;
     pricing: { package: { metadata: unknown } };
-    orderItem: { id: string; adLinkUrl: string } | null;
+    orderItem: {
+      id: string;
+      adLinkUrl: string;
+    } | null;
   }>;
 };
 
@@ -215,8 +220,10 @@ export class CompaniesService {
       contactName: company.contactName ?? '',
       phone: company.phone,
       industry: company.industry,
+      country: company.country ?? undefined,
       address: company.address,
       description: company.description,
+      showDetailsButton: false,
     };
 
     const activeAds: ActiveAdInfo[] = company.activeAds.map((ad) => ({
@@ -252,6 +259,7 @@ export class CompaniesService {
       [
         AdPackageType.POPUP_PRIORITY_SLOT,
         AdPackageType.POPUP_RANKING_ADJUSTMENT,
+        AdPackageType.POPUP_VIEW_DETAILS_LINK,
       ],
     );
   }
@@ -266,6 +274,7 @@ export class CompaniesService {
       [
         AdPackageType.POPUP_ROTATION_SLOT,
         AdPackageType.POPUP_RANKING_ADJUSTMENT,
+        AdPackageType.POPUP_VIEW_DETAILS_LINK,
       ],
     );
   }
@@ -300,6 +309,12 @@ export class CompaniesService {
             },
           },
           include: {
+            assets: {
+              select: {
+                fileUrl: true,
+                assetType: true,
+              },
+            },
             orderItem: {
               select: {
                 id: true,
@@ -328,6 +343,21 @@ export class CompaniesService {
       const modified = this.applyEffectsToCompany(company);
       const name =
         company.companyNameVi ?? company.companyNameCn ?? company.email;
+      const requiredSlotTypeSet = new Set<AdPackageType>(requiredSlotTypes);
+      const activeAdAssets = company.activeAds
+        .filter((ad) => requiredSlotTypeSet.has(ad.packageType))
+        .map((ad) => {
+          return {
+            adId: ad.id,
+            packageType: ad.packageType,
+            assets: ad.assets
+              .filter((asset) => Boolean(asset.fileUrl))
+              .map((asset) => ({
+                fileUrl: asset.fileUrl ?? '',
+                assetType: asset.assetType,
+              })),
+          };
+        });
 
       return {
         id: company.id,
@@ -337,11 +367,14 @@ export class CompaniesService {
         contactName: company.contactName ?? '',
         phone: company.phone,
         industry: company.industry,
+        country: company.country,
         address: company.address,
         description: company.description,
         featuredHighlight: modified.featuredHighlight ?? false,
         companyInfoHighlight: modified.companyInfoHighlight ?? false,
+        showDetailsButton: modified.showDetailsButton ?? false,
         adLinkUrl: modified.adLinkUrl,
+        metadata: { activeAdAssets },
         sortPriority: modified.sortPriority ?? 0,
       };
     });
@@ -431,6 +464,7 @@ export class CompaniesService {
         description: company.description,
         featuredHighlight: modified.featuredHighlight ?? false,
         companyInfoHighlight: modified.companyInfoHighlight ?? false,
+        showDetailsButton: modified.showDetailsButton ?? false,
         metadata,
         sortPriority: modified.sortPriority ?? 0,
       };
@@ -444,78 +478,13 @@ export class CompaniesService {
    * Computes effects on the fly using active ads.
    */
   async getFeaturedCompanies(): Promise<CompanyWithAdsResponseDto[]> {
-    const now = new Date();
-
-    const queryArgs = {
-      where: {
-        activeAds: {
-          some: {
-            packageType: AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
-            isActive: true,
-            startDate: { lte: now },
-            OR: [{ endDate: null }, { endDate: { gte: now } }],
-          },
-        },
-      },
-      include: {
-        activeAds: {
-          where: {
-            packageType: {
-              in: [
-                AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
-                AdPackageType.FEATURED_HIGHLIGHT_BOOST,
-              ],
-            },
-          },
-          include: {
-            orderItem: {
-              select: {
-                id: true,
-                adLinkUrl: true,
-              },
-            },
-            pricing: {
-              include: {
-                package: {
-                  select: {
-                    metadata: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    } as const;
-
-    const companies = (await this.prisma.company.findMany(
-      queryArgs as unknown as Prisma.CompanyFindManyArgs,
-    )) as unknown as CompanyWithActiveAdsRecord[];
-
-    const responses: CompanyWithAdsResponseDto[] = companies.map((company) => {
-      const modified = this.applyEffectsToCompany(company);
-      const name =
-        company.companyNameVi ?? company.companyNameCn ?? company.email;
-
-      return {
-        id: company.id,
-        name,
-        logoUrl: company.logoUrl,
-        email: company.email,
-        contactName: company.contactName ?? '',
-        phone: company.phone,
-        industry: company.industry,
-        address: company.address,
-        description: company.description,
-        featuredHighlight: modified.featuredHighlight ?? false,
-        companyInfoHighlight: modified.companyInfoHighlight ?? false,
-        sortPriority: modified.sortPriority ?? 0,
-      };
-    });
-
-    responses.sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0));
-
-    return responses;
+    return this.getPopupCompaniesBySlotTypes(
+      [AdPackageType.FEATURED_HOMEPAGE_DISPLAY],
+      [
+        AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
+        AdPackageType.FEATURED_HIGHLIGHT_BOOST,
+      ],
+    );
   }
 
   /**

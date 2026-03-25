@@ -25,6 +25,12 @@ export class CompanyWithAdsResponseDto {
   @ApiProperty()
   industry!: string;
 
+  @ApiPropertyOptional({
+    description: 'Company country',
+    nullable: true,
+  })
+  country?: string | null;
+
   @ApiProperty()
   address!: string;
 
@@ -39,6 +45,13 @@ export class CompanyWithAdsResponseDto {
 
   @ApiPropertyOptional()
   adLinkUrl?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the popup "view details" button should be shown for this company',
+    example: false,
+  })
+  showDetailsButton?: boolean;
 
   @ApiPropertyOptional({
     description: 'Additional metadata based on active ad packages',

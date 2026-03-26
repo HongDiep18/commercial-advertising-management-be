@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { AUDIT_ACTION } from '../audit/audit.constants';
 import { AUDIT_LOG_RECORDED_EVENT_NAME } from '../audit/audit-log-recorded-event-name.constant';
 import type { AuditLogRecordedEvent } from '../audit/audit-log-recorded.event';
 import { NOTIFICATIONS_CONFIG } from './notifications.constants';
@@ -20,6 +21,24 @@ type NotificationBuildResult = {
   content: string;
   metadata: Prisma.InputJsonValue;
 };
+
+type NotificationLocale = 'vi' | 'en' | 'zhTw';
+
+type NotificationLocalizedText = Record<NotificationLocale, string>;
+
+type CreateNotificationBuildResultInput = {
+  titleTranslations: NotificationLocalizedText;
+  contentTranslations: NotificationLocalizedText;
+  metadata: Prisma.InputJsonObject;
+};
+
+const NOTIFICATION_DEFAULT_LOCALE: NotificationLocale = 'vi';
+
+const NOTIFICATION_SUPPORTED_LOCALES: readonly NotificationLocale[] = [
+  'vi',
+  'en',
+  'zhTw',
+];
 
 @Injectable()
 export class NotificationsProjectorService implements OnModuleInit {
@@ -117,19 +136,27 @@ export class NotificationsProjectorService implements OnModuleInit {
   private buildNotificationPayload(
     auditLog: ProjectableAuditLog,
   ): NotificationBuildResult {
-    if (auditLog.action === 'property.contact_inquiry_created') {
+    if (auditLog.action === AUDIT_ACTION.PROPERTY_CONTACT_INQUIRY_CREATED) {
       return this.buildPropertyInquiryNotification(auditLog);
     }
-    if (auditLog.action === 'ad_order.created') {
+    if (auditLog.action === AUDIT_ACTION.AD_ORDER_CREATED) {
       return this.buildAdOrderCreatedNotification(auditLog);
     }
-    return {
-      title: 'Có thông báo mới',
-      content: `Có hoạt động mới cho ${auditLog.entityType}.`,
-      metadata: {
-        source: 'audit_log',
+    return this.createNotificationBuildResult({
+      titleTranslations: {
+        vi: 'Có thông báo mới',
+        en: 'You have a new notification',
+        zhTw: '您有一則新通知',
       },
-    };
+      contentTranslations: {
+        vi: `Có hoạt động mới cho ${auditLog.entityType}.`,
+        en: `There is new activity for ${auditLog.entityType}.`,
+        zhTw: `${auditLog.entityType} 有新的活動。`,
+      },
+      metadata: {
+        eventType: auditLog.action,
+      },
+    });
   }
 
   private buildPropertyInquiryNotification(
@@ -138,25 +165,48 @@ export class NotificationsProjectorService implements OnModuleInit {
     const parsedMetadata = this.parseJsonObject(auditLog.metadata);
     const parsedNewValue = this.parseJsonObject(auditLog.newValue);
     const inquiryData = this.extractObject(parsedNewValue, 'contactInquiry');
-    const propertyTitle =
-      this.readString(parsedMetadata, ['propertyTitle']) ??
-      `BĐS ${auditLog.entityId.slice(0, 8)}...`;
-    const inquiryName = this.readString(inquiryData, ['name']) ?? 'Khách hàng';
-    const inquiryEmail =
+    const shortPropertyId = auditLog.entityId.slice(0, 8);
+    const propertyTitleFromMetadata = this.readString(parsedMetadata, [
+      'propertyTitle',
+    ]);
+    const propertyTitleByLocale: NotificationLocalizedText = {
+      vi: propertyTitleFromMetadata ?? `BĐS ${shortPropertyId}...`,
+      en: propertyTitleFromMetadata ?? `Property ${shortPropertyId}...`,
+      zhTw: propertyTitleFromMetadata ?? `房產 ${shortPropertyId}...`,
+    };
+    const inquiryNameFromData = this.readString(inquiryData, ['name']);
+    const inquiryEmailFromData =
       this.readString(inquiryData, ['email']) ??
-      this.readString(parsedMetadata, ['email']) ??
-      'không rõ email';
-    return {
-      title: 'Có khách liên hệ bất động sản',
-      content: `${inquiryName} (${inquiryEmail}) vừa gửi liên hệ cho "${propertyTitle}".`,
+      this.readString(parsedMetadata, ['email']);
+    const inquiryNameByLocale: NotificationLocalizedText = {
+      vi: inquiryNameFromData ?? 'Khách hàng',
+      en: inquiryNameFromData ?? 'Customer',
+      zhTw: inquiryNameFromData ?? '客戶',
+    };
+    const inquiryEmailByLocale: NotificationLocalizedText = {
+      vi: inquiryEmailFromData ?? 'không rõ email',
+      en: inquiryEmailFromData ?? 'unknown email',
+      zhTw: inquiryEmailFromData ?? '未知電子郵件',
+    };
+    return this.createNotificationBuildResult({
+      titleTranslations: {
+        vi: 'Có khách liên hệ bất động sản',
+        en: 'New property inquiry received',
+        zhTw: '有新的房地產諮詢',
+      },
+      contentTranslations: {
+        vi: `${inquiryNameByLocale.vi} (${inquiryEmailByLocale.vi}) vừa gửi liên hệ cho "${propertyTitleByLocale.vi}".`,
+        en: `${inquiryNameByLocale.en} (${inquiryEmailByLocale.en}) has submitted an inquiry for "${propertyTitleByLocale.en}".`,
+        zhTw: `${inquiryNameByLocale.zhTw}（${inquiryEmailByLocale.zhTw}）剛提交了對「${propertyTitleByLocale.zhTw}」的諮詢。`,
+      },
       metadata: {
         propertyId:
           this.readString(parsedMetadata, ['propertyId']) ?? auditLog.entityId,
-        propertyTitle,
-        inquiryName,
-        inquiryEmail,
+        propertyTitle: propertyTitleByLocale.vi,
+        inquiryName: inquiryNameByLocale.vi,
+        inquiryEmail: inquiryEmailByLocale.vi,
       },
-    };
+    });
   }
 
   private buildAdOrderCreatedNotification(
@@ -173,16 +223,65 @@ export class NotificationsProjectorService implements OnModuleInit {
         this.readString(parsedMetadata, ['itemCount']) ?? Number.NaN.toString(),
       );
     const shortOrderId = `${auditLog.entityId.slice(0, 8)}...`;
-    const itemCountText = Number.isFinite(itemCount)
-      ? `${itemCount} hạng mục`
-      : 'nhiều hạng mục';
-    return {
-      title: 'Có đơn mua quảng cáo mới',
-      content: `Đơn #${shortOrderId} vừa được gửi với ${itemCountText}, tổng giá trị ${subtotal}.`,
+    const itemCountTextVi = this.buildAdOrderItemCountText(itemCount, 'vi');
+    const itemCountTextEn = this.buildAdOrderItemCountText(itemCount, 'en');
+    const itemCountTextZhTw = this.buildAdOrderItemCountText(itemCount, 'zhTw');
+    return this.createNotificationBuildResult({
+      titleTranslations: {
+        vi: 'Có đơn mua quảng cáo mới',
+        en: 'New advertising order submitted',
+        zhTw: '有新的廣告訂單',
+      },
+      contentTranslations: {
+        vi: `Đơn #${shortOrderId} vừa được gửi với ${itemCountTextVi}, tổng giá trị ${subtotal}.`,
+        en: `Order #${shortOrderId} was submitted with ${itemCountTextEn}, subtotal ${subtotal}.`,
+        zhTw: `訂單 #${shortOrderId} 已提交，包含 ${itemCountTextZhTw}，小計 ${subtotal}。`,
+      },
       metadata: {
         orderId: auditLog.entityId,
         subtotal,
         itemCount: Number.isFinite(itemCount) ? itemCount : null,
+      },
+    });
+  }
+
+  private buildAdOrderItemCountText(
+    itemCount: number,
+    locale: NotificationLocale,
+  ): string {
+    if (!Number.isFinite(itemCount)) {
+      if (locale === 'vi') {
+        return 'nhiều hạng mục';
+      }
+      if (locale === 'en') {
+        return 'multiple items';
+      }
+      return '多個項目';
+    }
+    if (locale === 'vi') {
+      return `${itemCount} hạng mục`;
+    }
+    if (locale === 'en') {
+      return `${itemCount} items`;
+    }
+    return `${itemCount} 個項目`;
+  }
+
+  private createNotificationBuildResult(
+    input: CreateNotificationBuildResultInput,
+  ): NotificationBuildResult {
+    return {
+      title: input.titleTranslations[NOTIFICATION_DEFAULT_LOCALE],
+      content: input.contentTranslations[NOTIFICATION_DEFAULT_LOCALE],
+      metadata: {
+        ...input.metadata,
+        source: 'audit_log',
+        defaultLocale: NOTIFICATION_DEFAULT_LOCALE,
+        locales: [...NOTIFICATION_SUPPORTED_LOCALES],
+        translations: {
+          title: input.titleTranslations,
+          content: input.contentTranslations,
+        },
       },
     };
   }

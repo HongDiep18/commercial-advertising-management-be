@@ -12,7 +12,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
-import { CompanyMaskingService, type MaskingContext } from './company-masking.service';
+import {
+  CompanyMaskingService,
+  type MaskingContext,
+} from './company-masking.service';
 import type {
   ActiveAdInfo,
   CompanyData,
@@ -100,59 +103,39 @@ export class CompaniesService {
     private readonly adEffectsRegistry: AdEffectsRegistryService,
     private readonly auditService: AuditService,
     private readonly maskingService: CompanyMaskingService,
-  ) { }
+  ) {}
 
   private static normalizeCompanyEmail(email: string): string {
     return email.trim().toLowerCase();
   }
 
-  private async loadApprovedCompanyEmails(): Promise<string[]> {
-    const rows = await this.prisma.companyProfileRequest.findMany({
+  async getAdminApprovedCompanyStats(): Promise<{ approvedCount: number }> {
+    const approvedRequests = await this.prisma.companyProfileRequest.findMany({
       where: { status: CompanyProfileRequestStatus.APPROVED },
       select: { email: true },
     });
-    return [
+    const approvedEmails = [
       ...new Set(
-        rows.map((r) => CompaniesService.normalizeCompanyEmail(r.email)),
+        approvedRequests.map((request) =>
+          CompaniesService.normalizeCompanyEmail(request.email),
+        ),
       ),
     ];
-  }
-
-  private async buildDirectoryVisibleCompanyWhere(): Promise<Prisma.CompanyWhereInput> {
-    const approvedEmails = await this.loadApprovedCompanyEmails();
-    const usersFilter: Prisma.CompanyWhereInput = {
-      users: {
-        some: {
-          isActive: true,
-          deletedAt: null,
-        },
-      },
-    };
     if (approvedEmails.length === 0) {
-      return { AND: [usersFilter, { id: { in: [] } }] };
+      return { approvedCount: 0 };
     }
-    return {
-      AND: [
-        usersFilter,
-        {
-          email: {
-            in: approvedEmails,
+    const approvedCount = await this.prisma.company.count({
+      where: {
+        email: { in: approvedEmails },
+        users: {
+          some: {
+            isActive: true,
+            deletedAt: null,
           },
         },
-      ],
-    };
-  }
-
-  async getCompanyDirectoryStats(): Promise<{
-    total: number;
-    directoryCount: number;
-  }> {
-    const directoryWhere = await this.buildDirectoryVisibleCompanyWhere();
-    const [total, directoryCount] = await Promise.all([
-      this.prisma.company.count(),
-      this.prisma.company.count({ where: directoryWhere }),
-    ]);
-    return { total, directoryCount };
+      },
+    });
+    return { approvedCount };
   }
 
   async createCompany(dto: CreateCompanyDto, userId?: string) {
@@ -222,7 +205,10 @@ export class CompaniesService {
 
     // Apply masking if context is provided
     if (maskingContext) {
-      const masked = this.maskingService.maskCompanyData(company, maskingContext);
+      const masked = this.maskingService.maskCompanyData(
+        company,
+        maskingContext,
+      );
       return {
         id: masked.id,
         logoUrl: masked.logoUrl ?? null,
@@ -563,9 +549,7 @@ export class CompaniesService {
 
     const now = new Date();
 
-    const where: Prisma.CompanyWhereInput = {
-      ...(await this.buildDirectoryVisibleCompanyWhere()),
-    };
+    const where: Prisma.CompanyWhereInput = {};
 
     if (search) {
       where.OR = [
@@ -660,7 +644,21 @@ export class CompaniesService {
       // Apply masking if context is provided
       const maskedCompany = maskingContext
         ? this.maskingService.maskCompanyData(
-          {
+            {
+              id: company.id,
+              companyNameVi: company.companyNameVi,
+              companyNameCn: company.companyNameCn,
+              email: company.email,
+              contactName: company.contactName,
+              phone: company.phone,
+              industry: company.industry,
+              address: company.address,
+              description: company.description,
+              logoUrl: company.logoUrl,
+            },
+            maskingContext,
+          )
+        : {
             id: company.id,
             companyNameVi: company.companyNameVi,
             companyNameCn: company.companyNameCn,
@@ -671,21 +669,7 @@ export class CompaniesService {
             address: company.address,
             description: company.description,
             logoUrl: company.logoUrl,
-          },
-          maskingContext,
-        )
-        : {
-          id: company.id,
-          companyNameVi: company.companyNameVi,
-          companyNameCn: company.companyNameCn,
-          email: company.email,
-          contactName: company.contactName,
-          phone: company.phone,
-          industry: company.industry,
-          address: company.address,
-          description: company.description,
-          logoUrl: company.logoUrl,
-        };
+          };
 
       const name =
         maskedCompany.companyNameVi ??
@@ -733,10 +717,8 @@ export class CompaniesService {
   async getCompanyCategories(
     maskingContext?: MaskingContext,
   ): Promise<CompanyCategoriesResponseDto> {
-    // Get all categories with counts
     const grouped = await this.prisma.company.groupBy({
       by: ['industry'],
-      where: await this.buildDirectoryVisibleCompanyWhere(),
       _count: {
         _all: true,
       },
@@ -758,7 +740,8 @@ export class CompaniesService {
     }
 
     // Check if user has access to all industries
-    const hasAllAccess = this.maskingService.hasAllIndustryAccess(maskingContext);
+    const hasAllAccess =
+      this.maskingService.hasAllIndustryAccess(maskingContext);
 
     // If has all access (Diamond/Admin), return all categories
     if (hasAllAccess) {
@@ -843,22 +826,22 @@ export class CompaniesService {
   ): string {
     const companyPayload = company
       ? {
-        id: company.id,
-        email: company.email,
-        logoUrl: company.logoUrl,
-        companyNameVi: company.companyNameVi,
-        companyNameCn: company.companyNameCn,
-        phone: company.phone,
-        address: company.address,
-        description: company.description,
-        taxId: company.taxId,
-        country: company.country,
-        region: company.region,
-        industry: company.industry,
-        website: company.website,
-        contactName: company.contactName,
-        contactPhone: company.contactPhone,
-      }
+          id: company.id,
+          email: company.email,
+          logoUrl: company.logoUrl,
+          companyNameVi: company.companyNameVi,
+          companyNameCn: company.companyNameCn,
+          phone: company.phone,
+          address: company.address,
+          description: company.description,
+          taxId: company.taxId,
+          country: company.country,
+          region: company.region,
+          industry: company.industry,
+          website: company.website,
+          contactName: company.contactName,
+          contactPhone: company.contactPhone,
+        }
       : null;
     return JSON.stringify({ company: companyPayload });
   }

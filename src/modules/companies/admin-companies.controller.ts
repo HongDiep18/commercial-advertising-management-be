@@ -10,6 +10,7 @@ import {
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   UploadedFile,
@@ -27,6 +28,7 @@ import {
 } from '../auth/dto/update-profile.dto';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { CompaniesService } from './companies.service';
+import { AdminCompanyStatsResponseDto } from './dto/admin-company-stats.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -52,6 +54,20 @@ export class AdminCompaniesController {
     private readonly companiesService: CompaniesService,
     private readonly fileUploadService: FileUploadService,
   ) {}
+
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Get approved company stats (admin)',
+    description: 'Returns total company profile requests with status APPROVED.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Approved company count',
+    type: AdminCompanyStatsResponseDto,
+  })
+  async getApprovedCompanyStats(): Promise<AdminCompanyStatsResponseDto> {
+    return this.companiesService.getAdminApprovedCompanyStats();
+  }
 
   @Patch(':companyId')
   @UseInterceptors(FileInterceptor('logo_url'))

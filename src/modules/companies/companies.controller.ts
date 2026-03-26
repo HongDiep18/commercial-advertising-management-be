@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -18,14 +27,11 @@ import {
 import { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
-import { CompanyDirectoryStatsResponseDto } from './dto/company-stats.dto';
 
 @ApiTags('Companies')
 @Controller('companies')
 export class CompaniesController {
-  constructor(
-    private readonly companiesService: CompaniesService,
-  ) { }
+  constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
   @ApiOperation({
@@ -72,7 +78,8 @@ export class CompaniesController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Paginated list of companies with directory effects applied and masked by tier',
+    description:
+      'Paginated list of companies with directory effects applied and masked by tier',
     type: CompanyDirectoryResponseDto,
   })
   async getCompanyDirectory(
@@ -84,22 +91,22 @@ export class CompaniesController {
     // Always provide masking context (guests get masked data with null tier)
     const maskingContext = user
       ? {
-        userTier: user.membershipTier,
-        userIndustries: [
-          user.primaryIndustry,
-          ...(user.selectedIndustries ?? []),
-        ].filter(Boolean),
-        userId: user.userId,
-        userCompanyId: user.companyId,
-        userRole: user.role,
-      }
+          userTier: user.membershipTier,
+          userIndustries: [
+            user.primaryIndustry,
+            ...(user.selectedIndustries ?? []),
+          ].filter(Boolean),
+          userId: user.userId,
+          userCompanyId: user.companyId,
+          userRole: user.role,
+        }
       : {
-        userTier: null, // Guest user - will apply full masking
-        userIndustries: [],
-        userId: undefined,
-        userCompanyId: undefined,
-        userRole: undefined,
-      };
+          userTier: null, // Guest user - will apply full masking
+          userIndustries: [],
+          userId: undefined,
+          userCompanyId: undefined,
+          userRole: undefined,
+        };
 
     return this.companiesService.getCompanyDirectory(query, maskingContext);
   }
@@ -121,7 +128,9 @@ export class CompaniesController {
     description: 'List of accessible company categories with counts',
     type: CompanyCategoriesResponseDto,
   })
-  async getCompanyCategories(@Request() req: any): Promise<CompanyCategoriesResponseDto> {
+  async getCompanyCategories(
+    @Request() req: any,
+  ): Promise<CompanyCategoriesResponseDto> {
     const user = req.user; // May be undefined for guests
 
     const maskingContext = user
@@ -138,23 +147,6 @@ export class CompaniesController {
       : undefined;
 
     return this.companiesService.getCompanyCategories(maskingContext);
-  }
-
-  @Get('stats')
-  @Public()
-  @ApiOperation({
-    summary: 'Company directory stats',
-    description:
-      'Returns total companies in the database and how many qualify for the public directory ' +
-      '(approved profile request, matching company email, at least one active non-deleted user).',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Total and directory-visible company counts',
-    type: CompanyDirectoryStatsResponseDto,
-  })
-  getCompanyDirectoryStats(): Promise<CompanyDirectoryStatsResponseDto> {
-    return this.companiesService.getCompanyDirectoryStats();
   }
 
   @Get('featured')
@@ -180,7 +172,8 @@ export class CompaniesController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get company detail',
-    description: 'Returns company detail with data masked based on user membership tier and industry access.',
+    description:
+      'Returns company detail with data masked based on user membership tier and industry access.',
   })
   @ApiResponse({
     status: 200,
@@ -188,7 +181,10 @@ export class CompaniesController {
     type: CompanyDetailResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  @ApiResponse({ status: 403, description: 'No access to this company\'s industry' })
+  @ApiResponse({
+    status: 403,
+    description: "No access to this company's industry",
+  })
   async getCompanyDetail(
     @Param('id') id: string,
     @Request() req: any,
@@ -198,22 +194,22 @@ export class CompaniesController {
     // Always provide masking context (guests get masked data with null tier)
     const maskingContext = user
       ? {
-        userTier: user.membershipTier,
-        userIndustries: [
-          user.primaryIndustry,
-          ...(user.selectedIndustries ?? []),
-        ].filter(Boolean),
-        userId: user.userId,
-        userCompanyId: user.companyId,
-        userRole: user.role,
-      }
+          userTier: user.membershipTier,
+          userIndustries: [
+            user.primaryIndustry,
+            ...(user.selectedIndustries ?? []),
+          ].filter(Boolean),
+          userId: user.userId,
+          userCompanyId: user.companyId,
+          userRole: user.role,
+        }
       : {
-        userTier: null, // Guest user - will apply full masking
-        userIndustries: [],
-        userId: undefined,
-        userCompanyId: undefined,
-        userRole: undefined,
-      };
+          userTier: null, // Guest user - will apply full masking
+          userIndustries: [],
+          userId: undefined,
+          userCompanyId: undefined,
+          userRole: undefined,
+        };
 
     return this.companiesService.getCompanyDetail(id, maskingContext);
   }

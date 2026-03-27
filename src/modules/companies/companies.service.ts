@@ -110,6 +110,17 @@ export class CompaniesService {
     return email.trim().toLowerCase();
   }
 
+  private static buildActiveUserCompanyWhere(): Prisma.CompanyWhereInput {
+    return {
+      users: {
+        some: {
+          isActive: true,
+          deletedAt: null,
+        },
+      },
+    };
+  }
+
   private static buildContainsOrGroup(
     field: 'industry' | 'region',
     values: readonly string[],
@@ -141,12 +152,7 @@ export class CompaniesService {
     const approvedCount = await this.prisma.company.count({
       where: {
         email: { in: approvedEmails },
-        users: {
-          some: {
-            isActive: true,
-            deletedAt: null,
-          },
-        },
+        ...CompaniesService.buildActiveUserCompanyWhere(),
       },
     });
     return { approvedCount };
@@ -565,6 +571,7 @@ export class CompaniesService {
     const now = new Date();
 
     const andConditions: Prisma.CompanyWhereInput[] = [];
+    andConditions.push(CompaniesService.buildActiveUserCompanyWhere());
     const industryFilters = Array.isArray(industry)
       ? industry.filter((value): value is string => typeof value === 'string')
       : [];
@@ -750,6 +757,7 @@ export class CompaniesService {
   ): Promise<CompanyCategoriesResponseDto> {
     const grouped = await this.prisma.company.groupBy({
       by: ['industry'],
+      where: CompaniesService.buildActiveUserCompanyWhere(),
       _count: {
         _all: true,
       },

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ActiveAdsModule } from '../active-ads/active-ads.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { FileGeneratingModule } from '../file-generating/file-generating.module';
 import { FileUploadModule } from '../file-upload/file-upload.module';
@@ -13,6 +14,7 @@ import { AdOrdersService } from './ad-orders.service';
     FileGeneratingModule,
     CompaniesModule,
     LoyaltyModule,
+    ActiveAdsModule,
   ],
   controllers: [AdOrdersController, AdOrdersAdminController],
   providers: [AdOrdersService],

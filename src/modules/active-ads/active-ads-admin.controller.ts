@@ -34,6 +34,7 @@ import {
   AdminAddActiveAdAssetsDto,
   AdminAddActiveAdAssetsResponseDto,
 } from './dto/admin-add-active-ad-assets.dto';
+import { AdminCreateCompanyPopupAddonDto } from './dto/admin-create-company-popup-addon.dto';
 import {
   AdminManualActivateAdDto,
   AdminManualActiveAdResponseDto,
@@ -194,6 +195,36 @@ export class ActiveAdsAdminController {
     });
   }
 
+  @Post('company/popup-addon')
+  @ApiOperation({
+    summary: 'Create popup add-on active ad for a company',
+    description:
+      'Creates a ranking adjustment or view-details link active ad without an order. Assets are optional.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Active ad created',
+    type: AdminManualActiveAdResponseDto,
+  })
+  async createCompanyPopupAddon(
+    @CurrentUser() admin: UserPayload,
+    @Body() dto: AdminCreateCompanyPopupAddonDto,
+  ): Promise<AdminManualActiveAdResponseDto> {
+    const startDate = new Date(dto.startDate);
+    const endDate =
+      dto.endDate !== undefined && dto.endDate !== null && dto.endDate !== ''
+        ? new Date(dto.endDate)
+        : null;
+    return this.activeAdsService.createCompanyPopupAddonActiveAd({
+      companyId: dto.companyId,
+      packageType: dto.packageType,
+      startDate,
+      endDate,
+      adLinkUrl: dto.adLinkUrl,
+      adminUserId: admin.userId,
+    });
+  }
+
   @Patch(':activeAdId')
   @ApiOperation({
     summary: 'Update an active ad',
@@ -207,6 +238,20 @@ export class ActiveAdsAdminController {
     @CurrentUser() admin: UserPayload,
   ): Promise<void> {
     await this.activeAdsService.updateActiveAd(activeAdId, dto, admin.userId);
+  }
+
+  @Delete(':activeAdId')
+  @ApiOperation({
+    summary: 'Delete an active ad',
+    description: 'Hard deletes an active ad and all of its assets.',
+  })
+  @ApiResponse({ status: 200, description: 'Active ad deleted successfully' })
+  async deleteActiveAd(
+    @Param('activeAdId') activeAdId: string,
+    @CurrentUser() admin: UserPayload,
+  ): Promise<{ message: string }> {
+    await this.activeAdsService.deleteActiveAd(activeAdId, admin.userId);
+    return { message: 'Active ad deleted successfully' };
   }
 
   @Put(':activeAdId/assets')

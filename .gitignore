@@ -32,3 +32,4 @@ CLAUDE.md
 tasks/
 
 /generated/prisma
+.claude

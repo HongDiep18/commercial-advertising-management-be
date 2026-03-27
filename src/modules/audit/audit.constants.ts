@@ -42,6 +42,7 @@ export const AUDIT_ACTION = {
   // Active ad actions
   ACTIVE_AD_CREATED: 'active_ad.created',
   ACTIVE_AD_MANUALLY_CREATED: 'active_ad.manually_created',
+  ACTIVE_AD_DELETED: 'active_ad.deleted',
 
   // Loyalty actions
   LOYALTY_POINTS_AWARDED: 'loyalty.points_awarded',

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { NewsArticleStatus, Prisma } from '@prisma/client';
 import { PaginatedResult } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -29,8 +29,6 @@ const articleInclude = {
 
 @Injectable()
 export class NewsService {
-  private readonly logger = new Logger(NewsService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async ingestMany(articles: IngestInput[]) {
@@ -87,9 +85,11 @@ export class NewsService {
       byGuidExisting.map((a) => [`${a.sourceSite}::${a.guid}`, a]),
     );
 
-    let created = 0;
     let updated = 0;
     let skipped = 0;
+
+    const toCreate: typeof normalized = [];
+    const toUpdate: typeof normalized = [];
 
     for (const input of normalized) {
       const existing =
@@ -98,30 +98,7 @@ export class NewsService {
           : undefined) ?? existingByUrl.get(input.url);
 
       if (!existing) {
-        try {
-          await this.prisma.newsArticle.create({
-            data: {
-              sourceSite: input.sourceSite,
-              categoryId: input.categoryId ?? null,
-              subcategoryId: input.subcategoryId ?? null,
-              guid: input.guid ?? null,
-              url: input.url,
-              title: input.title,
-              publishedAt: new Date(input.publishedAt),
-              thumbnailUrl: input.thumbnailUrl ?? null,
-              language: input.language ?? 'vi',
-              summaryVi: input.summaryVi ?? null,
-              status: NewsArticleStatus.DRAFT,
-            },
-          });
-          created += 1;
-        } catch (e) {
-          if (isDuplicateUrl(e)) {
-            skipped += 1;
-          } else {
-            throw e;
-          }
-        }
+        toCreate.push(input);
         continue;
       }
 
@@ -144,6 +121,42 @@ export class NewsService {
         continue;
       }
 
+      toUpdate.push(input);
+    }
+
+    // Deduplicate toCreate by URL to avoid individual INSERT failures when the same
+    // URL appears more than once in the feed (Prisma 7 sends one INSERT per row)
+    const seenUrls = new Set<string>();
+    const uniqueToCreate = toCreate.filter((a) => {
+      if (seenUrls.has(a.url)) return false;
+      seenUrls.add(a.url);
+      return true;
+    });
+
+    const { count: created } = await this.prisma.newsArticle.createMany({
+      data: uniqueToCreate.map((input) => ({
+        sourceSite: input.sourceSite,
+        categoryId: input.categoryId ?? null,
+        subcategoryId: input.subcategoryId ?? null,
+        guid: input.guid ?? null,
+        url: input.url,
+        title: input.title,
+        publishedAt: new Date(input.publishedAt),
+        thumbnailUrl: input.thumbnailUrl ?? null,
+        language: input.language ?? 'vi',
+        summaryVi: input.summaryVi ?? null,
+        status: NewsArticleStatus.DRAFT,
+      })),
+      skipDuplicates: true,
+    });
+    skipped += toCreate.length - created; // accounts for both within-batch and DB-level dupes
+
+    for (const input of toUpdate) {
+      const existing =
+        (input.guid
+          ? existingByGuid.get(`${input.sourceSite}::${input.guid}`)
+          : undefined) ?? existingByUrl.get(input.url);
+      if (!existing) continue;
       try {
         await this.prisma.newsArticle.update({
           where: { id: existing.id },
@@ -199,19 +212,6 @@ export class NewsService {
       });
     } catch (e) {
       if (isNotFound(e)) throw new NotFoundException('Article not found');
-      if (isDuplicateUrl(e)) {
-        // Another article already owns this URL — this is a stale duplicate DRAFT.
-        // Delete it so it is not retried on every cron run.
-        this.logger.warn(
-          `Deleting duplicate DRAFT article ${articleId} — URL already exists in another record`,
-        );
-        await this.prisma.newsArticle
-          .delete({ where: { id: articleId } })
-          .catch(() => {});
-        throw new ConflictException(
-          `Article ${articleId} is a duplicate URL — removed duplicate draft`,
-        );
-      }
       throw e;
     }
   }

@@ -3,6 +3,23 @@ import { Type } from 'class-transformer';
 import { Transform } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
+function parseListQueryValue(value: unknown): string[] | undefined {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+  }
+  return undefined;
+}
+
 export class CompanyDirectoryQueryDto {
   @ApiPropertyOptional({
     description: 'Search term for company name, industry, or description',
@@ -22,23 +39,17 @@ export class CompanyDirectoryQueryDto {
     ],
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value == null) return undefined;
-    if (Array.isArray(value)) {
-      return value
-        .filter((v): v is string => typeof v === 'string')
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0);
-    }
-    if (typeof value === 'string') {
-      return value
-        .split(',')
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0);
-    }
-    return undefined;
-  })
+  @Transform(({ value }) => parseListQueryValue(value))
   industry?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by region (single value, repeated query params, or comma-separated list)',
+    examples: ['Haiphong', 'Haiphong&region=Hanoi', 'Haiphong,Hanoi'],
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseListQueryValue(value))
+  region?: string[];
 
   @ApiPropertyOptional({
     description: 'Page number (1-based)',
@@ -115,6 +126,9 @@ export class CompanyDirectoryItemDto {
   @ApiProperty({ example: 'Manufacturing' })
   industry!: string;
 
+  @ApiPropertyOptional({ example: 'Hai Phong' })
+  region?: string | null;
+
   @ApiProperty({
     example: '12 Nguyen Hue, District 1, Ho Chi Minh City, Vietnam',
   })
@@ -180,7 +194,8 @@ export class CompanyCategoriesResponseDto {
   categories!: CompanyCategoryItemDto[];
 
   @ApiProperty({
-    description: 'Whether user has access to all industries (Guest/Diamond/Admin)',
+    description:
+      'Whether user has access to all industries (Guest/Diamond/Admin)',
     example: true,
   })
   hasAllAccess!: boolean;

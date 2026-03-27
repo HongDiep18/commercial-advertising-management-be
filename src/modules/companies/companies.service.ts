@@ -78,6 +78,7 @@ type CompanyWithActiveAdsRecord = {
   contactName: string | null;
   phone: string;
   industry: string;
+  region: string | null;
   country: string | null;
   address: string;
   description: string;
@@ -107,6 +108,19 @@ export class CompaniesService {
 
   private static normalizeCompanyEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private static buildContainsOrGroup(
+    field: 'industry' | 'region',
+    values: readonly string[],
+  ): Prisma.CompanyWhereInput | null {
+    if (values.length === 0) {
+      return null;
+    }
+    const orGroup: Prisma.CompanyWhereInput[] = values.map((value) => ({
+      [field]: { contains: value, mode: 'insensitive' },
+    }));
+    return { OR: orGroup };
   }
 
   async getAdminApprovedCompanyStats(): Promise<{ approvedCount: number }> {
@@ -541,6 +555,7 @@ export class CompaniesService {
     const {
       search,
       industry,
+      region,
       page = 1,
       limit = 20,
       sortBy = 'name',
@@ -549,30 +564,43 @@ export class CompaniesService {
 
     const now = new Date();
 
-    const where: Prisma.CompanyWhereInput = {};
+    const andConditions: Prisma.CompanyWhereInput[] = [];
+    const industryFilters = Array.isArray(industry)
+      ? industry.filter((value): value is string => typeof value === 'string')
+      : [];
+    const regionFilters = Array.isArray(region)
+      ? region.filter((value): value is string => typeof value === 'string')
+      : [];
 
     if (search) {
-      where.OR = [
-        { companyNameVi: { contains: search, mode: 'insensitive' } },
-        { companyNameCn: { contains: search, mode: 'insensitive' } },
-        { industry: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { region: { contains: search, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { companyNameVi: { contains: search, mode: 'insensitive' } },
+          { companyNameCn: { contains: search, mode: 'insensitive' } },
+          { industry: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { region: { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
 
-    // FE should pass industry filter explicitly based on user's selection
-    if (industry && industry.length > 0) {
-      const existingOr: Prisma.CompanyWhereInput[] = [];
-      if (where.OR) {
-        if (Array.isArray(where.OR)) existingOr.push(...where.OR);
-        else existingOr.push(where.OR);
-      }
-      const industryOr: Prisma.CompanyWhereInput[] = industry.map((i) => ({
-        industry: { contains: i, mode: 'insensitive' },
-      }));
-      where.OR = [...existingOr, ...industryOr];
+    // Industry group OR-values, AND-ed with region group.
+    const industryGroup = CompaniesService.buildContainsOrGroup(
+      'industry',
+      industryFilters,
+    );
+    if (industryGroup) {
+      andConditions.push(industryGroup);
     }
+    const regionGroup = CompaniesService.buildContainsOrGroup(
+      'region',
+      regionFilters,
+    );
+    if (regionGroup) {
+      andConditions.push(regionGroup);
+    }
+    const where: Prisma.CompanyWhereInput =
+      andConditions.length > 0 ? { AND: andConditions } : {};
 
     // Get total count
     const total = await this.prisma.company.count({ where });
@@ -652,6 +680,7 @@ export class CompaniesService {
               contactName: company.contactName,
               phone: company.phone,
               industry: company.industry,
+              region: company.region,
               address: company.address,
               description: company.description,
               logoUrl: company.logoUrl,
@@ -666,6 +695,7 @@ export class CompaniesService {
             contactName: company.contactName,
             phone: company.phone,
             industry: company.industry,
+            region: company.region,
             address: company.address,
             description: company.description,
             logoUrl: company.logoUrl,
@@ -684,6 +714,7 @@ export class CompaniesService {
         contactName: maskedCompany.contactName ?? '',
         phone: maskedCompany.phone,
         industry: maskedCompany.industry,
+        region: maskedCompany.region ?? null,
         address: maskedCompany.address ?? '',
         description: maskedCompany.description ?? '',
         companyInfoHighlight: modified.companyInfoHighlight ?? false,

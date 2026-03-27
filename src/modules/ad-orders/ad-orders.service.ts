@@ -19,7 +19,8 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
-import { SENTINEL_DATE, SLOT_CAPACITY } from '../ads/ads.constants';
+import { SLOT_CAPACITY } from '../ads/ads.constants';
+import { ActiveAdsService } from '../active-ads/active-ads.service';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type {
   AdminListOrdersQueryDto,
@@ -94,6 +95,7 @@ export class AdOrdersService {
     private readonly mailService: MailService,
     private readonly loyaltyService: LoyaltyService,
     private readonly auditService: AuditService,
+    private readonly activeAdsService: ActiveAdsService,
   ) {}
 
   /**
@@ -160,12 +162,12 @@ export class AdOrdersService {
             )
           : null;
 
-      await this.checkSlotAvailability(
-        this.prisma,
+      await this.activeAdsService.checkSlotAvailability({
+        db: this.prisma,
         packageType,
         startDate,
-        projectedEndDate,
-      );
+        endDate: projectedEndDate,
+      });
     }
 
     let subtotal = BigInt(0);
@@ -933,12 +935,12 @@ export class AdOrdersService {
               )
             : null;
 
-        await this.checkSlotAvailability(
-          tx,
+        await this.activeAdsService.checkSlotAvailability({
+          db: tx,
           packageType,
-          item.startDate,
-          projectedEndDate,
-        );
+          startDate: item.startDate,
+          endDate: projectedEndDate,
+        });
       }
 
       // Update order status
@@ -1178,42 +1180,6 @@ export class AdOrdersService {
           pricingModel: pricing.pricingModel,
         },
       });
-    }
-  }
-
-  /**
-   * Throws SLOT_NOT_AVAILABLE if the slot-limited package type is at capacity
-   * for the requested [startDate, endDate] range.
-   * Accepts either PrismaService or a transaction client.
-   *
-   * Intentional design: only approved (isActive: true) ads are counted.
-   * PENDING orders are not reserved against slot capacity — slots are confirmed
-   * at approval time. In a low-volume, admin-driven flow this is acceptable;
-   * the admin simply rejects the second order if the slot is taken by the time
-   * they approve it.
-   */
-  private async checkSlotAvailability(
-    db: { activeAd: PrismaService['activeAd'] },
-    packageType: AdPackageType,
-    startDate: Date,
-    endDate: Date | null,
-  ): Promise<void> {
-    const capacity = SLOT_CAPACITY[packageType];
-    if (!capacity) return;
-
-    const effectiveEndDate = endDate ?? SENTINEL_DATE;
-
-    const occupiedCount = await db.activeAd.count({
-      where: {
-        packageType,
-        isActive: true,
-        startDate: { lt: effectiveEndDate },
-        OR: [{ endDate: null }, { endDate: { gt: startDate } }],
-      },
-    });
-
-    if (occupiedCount >= capacity) {
-      throw new BadRequestException(AdOrdersErrors.SLOT_NOT_AVAILABLE);
     }
   }
 

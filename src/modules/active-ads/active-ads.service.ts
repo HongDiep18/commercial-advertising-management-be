@@ -6,11 +6,13 @@ import {
   type Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { CompaniesService } from '../companies/companies.service';
-import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
+import { CompaniesService } from '../companies/companies.service';
 import type { CompanyWithAdsResponseDto } from '../companies/dto/company-with-ads-response.dto';
 import { ActiveAdsErrors } from './active-ads.errors';
+import type { ActiveAdDto } from './dto/active-ads.dto';
+import { AdStatus } from './dto/active-ads.dto';
 import type { AdminManualActiveAdResponseDto } from './dto/admin-manual-activate-ad.dto';
 
 type ActiveAdWithOrderItemRecord = {
@@ -163,7 +165,7 @@ export class ActiveAdsService {
             fileUrl: asset.fileUrl || '',
             assetType: asset.assetType,
           })),
-        adLinkUrl: ad.orderItem?.adLinkUrl ?? ad.adLinkUrl ?? undefined,
+        adLinkUrl: ad.adLinkUrl ?? ad.orderItem?.adLinkUrl ?? undefined,
         startDate: ad.startDate,
         endDate: ad.endDate || undefined,
         isActive: ad.isActive,
@@ -206,75 +208,124 @@ export class ActiveAdsService {
   /**
    * Get all active ads for a specific company
    */
-  async getCompanyActiveAds(companyId: string): Promise<ActiveAdResponse[]> {
-    const now = new Date();
-
-    const queryArgs = {
+  async getCompanyActiveAds(companyId: string): Promise<ActiveAdDto> {
+    const activeAds = await this.prisma.activeAd.findMany({
       where: {
         companyId,
-        isActive: true,
-        startDate: { lte: now },
-        OR: [
-          { endDate: null }, // ONE_TIME or PER_ACTION
-          { endDate: { gte: now } }, // DURATION not expired
-        ],
       },
       orderBy: { createdAt: 'desc' },
       include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
         assets: {
           select: {
             fileUrl: true,
             assetType: true,
           },
         },
-        orderItem: {
-          include: {
-            assets: {
-              select: {
-                fileUrl: true,
-                assetType: true,
-              },
-            },
-          },
-        },
       },
-    } as const;
-
-    const activeAds = (await this.prisma.activeAd.findMany(
-      queryArgs as unknown as Prisma.ActiveAdFindManyArgs,
-    )) as unknown as ActiveAdWithOrderItemRecord[];
-
-    return activeAds.map((ad) => {
-      const assetsSource =
-        ad.assets.length > 0 ? ad.assets : (ad.orderItem?.assets ?? []);
+    });
+    const now = new Date();
+    const items = activeAds.map((ad) => {
+      let status: AdStatus;
+      if (!ad.isActive) {
+        status = AdStatus.DISABLED;
+      } else if (ad.endDate && ad.endDate < now) {
+        status = AdStatus.EXPIRED;
+      } else if (ad.startDate > now) {
+        status = AdStatus.PENDING;
+      } else {
+        status = AdStatus.ACTIVATING;
+      }
       return {
         id: ad.id,
-        company: {
-          id: ad.company.id,
-          name: ad.company.name,
-          description: ad.company.description,
-        },
         packageType: ad.packageType,
         pricingModel: ad.pricingModel,
-        assets: assetsSource
-          .filter((asset) => Boolean(asset.fileUrl))
-          .map((asset) => ({
-            fileUrl: asset.fileUrl || '',
-            assetType: asset.assetType,
-          })),
-        adLinkUrl: ad.orderItem?.adLinkUrl ?? ad.adLinkUrl ?? undefined,
+        assets: ad.assets.map((asset) => ({
+          fileUrl: asset.fileUrl ?? '',
+          assetType: asset.assetType,
+        })),
+        adLinkUrl: ad.adLinkUrl,
         startDate: ad.startDate,
-        endDate: ad.endDate || undefined,
+        endDate: ad.endDate,
         isActive: ad.isActive,
+        status,
       };
     });
+    return {
+      company_id: companyId,
+      items,
+    };
+  }
+
+  async updateActiveAd(
+    activeAdId: string,
+    input: {
+      isActive?: boolean;
+      startDate?: string;
+      endDate?: string | null;
+      adLinkUrl?: string | null;
+    },
+    adminUserId: string,
+  ): Promise<void> {
+    const activeAd = await this.prisma.activeAd.findUnique({
+      where: { id: activeAdId },
+      select: { id: true },
+    });
+    if (!activeAd) {
+      throw new NotFoundException(ActiveAdsErrors.ACTIVE_AD_NOT_FOUND);
+    }
+
+    const data: Prisma.ActiveAdUpdateInput = {};
+    if (input.isActive !== undefined) data.isActive = input.isActive;
+    if (input.startDate !== undefined)
+      data.startDate = new Date(input.startDate);
+    if ('endDate' in input)
+      data.endDate = input.endDate ? new Date(input.endDate) : null;
+    if ('adLinkUrl' in input) data.adLinkUrl = input.adLinkUrl ?? null;
+
+    await this.prisma.activeAd.update({ where: { id: activeAdId }, data });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.ACTIVE_AD_MANUALLY_CREATED,
+      entityType: AUDIT_ENTITY.ACTIVE_AD,
+      entityId: activeAdId,
+      actorId: adminUserId,
+      metadata: { updatedFields: Object.keys(data) },
+    });
+  }
+
+  async replaceActiveAdAssets(
+    activeAdId: string,
+    assets: Array<{ fileUrl: string; assetType: string; notes?: string }>,
+  ): Promise<{ replacedCount: number }> {
+    const activeAd = await this.prisma.activeAd.findUnique({
+      where: { id: activeAdId },
+      select: { id: true },
+    });
+    if (!activeAd) {
+      throw new NotFoundException(ActiveAdsErrors.ACTIVE_AD_NOT_FOUND);
+    }
+
+    const deleteAssetsOperation = this.prisma.activeAdAsset.deleteMany({
+      where: { activeAdId },
+    });
+
+    if (assets.length > 0) {
+      await this.prisma.$transaction([
+        deleteAssetsOperation,
+        this.prisma.activeAdAsset.createMany({
+          data: assets.map((asset) => ({
+            activeAdId,
+            assetType: asset.assetType,
+            fileUrl: asset.fileUrl,
+            notes: asset.notes ?? null,
+          })),
+        }),
+      ]);
+    } else {
+      await this.prisma.$transaction([deleteAssetsOperation]);
+    }
+
+    return { replacedCount: assets.length };
   }
 
   async manuallyActivateAdForCompany(input: {

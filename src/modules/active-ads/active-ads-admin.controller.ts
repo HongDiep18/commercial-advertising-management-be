@@ -3,8 +3,11 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
+  Patch,
   Post,
+  Put,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -26,6 +29,7 @@ import type { UserPayload } from '../../common/interfaces/user-payload.interface
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { ActiveAdsErrors } from './active-ads.errors';
 import { ActiveAdsService } from './active-ads.service';
+import type { ActiveAdDto } from './dto/active-ads.dto';
 import {
   AdminAddActiveAdAssetsDto,
   AdminAddActiveAdAssetsResponseDto,
@@ -34,6 +38,8 @@ import {
   AdminManualActivateAdDto,
   AdminManualActiveAdResponseDto,
 } from './dto/admin-manual-activate-ad.dto';
+import { AdminReplaceActiveAdAssetsDto } from './dto/admin-replace-active-ad-assets.dto';
+import { AdminUpdateActiveAdDto } from './dto/admin-update-active-ad.dto';
 
 @ApiTags('Admin - Active Ads')
 @ApiBearerAuth()
@@ -186,5 +192,55 @@ export class ActiveAdsAdminController {
       startDate,
       adLinkUrl: dto.adLinkUrl,
     });
+  }
+
+  @Patch(':activeAdId')
+  @ApiOperation({
+    summary: 'Update an active ad',
+    description:
+      'Update isActive, startDate, endDate, or adLinkUrl of an active ad.',
+  })
+  @ApiResponse({ status: 200, description: 'Active ad updated successfully' })
+  async updateActiveAd(
+    @Param('activeAdId') activeAdId: string,
+    @Body() dto: AdminUpdateActiveAdDto,
+    @CurrentUser() admin: UserPayload,
+  ): Promise<void> {
+    await this.activeAdsService.updateActiveAd(activeAdId, dto, admin.userId);
+  }
+
+  @Put(':activeAdId/assets')
+  @ApiOperation({
+    summary: 'Replace all assets of an active ad',
+    description:
+      'Deletes all existing assets for the active ad and replaces them with the provided list.',
+  })
+  @ApiResponse({ status: 200, description: 'Assets replaced successfully' })
+  async replaceActiveAdAssets(
+    @Param('activeAdId') activeAdId: string,
+    @Body() dto: AdminReplaceActiveAdAssetsDto,
+  ): Promise<{ replacedCount: number }> {
+    const activeAdsService: {
+      replaceActiveAdAssets: (
+        id: string,
+        assets: AdminReplaceActiveAdAssetsDto['assets'],
+      ) => Promise<{ replacedCount: number }>;
+    } = this.activeAdsService;
+    return await activeAdsService.replaceActiveAdAssets(activeAdId, dto.assets);
+  }
+
+  @Get('company/:companyId')
+  @ApiOperation({
+    summary: 'Get active ads for a specific company',
+    description: 'Get all active ads for a specific company',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Company active ads retrieved successfully',
+  })
+  async getCompanyActiveAds(
+    @Param('companyId') companyId: string,
+  ): Promise<ActiveAdDto> {
+    return this.activeAdsService.getCompanyActiveAds(companyId);
   }
 }

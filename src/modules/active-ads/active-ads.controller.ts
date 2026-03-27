@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdPackageType } from '@prisma/client';
 import { Public } from '../../common/decorators/public.decorator';
@@ -40,21 +40,6 @@ export class ActiveAdsController {
   ): Promise<ActiveAdResponse[]> {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     return this.activeAdsService.getActiveAdsByType(packageType, limitNum);
-  }
-
-  @Get('companies/:companyId')
-  @ApiOperation({
-    summary: 'Get active ads for a specific company',
-    description: 'Get all active ads for a specific company',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Company active ads retrieved successfully',
-  })
-  async getCompanyActiveAds(
-    @Param('companyId') companyId: string,
-  ): Promise<ActiveAdResponse[]> {
-    return this.activeAdsService.getCompanyActiveAds(companyId);
   }
 
   @Get('popup-priority')

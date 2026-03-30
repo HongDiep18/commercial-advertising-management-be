@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -25,9 +26,12 @@ import {
 } from './dto/admin-list-orders.dto';
 import {
   AdminApproveOrderDto,
+  AdminEditPendingOrderDto,
   AdminOrderActionResponseDto,
   AdminRejectOrderDto,
 } from './dto/admin-order-actions.dto';
+import type { AdOrderSummary } from './ad-orders.service';
+import type { AdminOrderDto } from './dto/admin-list-orders.dto';
 import { AdminOrdersMetricsResponseDto } from './dto/admin-orders-metrics.dto';
 
 @ApiTags('Admin - Ad Orders')
@@ -79,6 +83,34 @@ export class AdOrdersAdminController {
   async getMetrics(): Promise<AdminOrdersMetricsResponseDto> {
     const metrics = await this.adOrdersService.getAdminOrdersMetrics();
     return metrics;
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get a single ad order by ID',
+    description: 'Retrieve full order details for admin. Admin and Super Admin only.',
+  })
+  @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async getOrderById(@Param('id') orderId: string): Promise<AdminOrderDto> {
+    return this.adOrdersService.adminGetOrderById(orderId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Edit a draft or pending ad order',
+    description:
+      'Update order notes, existing item fields, replace item assets, or append Homepage Popup add-on packages. Recalculates subtotal when add-ons are added. Admin and Super Admin only.',
+  })
+  @ApiResponse({ status: 200, description: 'Order updated successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error or order not editable' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async editOrder(
+    @Param('id') orderId: string,
+    @CurrentUser() admin: UserPayload,
+    @Body() dto: AdminEditPendingOrderDto,
+  ): Promise<AdOrderSummary> {
+    return this.adOrdersService.adminEditPendingOrder(orderId, admin.userId, dto);
   }
 
   @Post(':id/approve')

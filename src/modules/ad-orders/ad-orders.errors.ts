@@ -61,6 +61,28 @@ export const AdOrdersErrors = {
     code: 'AD_ORDER_NOT_PENDING',
     message: 'Only pending orders can be approved or rejected',
   },
+  ORDER_NOT_EDITABLE: {
+    code: 'AD_ORDER_NOT_EDITABLE',
+    message: 'Only draft or pending orders can be edited',
+  },
+  ORDER_CANNOT_BE_EMPTY: {
+    code: 'AD_ORDER_CANNOT_BE_EMPTY',
+    message: 'Cannot remove all items from an order',
+  },
+  ADDON_INVALID_TYPE: {
+    code: 'AD_ORDER_ADDON_INVALID_TYPE',
+    message:
+      'Add-on packages must be Homepage Popup add-ons (View Details Link or Ranking Adjustment)',
+  },
+  ADDON_REQUIRES_BASE_PACKAGE: {
+    code: 'AD_ORDER_ADDON_REQUIRES_BASE',
+    message:
+      'Order must contain a Homepage Popup base package to add add-ons',
+  },
+  EDIT_ITEM_NOT_IN_ORDER: {
+    code: 'AD_ORDER_EDIT_ITEM_NOT_FOUND',
+    message: 'One or more item IDs do not belong to this order',
+  },
   ORDER_COMPANY_REQUIRED: {
     code: 'AD_ORDER_COMPANY_REQUIRED',
     message: 'Order must be associated with a company to activate ads',

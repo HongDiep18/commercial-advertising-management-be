@@ -31,6 +31,7 @@ export const AUDIT_ACTION = {
 
   // Ad order actions
   AD_ORDER_CREATED: 'ad_order.created',
+  AD_ORDER_UPDATED: 'ad_order.updated',
   AD_ORDER_APPROVED: 'ad_order.approved',
   AD_ORDER_REJECTED: 'ad_order.rejected',
 

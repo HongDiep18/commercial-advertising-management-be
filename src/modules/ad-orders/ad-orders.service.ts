@@ -28,6 +28,7 @@ import type {
 } from './dto/admin-list-orders.dto';
 import type {
   AdminApproveOrderDto,
+  AdminEditPendingOrderDto,
   AdminRejectOrderDto,
 } from './dto/admin-order-actions.dto';
 import type { CreateAdOrderDto } from './dto/create-ad-order.dto';
@@ -1181,6 +1182,287 @@ export class AdOrdersService {
         },
       });
     }
+  }
+
+  /**
+   * Admin method to get a single order by ID with full details
+   */
+  async adminGetOrderById(orderId: string): Promise<AdminOrderDto> {
+    const order = await this.prisma.adOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        user: { select: { id: true, email: true } },
+        company: {
+          select: {
+            id: true,
+            companyNameVi: true,
+            companyNameCn: true,
+            email: true,
+            contactName: true,
+            phone: true,
+          },
+        },
+        items: {
+          include: {
+            pricing: {
+              include: {
+                package: {
+                  include: { category: { select: { type: true } } },
+                },
+              },
+            },
+            assets: {
+              select: { id: true, fileUrl: true, fileSizeKb: true, assetType: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
+    }
+
+    return {
+      id: order.id,
+      status: order.status,
+      totalAmount: Number(order.subtotal),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      user: { id: order.user.id, email: order.user.email },
+      company: order.company
+        ? {
+            id: order.company.id,
+            nameVi: order.company.companyNameVi,
+            nameCn: order.company.companyNameCn,
+            email: order.company.email,
+            contactName: order.company.contactName ?? '',
+            phone: order.company.phone,
+          }
+        : { id: '', nameVi: '', nameCn: '', email: '', contactName: '', phone: '' },
+      items: order.items.map((item) => ({
+        id: item.id,
+        pricingId: item.pricingId,
+        packageId: item.pricing.packageId,
+        packageName: item.pricing.package.name,
+        packageType: item.pricing.package.type,
+        pricingName: `${item.durationValue || 'N/A'} ${item.durationUnit || ''}`.trim(),
+        pricingModel: item.pricing.pricingModel,
+        categoryType: item.pricing.package.category?.type ?? null,
+        durationValue: item.durationValue ?? item.pricing.durationValue ?? null,
+        durationUnit: item.durationUnit ?? item.pricing.durationUnit ?? null,
+        price: Number(item.unitPrice),
+        designServiceRequired: item.designServiceRequired,
+        startDate: item.startDate,
+        adLinkUrl: item.adLinkUrl ?? undefined,
+        assets: item.assets.map((a) => ({
+          id: a.id,
+          fileUrl: a.fileUrl ?? '',
+          fileSizeKb: a.fileSizeKb ?? 0,
+          assetType: a.assetType,
+        })),
+        packageMetadata:
+          (item.pricing.package.metadata as Record<string, unknown>) ?? null,
+      })),
+    };
+  }
+
+  /**
+   * Admin method to edit a DRAFT or PENDING order:
+   * - Update notes / per-item fields / replace assets on existing items
+   * - Append Homepage Popup add-on items (POPUP_VIEW_DETAILS_LINK, POPUP_RANKING_ADJUSTMENT)
+   * - Recalculates subtotal based on all changes
+   */
+  async adminEditPendingOrder(
+    orderId: string,
+    adminUserId: string,
+    dto: AdminEditPendingOrderDto,
+  ): Promise<AdOrderSummary> {
+    const ADDON_ALLOWED_TYPES: AdPackageType[] = [
+      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      AdPackageType.POPUP_RANKING_ADJUSTMENT,
+    ];
+    const BASE_POPUP_TYPES: AdPackageType[] = [
+      AdPackageType.POPUP_PRIORITY_SLOT,
+      AdPackageType.POPUP_ROTATION_SLOT,
+    ];
+
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // 1. Fetch order with items + assets + package type (needed for add-on validation)
+      const order = await tx.adOrder.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              assets: true,
+              pricing: { include: { package: true } },
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
+      }
+      if (
+        order.status !== AdOrderStatus.DRAFT &&
+        order.status !== AdOrderStatus.PENDING
+      ) {
+        throw new BadRequestException(AdOrdersErrors.ORDER_NOT_EDITABLE);
+      }
+
+      const itemById = new Map(order.items.map((i) => [i.id, i]));
+
+      // 0. Pre-validate: block if all items would be removed
+      const deleteCount = dto.deleteItemIds?.length ?? 0;
+      const addCount = dto.newItems?.length ?? 0;
+      const remainingCount = order.items.length - deleteCount + addCount;
+      if (remainingCount <= 0) {
+        throw new BadRequestException(AdOrdersErrors.ORDER_CANNOT_BE_EMPTY);
+      }
+
+      // 2a. Edit existing items
+      if (dto.items && dto.items.length > 0) {
+        for (const edit of dto.items) {
+          if (!itemById.has(edit.itemId)) {
+            throw new BadRequestException(AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER);
+          }
+
+          const updateData: Prisma.AdOrderItemUpdateInput = {};
+          if (edit.adLinkUrl !== undefined) updateData.adLinkUrl = edit.adLinkUrl;
+          if (edit.startDate !== undefined)
+            updateData.startDate = new Date(edit.startDate);
+          if (edit.designServiceRequired !== undefined)
+            updateData.designServiceRequired = edit.designServiceRequired;
+
+          if (Object.keys(updateData).length > 0) {
+            await tx.adOrderItem.update({
+              where: { id: edit.itemId },
+              data: updateData,
+            });
+          }
+
+          if (edit.assets !== undefined) {
+            await tx.adOrderAsset.deleteMany({ where: { orderItemId: edit.itemId } });
+            if (edit.assets.length > 0) {
+              await tx.adOrderAsset.createMany({
+                data: edit.assets.map((a) => ({
+                  orderItemId: edit.itemId,
+                  assetType: a.assetType,
+                  fileUrl: a.fileUrl,
+                  fileSizeKb: a.fileSizeKb ?? null,
+                  notes: a.notes ?? null,
+                })),
+              });
+            }
+          }
+        }
+      }
+
+      // 2b. Delete items
+      let deleteSubtotalDelta = BigInt(0);
+      if (dto.deleteItemIds && dto.deleteItemIds.length > 0) {
+        for (const itemId of dto.deleteItemIds) {
+          if (!itemById.has(itemId)) {
+            throw new BadRequestException(AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER);
+          }
+          deleteSubtotalDelta += BigInt(itemById.get(itemId)!.lineTotal.toString());
+        }
+        await tx.adOrderItem.deleteMany({
+          where: { id: { in: dto.deleteItemIds } },
+        });
+      }
+
+      // 2c. Add add-on items (POPUP_VIEW_DETAILS_LINK or POPUP_RANKING_ADJUSTMENT only)
+      let addSubtotalDelta = BigInt(0);
+      if (dto.newItems && dto.newItems.length > 0) {
+        // Validate order has a base Homepage Popup package after pending deletions
+        const deletingIds = new Set(dto.deleteItemIds ?? []);
+        const hasBasePopup = order.items
+          .filter((i) => !deletingIds.has(i.id))
+          .some((i) => BASE_POPUP_TYPES.includes(i.pricing.package.type));
+        if (!hasBasePopup) {
+          throw new BadRequestException(AdOrdersErrors.ADDON_REQUIRES_BASE_PACKAGE);
+        }
+
+        const pricingIds = dto.newItems.map((i) => i.pricingId);
+        const pricingRecords = await tx.adPackagePricing.findMany({
+          where: { id: { in: pricingIds }, isActive: true, deletedAt: null },
+          include: { package: true },
+        });
+
+        if (pricingRecords.length !== pricingIds.length) {
+          throw new BadRequestException(AdOrdersErrors.INVALID_PRICING_SET);
+        }
+
+        for (const pricing of pricingRecords) {
+          if (!ADDON_ALLOWED_TYPES.includes(pricing.package.type)) {
+            throw new BadRequestException(AdOrdersErrors.ADDON_INVALID_TYPE);
+          }
+        }
+
+        const pricingMap = new Map(pricingRecords.map((p) => [p.id, p]));
+
+        for (const newItem of dto.newItems) {
+          const pricing = pricingMap.get(newItem.pricingId)!;
+          const lineTotal = pricing.finalPrice;
+
+          await tx.adOrderItem.create({
+            data: {
+              orderId,
+              packageId: pricing.packageId,
+              pricingId: pricing.id,
+              durationValue: pricing.durationValue ?? null,
+              durationUnit: pricing.durationUnit ?? null,
+              startDate: new Date(newItem.startDate),
+              designServiceRequired: newItem.designServiceRequired,
+              adLinkUrl: newItem.adLinkUrl ?? '',
+              unitPrice: pricing.finalPrice,
+              quantity: 1,
+              lineTotal,
+            },
+          });
+
+          addSubtotalDelta += BigInt(lineTotal.toString());
+        }
+      }
+
+      // 2d. Update order-level fields + recalculate subtotal
+      const subtotalDelta = addSubtotalDelta - deleteSubtotalDelta;
+      const orderUpdate: Prisma.AdOrderUpdateInput = {
+        lastUpdatedBy: adminUserId,
+        lastUpdatedAt: new Date(),
+      };
+      if (dto.notes !== undefined) orderUpdate.notes = dto.notes;
+      if (subtotalDelta !== BigInt(0)) {
+        orderUpdate.subtotal =
+          subtotalDelta > BigInt(0)
+            ? { increment: subtotalDelta }
+            : { decrement: -subtotalDelta };
+      }
+
+      await tx.adOrder.update({ where: { id: orderId }, data: orderUpdate });
+
+      // 3. Reload full order for response
+      return tx.adOrder.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { items: { include: { assets: true } } },
+      });
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.AD_ORDER_UPDATED,
+      entityType: AUDIT_ENTITY.AD_ORDER,
+      entityId: orderId,
+      actorId: adminUserId,
+      metadata: {
+        updatedItemCount: dto.items?.length ?? 0,
+        deletedItemCount: dto.deleteItemIds?.length ?? 0,
+        addedItemCount: dto.newItems?.length ?? 0,
+      },
+    });
+
+    return this.mapOrderToSummary(updatedOrder);
   }
 
   /**

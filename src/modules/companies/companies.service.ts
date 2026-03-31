@@ -301,6 +301,81 @@ export class CompaniesService {
   }
 
   /**
+   * Build a CompanyWithAdsResponseDto from a raw company record and virtual ActiveAdInfo[].
+   * Used by the ad order preview to simulate effects without real ActiveAd records.
+   */
+  buildPreviewCompanyItem(
+    company: {
+      id: string;
+      companyNameVi: string | null;
+      companyNameCn: string | null;
+      logoUrl: string | null;
+      email: string;
+      contactName: string | null;
+      phone: string;
+      industry: string;
+      country: string | null;
+      address: string;
+      description: string;
+    },
+    virtualAds: ActiveAdInfo[],
+    requiredSlotTypes: AdPackageType[],
+    orderItems: Array<{
+      id: string;
+      adLinkUrl: string;
+      package: { type: AdPackageType; metadata: unknown };
+      assets: Array<{ fileUrl: string | null; assetType: string }>;
+    }>,
+  ): CompanyWithAdsResponseDto {
+    const name =
+      company.companyNameVi ?? company.companyNameCn ?? company.email;
+    const companyData: CompanyData = {
+      id: company.id,
+      name,
+      email: company.email,
+      contactName: company.contactName ?? '',
+      phone: company.phone,
+      industry: company.industry,
+      country: company.country ?? undefined,
+      address: company.address,
+      description: company.description,
+      showDetailsButton: false,
+    };
+
+    const modified = this.adEffectsRegistry.applyEffects(companyData, virtualAds);
+
+    const requiredSlotTypeSet = new Set(requiredSlotTypes);
+    const activeAdAssets = orderItems
+      .filter((i) => requiredSlotTypeSet.has(i.package.type))
+      .map((i) => ({
+        adId: i.id,
+        packageType: i.package.type,
+        assets: i.assets
+          .filter((a) => Boolean(a.fileUrl))
+          .map((a) => ({ fileUrl: a.fileUrl!, assetType: a.assetType })),
+      }));
+
+    return {
+      id: company.id,
+      name,
+      logoUrl: company.logoUrl,
+      email: company.email,
+      contactName: company.contactName ?? '',
+      phone: company.phone,
+      industry: company.industry,
+      country: company.country,
+      address: company.address,
+      description: company.description,
+      featuredHighlight: modified.featuredHighlight ?? false,
+      companyInfoHighlight: modified.companyInfoHighlight ?? false,
+      showDetailsButton: modified.showDetailsButton ?? false,
+      adLinkUrl: modified.adLinkUrl,
+      metadata: { activeAdAssets },
+      sortPriority: modified.sortPriority ?? 0,
+    };
+  }
+
+  /**
    * Get companies with POPUP_PRIORITY_SLOT or POPUP_ROTATION_SLOT ads.
    * Computes effects on the fly using active ads and the ad effects registry.
    */

@@ -12,7 +12,9 @@ import {
   Prisma,
 } from '@prisma/client';
 import { Readable } from 'stream';
+import { ROLE_HIERARCHY, Role } from '../../common/enums/role.enum';
 import { PointsSource } from '../../common/enums/points-source.enum';
+import type { UserPayload } from '../../common/interfaces/user-payload.interface';
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -21,7 +23,9 @@ import { AuditService } from '../audit/audit.service';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { SLOT_CAPACITY } from '../ads/ads.constants';
 import { ActiveAdsService } from '../active-ads/active-ads.service';
+import { CompaniesService } from '../companies/companies.service';
 import { AdOrdersErrors } from './ad-orders.errors';
+import type { AdOrderPreviewResponseDto } from './dto/ad-order-preview-response.dto';
 import type {
   AdminListOrdersQueryDto,
   AdminOrderDto,
@@ -97,6 +101,7 @@ export class AdOrdersService {
     private readonly loyaltyService: LoyaltyService,
     private readonly auditService: AuditService,
     private readonly activeAdsService: ActiveAdsService,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   /**
@@ -1503,5 +1508,134 @@ export class AdOrdersService {
     }
 
     return end;
+  }
+
+  async getAdOrderPreview(
+    user: UserPayload,
+    orderId: string,
+  ): Promise<AdOrderPreviewResponseDto> {
+    const order = await this.prisma.adOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        company: true,
+        items: {
+          include: {
+            package: { select: { type: true, metadata: true } },
+            assets: { select: { fileUrl: true, assetType: true } },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
+    }
+
+    const isAdmin =
+      ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[Role.ADMIN];
+    if (order.userId !== user.userId && !isAdmin) {
+      throw new ForbiddenException(AdOrdersErrors.ORDER_ACCESS_DENIED);
+    }
+
+    if (!order.company) {
+      throw new NotFoundException(AdOrdersErrors.COMPANY_NOT_FOUND);
+    }
+
+    const { company, items } = order;
+
+    const POPUP_PRIORITY_TYPES = [
+      AdPackageType.POPUP_PRIORITY_SLOT,
+      AdPackageType.POPUP_RANKING_ADJUSTMENT,
+      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+    ] as const;
+    const POPUP_ROTATIONAL_TYPES = [
+      AdPackageType.POPUP_ROTATION_SLOT,
+      AdPackageType.POPUP_RANKING_ADJUSTMENT,
+      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+    ] as const;
+    const FEATURED_TYPES = [
+      AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
+      AdPackageType.FEATURED_HIGHLIGHT_BOOST,
+    ] as const;
+
+    const hasPrioritySlot = items.some(
+      (i) => i.package.type === AdPackageType.POPUP_PRIORITY_SLOT,
+    );
+    const hasRotationalSlot = items.some(
+      (i) => i.package.type === AdPackageType.POPUP_ROTATION_SLOT,
+    );
+    const hasFeaturedSlot = items.some(
+      (i) => i.package.type === AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
+    );
+
+    const [livePriority, liveRotational, liveFeatured] = await Promise.all([
+      this.companiesService.getPopupPriorityCompanies(),
+      this.companiesService.getPopupRotationalCompanies(),
+      this.companiesService.getFeaturedCompanies(),
+    ]);
+
+    const basePriority = livePriority.filter((c) => c.id !== company.id);
+    const baseRotational = liveRotational.filter((c) => c.id !== company.id);
+    const baseFeatured = liveFeatured.filter((c) => c.id !== company.id);
+
+    const buildVirtualAds = (
+      types: readonly AdPackageType[],
+    ) => {
+      const typeSet = new Set(types);
+      return items
+        .filter((i) => typeSet.has(i.package.type))
+        .map((i) => ({
+          id: i.id,
+          companyId: company.id,
+          packageType: i.package.type,
+          orderItemId: i.id,
+          adLinkUrl: i.adLinkUrl ?? null,
+          metadata:
+            (i.package.metadata as Record<string, unknown>) ?? {},
+        }));
+    };
+
+    const popupPriority = hasPrioritySlot
+      ? [
+          ...basePriority,
+          this.companiesService.buildPreviewCompanyItem(
+            company,
+            buildVirtualAds(POPUP_PRIORITY_TYPES),
+            [AdPackageType.POPUP_PRIORITY_SLOT],
+            items,
+          ),
+        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
+      : basePriority;
+
+    const popupRotational = hasRotationalSlot
+      ? [
+          ...baseRotational,
+          this.companiesService.buildPreviewCompanyItem(
+            company,
+            buildVirtualAds(POPUP_ROTATIONAL_TYPES),
+            [AdPackageType.POPUP_ROTATION_SLOT],
+            items,
+          ),
+        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
+      : baseRotational;
+
+    const featuredCompanies = hasFeaturedSlot
+      ? [
+          ...baseFeatured,
+          this.companiesService.buildPreviewCompanyItem(
+            company,
+            buildVirtualAds(FEATURED_TYPES),
+            [AdPackageType.FEATURED_HOMEPAGE_DISPLAY],
+            items,
+          ),
+        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
+      : baseFeatured;
+
+    return {
+      orderId: order.id,
+      popupPriority,
+      popupRotational,
+      featuredCompanies,
+    };
   }
 }

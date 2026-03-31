@@ -137,7 +137,7 @@ export class AdminEditPendingOrderDto {
   deleteItemIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Homepage Popup add-on items to append (POPUP_VIEW_DETAILS_LINK or POPUP_RANKING_ADJUSTMENT only)',
+    description: 'Homepage Popup add-on items to append (POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK, or POPUP_RANKING_ADJUSTMENT only)',
     type: [AdminNewOrderItemDto],
   })
   @IsOptional()

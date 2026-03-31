@@ -1288,7 +1288,7 @@ export class AdOrdersService {
   /**
    * Admin method to edit a DRAFT or PENDING order:
    * - Update notes / per-item fields / replace assets on existing items
-   * - Append Homepage Popup add-on items (POPUP_VIEW_DETAILS_LINK, POPUP_RANKING_ADJUSTMENT)
+   * - Append Homepage Popup add-on items (POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK, POPUP_RANKING_ADJUSTMENT)
    * - Recalculates subtotal based on all changes
    */
   async adminEditPendingOrder(
@@ -1297,12 +1297,9 @@ export class AdOrdersService {
     dto: AdminEditPendingOrderDto,
   ): Promise<AdOrderSummary> {
     const ADDON_ALLOWED_TYPES: AdPackageType[] = [
-      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
+      AdPackageType.POPUP_ROTATION_DETAILS_LINK,
       AdPackageType.POPUP_RANKING_ADJUSTMENT,
-    ];
-    const BASE_POPUP_TYPES: AdPackageType[] = [
-      AdPackageType.POPUP_PRIORITY_SLOT,
-      AdPackageType.POPUP_ROTATION_SLOT,
     ];
 
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
@@ -1400,20 +1397,9 @@ export class AdOrdersService {
         });
       }
 
-      // 2c. Add add-on items (POPUP_VIEW_DETAILS_LINK or POPUP_RANKING_ADJUSTMENT only)
+      // 2c. Add add-on items (POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK, or POPUP_RANKING_ADJUSTMENT only)
       let addSubtotalDelta = BigInt(0);
       if (dto.newItems && dto.newItems.length > 0) {
-        // Validate order has a base Homepage Popup package after pending deletions
-        const deletingIds = new Set(dto.deleteItemIds ?? []);
-        const hasBasePopup = order.items
-          .filter((i) => !deletingIds.has(i.id))
-          .some((i) => BASE_POPUP_TYPES.includes(i.pricing.package.type));
-        if (!hasBasePopup) {
-          throw new BadRequestException(
-            AdOrdersErrors.ADDON_REQUIRES_BASE_PACKAGE,
-          );
-        }
-
         const pricingIds = dto.newItems.map((i) => i.pricingId);
         const pricingRecords = await tx.adPackagePricing.findMany({
           where: { id: { in: pricingIds }, isActive: true, deletedAt: null },

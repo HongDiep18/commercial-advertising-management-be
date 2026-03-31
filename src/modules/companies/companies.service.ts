@@ -1,9 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import {
   AdPackageType,
@@ -12,10 +12,6 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
-import {
-  CompanyMaskingService,
-  type MaskingContext,
-} from './company-masking.service';
 import type {
   ActiveAdInfo,
   CompanyData,
@@ -23,6 +19,10 @@ import type {
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
+import {
+  CompanyMaskingService,
+  type MaskingContext,
+} from './company-masking.service';
 import type { CompanyDetailResponseDto } from './dto/company-detail.dto';
 import type {
   CompanyCategoriesResponseDto,
@@ -292,9 +292,7 @@ export class CompaniesService {
       id: ad.id,
       companyId: ad.companyId,
       packageType: ad.packageType,
-      orderItemId: ad.orderItemId,
-      adLinkUrl: ad.orderItem?.adLinkUrl ?? ad.adLinkUrl ?? null,
-      metadata: (ad.pricing.package.metadata as Record<string, unknown>) || {},
+      adLinkUrl: ad.adLinkUrl,
     }));
 
     return this.adEffectsRegistry.applyEffects(companyData, activeAds);
@@ -342,7 +340,10 @@ export class CompaniesService {
       showDetailsButton: false,
     };
 
-    const modified = this.adEffectsRegistry.applyEffects(companyData, virtualAds);
+    const modified = this.adEffectsRegistry.applyEffects(
+      companyData,
+      virtualAds,
+    );
 
     const requiredSlotTypeSet = new Set(requiredSlotTypes);
     const activeAdAssets = orderItems
@@ -396,7 +397,7 @@ export class CompaniesService {
       [
         AdPackageType.POPUP_PRIORITY_SLOT,
         AdPackageType.POPUP_RANKING_ADJUSTMENT,
-        AdPackageType.POPUP_VIEW_DETAILS_LINK,
+        AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
       ],
     );
   }
@@ -411,7 +412,7 @@ export class CompaniesService {
       [
         AdPackageType.POPUP_ROTATION_SLOT,
         AdPackageType.POPUP_RANKING_ADJUSTMENT,
-        AdPackageType.POPUP_VIEW_DETAILS_LINK,
+        AdPackageType.POPUP_ROTATION_DETAILS_LINK,
       ],
     );
   }
@@ -422,7 +423,7 @@ export class CompaniesService {
   ): Promise<CompanyWithAdsResponseDto[]> {
     const now = new Date();
 
-    const queryArgs: Prisma.CompanyFindManyArgs = {
+    const companies = (await this.prisma.company.findMany({
       where: {
         activeAds: {
           some: {
@@ -470,11 +471,7 @@ export class CompaniesService {
           },
         },
       },
-    } as const;
-
-    const companies = (await this.prisma.company.findMany(
-      queryArgs as unknown as Prisma.CompanyFindManyArgs,
-    )) as unknown as CompanyWithActiveAdsRecord[];
+    })) as CompanyWithActiveAdsRecord[];
 
     const responses: CompanyWithAdsResponseDto[] = companies.map((company) => {
       const modified = this.applyEffectsToCompany(company);
@@ -583,9 +580,7 @@ export class CompaniesService {
       const metadata: Record<string, unknown> = {
         printPlacements: printPlacementAds.map((ad) => ({
           adId: ad.id,
-          orderItemId: ad.orderItemId,
-          metadata:
-            (ad.pricing.package.metadata as Record<string, unknown>) || {},
+          adLinkUrl: ad.adLinkUrl,
         })),
       };
 

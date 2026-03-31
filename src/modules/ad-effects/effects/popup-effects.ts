@@ -31,21 +31,23 @@ export class PopupSlotEffect implements AdEffect {
 }
 
 /**
- * Effect for POPUP_VIEW_DETAILS_LINK
+ * Effect for POPUP_VIEW_DETAILS_LINK, POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK
  * Enables details button and adds ad_link_url when available
  */
 export class PopupViewDetailsLinkEffect implements AdEffect {
-  readonly packageType = AdPackageType.POPUP_VIEW_DETAILS_LINK;
+  readonly packageType: AdPackageType;
+
+  constructor(packageType: AdPackageType) {
+    this.packageType = packageType;
+  }
 
   shouldApply(activeAds: ActiveAdInfo[]): boolean {
-    return activeAds.some(
-      (ad) => ad.packageType === AdPackageType.POPUP_VIEW_DETAILS_LINK,
-    );
+    return activeAds.some((ad) => ad.packageType === this.packageType);
   }
 
   apply(context: AdEffectContext): CompanyData {
     const viewDetailsAd = context.activeAds.find(
-      (ad) => ad.packageType === AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      (ad) => ad.packageType === this.packageType,
     );
 
     if (!viewDetailsAd) {

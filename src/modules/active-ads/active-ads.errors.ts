@@ -25,7 +25,8 @@ export const ActiveAdsErrors = {
   },
   INVALID_ADDON_PACKAGE_TYPE: {
     code: 'ACTIVE_ADS_INVALID_ADDON_PACKAGE_TYPE',
-    message: 'Only popup ranking adjustment or view-details link add-ons are allowed',
+    message:
+      'Only popup ranking adjustment or view-details link add-ons are allowed',
   },
   ACTIVE_AD_ASSETS_FILES_REQUIRED: {
     code: 'ACTIVE_ADS_ACTIVE_AD_ASSETS_FILES_REQUIRED',

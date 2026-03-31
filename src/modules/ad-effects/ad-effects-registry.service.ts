@@ -37,7 +37,15 @@ export class AdEffectsRegistryService {
     // Popup effects
     this.register(new PopupSlotEffect(AdPackageType.POPUP_PRIORITY_SLOT));
     this.register(new PopupSlotEffect(AdPackageType.POPUP_ROTATION_SLOT));
-    this.register(new PopupViewDetailsLinkEffect());
+    this.register(
+      new PopupViewDetailsLinkEffect(AdPackageType.POPUP_VIEW_DETAILS_LINK),
+    );
+    this.register(
+      new PopupViewDetailsLinkEffect(AdPackageType.POPUP_PRIORITY_DETAILS_LINK),
+    );
+    this.register(
+      new PopupViewDetailsLinkEffect(AdPackageType.POPUP_ROTATION_DETAILS_LINK),
+    );
     this.register(new PopupRankingAdjustmentEffect());
 
     // Featured effects

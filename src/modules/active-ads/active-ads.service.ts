@@ -510,6 +510,8 @@ export class ActiveAdsService {
     const allowed: AdPackageType[] = [
       AdPackageType.POPUP_RANKING_ADJUSTMENT,
       AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
+      AdPackageType.POPUP_ROTATION_DETAILS_LINK,
     ];
     if (!allowed.includes(input.packageType)) {
       throw new BadRequestException(ActiveAdsErrors.INVALID_ADDON_PACKAGE_TYPE);

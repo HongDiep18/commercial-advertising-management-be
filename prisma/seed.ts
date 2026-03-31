@@ -738,6 +738,28 @@ async function seedAdPackages(): Promise<void> {
     },
     {
       categoryType: AdCategoryType.HOMEPAGE_POPUP,
+      type: AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
+      name: '"View Details" Link (Priority Slot)',
+      nameZh: '「查看詳情」連結（優先位）',
+      description:
+        'Adds a clickable "View Details" link to the Priority Slot (position 1) popup advertisement. Single-use, one-time fee.',
+      pricingModel: PricingModel.ONE_TIME,
+      metadata: { action: 'attach_view_details_link', slot: 'priority' },
+      sortOrder: 3,
+    },
+    {
+      categoryType: AdCategoryType.HOMEPAGE_POPUP,
+      type: AdPackageType.POPUP_ROTATION_DETAILS_LINK,
+      name: '"View Details" Link (Rotation Slot)',
+      nameZh: '「查看詳情」連結（輪播位）',
+      description:
+        'Adds a clickable "View Details" link to the Rotation Slot (positions 2–5) popup advertisement. Single-use, one-time fee.',
+      pricingModel: PricingModel.ONE_TIME,
+      metadata: { action: 'attach_view_details_link', slot: 'rotation' },
+      sortOrder: 4,
+    },
+    {
+      categoryType: AdCategoryType.HOMEPAGE_POPUP,
       type: AdPackageType.POPUP_RANKING_ADJUSTMENT,
       name: 'Ranking Adjustment (Promoting Rank)',
       nameZh: '排名調整（提升排名）',
@@ -749,7 +771,7 @@ async function seedAdPackages(): Promise<void> {
         min_quantity: 1,
         max_quantity: 10,
       },
-      sortOrder: 4,
+      sortOrder: 5,
     },
     // featured_company
     {
@@ -1147,6 +1169,12 @@ async function seedAdPackages(): Promise<void> {
     packageIdByKey.set(key, pkg.id);
   }
 
+  // Deactivate legacy POPUP_VIEW_DETAILS_LINK packages
+  await prisma.adPackage.updateMany({
+    where: { type: AdPackageType.POPUP_VIEW_DETAILS_LINK },
+    data: { isActive: false },
+  });
+
   console.log('  ✓ Ad packages seeded');
 
   console.log('Seeding ad package pricing...');
@@ -1239,6 +1267,26 @@ async function seedAdPackages(): Promise<void> {
     // popup_view_details_link (one_time)
     {
       packageKey: `${AdPackageType.POPUP_VIEW_DETAILS_LINK}:"View Details" Link Setting`,
+      pricingModel: PricingModel.ONE_TIME,
+      durationValue: null,
+      durationUnit: null,
+      basePrice: BigInt(500_000),
+      discountRate: 0,
+      finalPrice: BigInt(500_000),
+    },
+    // popup_priority_details_link (one_time)
+    {
+      packageKey: `${AdPackageType.POPUP_PRIORITY_DETAILS_LINK}:"View Details" Link (Priority Slot)`,
+      pricingModel: PricingModel.ONE_TIME,
+      durationValue: null,
+      durationUnit: null,
+      basePrice: BigInt(500_000),
+      discountRate: 0,
+      finalPrice: BigInt(500_000),
+    },
+    // popup_rotation_details_link (one_time)
+    {
+      packageKey: `${AdPackageType.POPUP_ROTATION_DETAILS_LINK}:"View Details" Link (Rotation Slot)`,
       pricingModel: PricingModel.ONE_TIME,
       durationValue: null,
       durationUnit: null,

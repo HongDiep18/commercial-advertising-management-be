@@ -12,18 +12,18 @@ import {
   Prisma,
 } from '@prisma/client';
 import { Readable } from 'stream';
-import { ROLE_HIERARCHY, Role } from '../../common/enums/role.enum';
 import { PointsSource } from '../../common/enums/points-source.enum';
+import { ROLE_HIERARCHY, Role } from '../../common/enums/role.enum';
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
 import { PrismaService } from '../../database/prisma.service';
+import { ActiveAdsService } from '../active-ads/active-ads.service';
+import { SLOT_CAPACITY } from '../ads/ads.constants';
+import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
+import { AuditService } from '../audit/audit.service';
+import { CompaniesService } from '../companies/companies.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
-import { AuditService } from '../audit/audit.service';
-import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
-import { SLOT_CAPACITY } from '../ads/ads.constants';
-import { ActiveAdsService } from '../active-ads/active-ads.service';
-import { CompaniesService } from '../companies/companies.service';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type { AdOrderPreviewResponseDto } from './dto/ad-order-preview-response.dto';
 import type {
@@ -1217,7 +1217,12 @@ export class AdOrdersService {
               },
             },
             assets: {
-              select: { id: true, fileUrl: true, fileSizeKb: true, assetType: true },
+              select: {
+                id: true,
+                fileUrl: true,
+                fileSizeKb: true,
+                assetType: true,
+              },
             },
           },
         },
@@ -1244,14 +1249,22 @@ export class AdOrdersService {
             contactName: order.company.contactName ?? '',
             phone: order.company.phone,
           }
-        : { id: '', nameVi: '', nameCn: '', email: '', contactName: '', phone: '' },
+        : {
+            id: '',
+            nameVi: '',
+            nameCn: '',
+            email: '',
+            contactName: '',
+            phone: '',
+          },
       items: order.items.map((item) => ({
         id: item.id,
         pricingId: item.pricingId,
         packageId: item.pricing.packageId,
         packageName: item.pricing.package.name,
         packageType: item.pricing.package.type,
-        pricingName: `${item.durationValue || 'N/A'} ${item.durationUnit || ''}`.trim(),
+        pricingName:
+          `${item.durationValue || 'N/A'} ${item.durationUnit || ''}`.trim(),
         pricingModel: item.pricing.pricingModel,
         categoryType: item.pricing.package.category?.type ?? null,
         durationValue: item.durationValue ?? item.pricing.durationValue ?? null,
@@ -1330,11 +1343,14 @@ export class AdOrdersService {
       if (dto.items && dto.items.length > 0) {
         for (const edit of dto.items) {
           if (!itemById.has(edit.itemId)) {
-            throw new BadRequestException(AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER);
+            throw new BadRequestException(
+              AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER,
+            );
           }
 
           const updateData: Prisma.AdOrderItemUpdateInput = {};
-          if (edit.adLinkUrl !== undefined) updateData.adLinkUrl = edit.adLinkUrl;
+          if (edit.adLinkUrl !== undefined)
+            updateData.adLinkUrl = edit.adLinkUrl;
           if (edit.startDate !== undefined)
             updateData.startDate = new Date(edit.startDate);
           if (edit.designServiceRequired !== undefined)
@@ -1348,7 +1364,9 @@ export class AdOrdersService {
           }
 
           if (edit.assets !== undefined) {
-            await tx.adOrderAsset.deleteMany({ where: { orderItemId: edit.itemId } });
+            await tx.adOrderAsset.deleteMany({
+              where: { orderItemId: edit.itemId },
+            });
             if (edit.assets.length > 0) {
               await tx.adOrderAsset.createMany({
                 data: edit.assets.map((a) => ({
@@ -1369,9 +1387,13 @@ export class AdOrdersService {
       if (dto.deleteItemIds && dto.deleteItemIds.length > 0) {
         for (const itemId of dto.deleteItemIds) {
           if (!itemById.has(itemId)) {
-            throw new BadRequestException(AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER);
+            throw new BadRequestException(
+              AdOrdersErrors.EDIT_ITEM_NOT_IN_ORDER,
+            );
           }
-          deleteSubtotalDelta += BigInt(itemById.get(itemId)!.lineTotal.toString());
+          deleteSubtotalDelta += BigInt(
+            itemById.get(itemId)!.lineTotal.toString(),
+          );
         }
         await tx.adOrderItem.deleteMany({
           where: { id: { in: dto.deleteItemIds } },
@@ -1387,7 +1409,9 @@ export class AdOrdersService {
           .filter((i) => !deletingIds.has(i.id))
           .some((i) => BASE_POPUP_TYPES.includes(i.pricing.package.type));
         if (!hasBasePopup) {
-          throw new BadRequestException(AdOrdersErrors.ADDON_REQUIRES_BASE_PACKAGE);
+          throw new BadRequestException(
+            AdOrdersErrors.ADDON_REQUIRES_BASE_PACKAGE,
+          );
         }
 
         const pricingIds = dto.newItems.map((i) => i.pricingId);
@@ -1531,8 +1555,7 @@ export class AdOrdersService {
       throw new NotFoundException(AdOrdersErrors.ORDER_NOT_FOUND);
     }
 
-    const isAdmin =
-      ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[Role.ADMIN];
+    const isAdmin = ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[Role.ADMIN];
     if (order.userId !== user.userId && !isAdmin) {
       throw new ForbiddenException(AdOrdersErrors.ORDER_ACCESS_DENIED);
     }
@@ -1546,12 +1569,12 @@ export class AdOrdersService {
     const POPUP_PRIORITY_TYPES = [
       AdPackageType.POPUP_PRIORITY_SLOT,
       AdPackageType.POPUP_RANKING_ADJUSTMENT,
-      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
     ] as const;
     const POPUP_ROTATIONAL_TYPES = [
       AdPackageType.POPUP_ROTATION_SLOT,
       AdPackageType.POPUP_RANKING_ADJUSTMENT,
-      AdPackageType.POPUP_VIEW_DETAILS_LINK,
+      AdPackageType.POPUP_ROTATION_DETAILS_LINK,
     ] as const;
     const FEATURED_TYPES = [
       AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
@@ -1568,19 +1591,7 @@ export class AdOrdersService {
       (i) => i.package.type === AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
     );
 
-    const [livePriority, liveRotational, liveFeatured] = await Promise.all([
-      this.companiesService.getPopupPriorityCompanies(),
-      this.companiesService.getPopupRotationalCompanies(),
-      this.companiesService.getFeaturedCompanies(),
-    ]);
-
-    const basePriority = livePriority.filter((c) => c.id !== company.id);
-    const baseRotational = liveRotational.filter((c) => c.id !== company.id);
-    const baseFeatured = liveFeatured.filter((c) => c.id !== company.id);
-
-    const buildVirtualAds = (
-      types: readonly AdPackageType[],
-    ) => {
+    const buildVirtualAds = (types: readonly AdPackageType[]) => {
       const typeSet = new Set(types);
       return items
         .filter((i) => typeSet.has(i.package.type))
@@ -1590,46 +1601,42 @@ export class AdOrdersService {
           packageType: i.package.type,
           orderItemId: i.id,
           adLinkUrl: i.adLinkUrl ?? null,
-          metadata:
-            (i.package.metadata as Record<string, unknown>) ?? {},
+          metadata: (i.package.metadata as Record<string, unknown>) ?? {},
         }));
     };
 
     const popupPriority = hasPrioritySlot
       ? [
-          ...basePriority,
           this.companiesService.buildPreviewCompanyItem(
             company,
             buildVirtualAds(POPUP_PRIORITY_TYPES),
             [AdPackageType.POPUP_PRIORITY_SLOT],
             items,
           ),
-        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
-      : basePriority;
+        ]
+      : [];
 
     const popupRotational = hasRotationalSlot
       ? [
-          ...baseRotational,
           this.companiesService.buildPreviewCompanyItem(
             company,
             buildVirtualAds(POPUP_ROTATIONAL_TYPES),
             [AdPackageType.POPUP_ROTATION_SLOT],
             items,
           ),
-        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
-      : baseRotational;
+        ]
+      : [];
 
     const featuredCompanies = hasFeaturedSlot
       ? [
-          ...baseFeatured,
           this.companiesService.buildPreviewCompanyItem(
             company,
             buildVirtualAds(FEATURED_TYPES),
             [AdPackageType.FEATURED_HOMEPAGE_DISPLAY],
             items,
           ),
-        ].sort((a, b) => (b.sortPriority ?? 0) - (a.sortPriority ?? 0))
-      : baseFeatured;
+        ]
+      : [];
 
     return {
       orderId: order.id,

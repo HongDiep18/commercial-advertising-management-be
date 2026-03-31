@@ -76,7 +76,7 @@ export const AdOrdersErrors = {
   ADDON_INVALID_TYPE: {
     code: 'AD_ORDER_ADDON_INVALID_TYPE',
     message:
-      'Add-on packages must be Homepage Popup add-ons (View Details Link or Ranking Adjustment)',
+      'Add-on packages must be Homepage Popup add-ons (Details Link or Ranking Adjustment)',
   },
   ADDON_REQUIRES_BASE_PACKAGE: {
     code: 'AD_ORDER_ADDON_REQUIRES_BASE',

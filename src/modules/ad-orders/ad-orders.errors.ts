@@ -39,6 +39,10 @@ export const AdOrdersErrors = {
     code: 'AD_ORDER_NOT_OWNER',
     message: 'You cannot modify this order',
   },
+  ORDER_ACCESS_DENIED: {
+    code: 'AD_ORDER_NOT_OWNER',
+    message: 'You do not have access to this order',
+  },
   ORDER_NOT_DRAFT: {
     code: 'AD_ORDER_NOT_DRAFT',
     message: 'Only draft orders can be updated with assets',

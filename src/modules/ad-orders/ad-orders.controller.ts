@@ -35,6 +35,7 @@ import {
   UserOrderHistoryQueryDto,
   UserOrderHistoryResponseDto,
 } from './dto/user-order-history.dto';
+import { AdOrderPreviewResponseDto } from './dto/ad-order-preview-response.dto';
 
 @ApiTags('Ad Orders')
 @ApiBearerAuth()
@@ -193,6 +194,33 @@ export class AdOrdersController {
     @Query() query: UserOrderHistoryQueryDto,
   ): Promise<UserOrderHistoryResponseDto> {
     return this.adOrdersService.getUserOrderHistory(user.userId, query);
+  }
+
+  /**
+   * Preview what the homepage would look like if this order were active
+   */
+  @Get(':orderId/preview')
+  @ApiOperation({
+    summary: 'Preview ad order homepage impact',
+    description:
+      'Simulates what the homepage would look like if this order were active. ' +
+      'Returns popupPriority, popupRotational, and featuredCompanies lists with the ' +
+      "ordering company injected at the appropriate position based on their purchased packages. " +
+      'Accessible by the order owner or any admin.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview data assembled successfully',
+    type: AdOrderPreviewResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Missing or invalid token' })
+  @ApiResponse({ status: 403, description: 'Not authorized to access this order (AD_ORDER_NOT_OWNER)' })
+  @ApiResponse({ status: 404, description: 'Order not found (AD_ORDER_NOT_FOUND) or order has no associated company (AD_ORDER_COMPANY_NOT_FOUND)' })
+  async getOrderPreview(
+    @CurrentUser() user: UserPayload,
+    @Param('orderId') orderId: string,
+  ): Promise<AdOrderPreviewResponseDto> {
+    return this.adOrdersService.getAdOrderPreview(user, orderId);
   }
 
   /**

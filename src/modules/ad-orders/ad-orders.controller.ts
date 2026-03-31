@@ -7,10 +7,10 @@ import {
   Param,
   Post,
   Query,
+  StreamableFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { StreamableFile } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -26,6 +26,7 @@ import { FileUploadService } from '../file-upload/file-upload.service';
 import { AdOrdersErrors } from './ad-orders.errors';
 import type { AdOrderSummary } from './ad-orders.service';
 import { AdOrdersService } from './ad-orders.service';
+import { AdOrderPreviewResponseDto } from './dto/ad-order-preview-response.dto';
 import { CreateAdOrderDto } from './dto/create-ad-order.dto';
 import {
   AttachAdOrderAssetsFormDto,
@@ -35,7 +36,6 @@ import {
   UserOrderHistoryQueryDto,
   UserOrderHistoryResponseDto,
 } from './dto/user-order-history.dto';
-import { AdOrderPreviewResponseDto } from './dto/ad-order-preview-response.dto';
 
 @ApiTags('Ad Orders')
 @ApiBearerAuth()
@@ -205,7 +205,7 @@ export class AdOrdersController {
     description:
       'Simulates what the homepage would look like if this order were active. ' +
       'Returns popupPriority, popupRotational, and featuredCompanies lists with the ' +
-      "ordering company injected at the appropriate position based on their purchased packages. " +
+      'ordering company injected at the appropriate position based on their purchased packages. ' +
       'Accessible by the order owner or any admin.',
   })
   @ApiResponse({
@@ -214,8 +214,15 @@ export class AdOrdersController {
     type: AdOrderPreviewResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Missing or invalid token' })
-  @ApiResponse({ status: 403, description: 'Not authorized to access this order (AD_ORDER_NOT_OWNER)' })
-  @ApiResponse({ status: 404, description: 'Order not found (AD_ORDER_NOT_FOUND) or order has no associated company (AD_ORDER_COMPANY_NOT_FOUND)' })
+  @ApiResponse({
+    status: 403,
+    description: 'Not authorized to access this order (AD_ORDER_NOT_OWNER)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Order not found (AD_ORDER_NOT_FOUND) or order has no associated company (AD_ORDER_COMPANY_NOT_FOUND)',
+  })
   async getOrderPreview(
     @CurrentUser() user: UserPayload,
     @Param('orderId') orderId: string,
@@ -245,7 +252,10 @@ export class AdOrdersController {
     },
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  @ApiResponse({ status: 403, description: 'Not authorized to access this order' })
+  @ApiResponse({
+    status: 403,
+    description: 'Not authorized to access this order',
+  })
   @Header('Content-Type', 'application/pdf')
   async downloadOrderInvoice(
     @CurrentUser() user: UserPayload,

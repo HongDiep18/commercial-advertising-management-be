@@ -12,6 +12,8 @@ import {
 const COMPANY_POPUP_ADDON_TYPES = [
   AdPackageType.POPUP_RANKING_ADJUSTMENT,
   AdPackageType.POPUP_VIEW_DETAILS_LINK,
+  AdPackageType.POPUP_PRIORITY_DETAILS_LINK,
+  AdPackageType.POPUP_ROTATION_DETAILS_LINK,
 ] as const;
 
 export class AdminCreateCompanyPopupAddonDto {

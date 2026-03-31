@@ -259,8 +259,10 @@ enum AdCategoryType {
 enum AdPackageType {
   POPUP_PRIORITY_SLOT      @map("popup_priority_slot")
   POPUP_ROTATION_SLOT      @map("popup_rotation_slot")
-  POPUP_VIEW_DETAILS_LINK  @map("popup_view_details_link")
-  POPUP_RANKING_ADJUSTMENT @map("popup_ranking_adjustment")
+  POPUP_VIEW_DETAILS_LINK     @map("popup_view_details_link")
+  POPUP_PRIORITY_DETAILS_LINK @map("popup_priority_details_link")
+  POPUP_ROTATION_DETAILS_LINK @map("popup_rotation_details_link")
+  POPUP_RANKING_ADJUSTMENT    @map("popup_ranking_adjustment")
 
   FEATURED_HOMEPAGE_DISPLAY @map("featured_homepage_display")
   FEATURED_HIGHLIGHT_BOOST  @map("featured_highlight_boost")

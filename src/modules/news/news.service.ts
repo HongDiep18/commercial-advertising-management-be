@@ -6,8 +6,6 @@ import { PrismaService } from '../../database/prisma.service';
 const isNotFound = (e: unknown) =>
   e instanceof Error && 'code' in e && e.code === 'P2025';
 
-const isDuplicateUrl = (e: unknown) =>
-  e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
 
 type IngestInput = {
   sourceSite: string;
@@ -113,14 +111,6 @@ export class NewsService {
         continue;
       }
 
-      // If the URL changed, make sure it isn't already owned by a different article
-      const urlConflict =
-        input.url !== existing.url && existingByUrl.has(input.url);
-      if (urlConflict) {
-        skipped += 1;
-        continue;
-      }
-
       toUpdate.push(input);
     }
 
@@ -157,29 +147,20 @@ export class NewsService {
           ? existingByGuid.get(`${input.sourceSite}::${input.guid}`)
           : undefined) ?? existingByUrl.get(input.url);
       if (!existing) continue;
-      try {
-        await this.prisma.newsArticle.update({
-          where: { id: existing.id },
-          data: {
-            categoryId: input.categoryId ?? null,
-            subcategoryId: input.subcategoryId ?? null,
-            guid: input.guid ?? null,
-            url: input.url,
-            title: input.title,
-            publishedAt: new Date(input.publishedAt),
-            thumbnailUrl: input.thumbnailUrl ?? null,
-            language: input.language ?? 'vi',
-            summaryVi: input.summaryVi ?? null,
-          },
-        });
-        updated += 1;
-      } catch (e) {
-        if (isDuplicateUrl(e)) {
-          skipped += 1;
-        } else {
-          throw e;
-        }
-      }
+      await this.prisma.newsArticle.update({
+        where: { id: existing.id },
+        data: {
+          categoryId: input.categoryId ?? null,
+          subcategoryId: input.subcategoryId ?? null,
+          guid: input.guid ?? null,
+          title: input.title,
+          publishedAt: new Date(input.publishedAt),
+          thumbnailUrl: input.thumbnailUrl ?? null,
+          language: input.language ?? 'vi',
+          summaryVi: input.summaryVi ?? null,
+        },
+      });
+      updated += 1;
     }
 
     return { created, updated, skipped };

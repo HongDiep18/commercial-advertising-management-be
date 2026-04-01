@@ -19,7 +19,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
+import type { AdOrderSummary } from './ad-orders.service';
 import { AdOrdersService } from './ad-orders.service';
+import type { AdminOrderDto } from './dto/admin-list-orders.dto';
 import {
   AdminListOrdersQueryDto,
   AdminListOrdersResponseDto,
@@ -30,8 +32,6 @@ import {
   AdminOrderActionResponseDto,
   AdminRejectOrderDto,
 } from './dto/admin-order-actions.dto';
-import type { AdOrderSummary } from './ad-orders.service';
-import type { AdminOrderDto } from './dto/admin-list-orders.dto';
 import { AdminOrdersMetricsResponseDto } from './dto/admin-orders-metrics.dto';
 
 @ApiTags('Admin - Ad Orders')
@@ -88,7 +88,8 @@ export class AdOrdersAdminController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get a single ad order by ID',
-    description: 'Retrieve full order details for admin. Admin and Super Admin only.',
+    description:
+      'Retrieve full order details for admin. Admin and Super Admin only.',
   })
   @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Order not found' })
@@ -103,14 +104,21 @@ export class AdOrdersAdminController {
       'Update order notes, existing item fields, replace item assets, or append Homepage Popup add-on packages. Recalculates subtotal when add-ons are added. Admin and Super Admin only.',
   })
   @ApiResponse({ status: 200, description: 'Order updated successfully' })
-  @ApiResponse({ status: 400, description: 'Validation error or order not editable' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or order not editable',
+  })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async editOrder(
     @Param('id') orderId: string,
     @CurrentUser() admin: UserPayload,
     @Body() dto: AdminEditPendingOrderDto,
   ): Promise<AdOrderSummary> {
-    return this.adOrdersService.adminEditPendingOrder(orderId, admin.userId, dto);
+    return this.adOrdersService.adminEditPendingOrder(
+      orderId,
+      admin.userId,
+      dto,
+    );
   }
 
   @Post(':id/approve')

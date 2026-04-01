@@ -11,6 +11,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthController } from './auth.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { AuthService } from './auth.service';
+import { CaptchaVerificationService } from './captcha-verification.service';
 
 @Module({
   imports: [
@@ -33,7 +34,13 @@ import { AuthService } from './auth.service';
     }),
   ],
   controllers: [AuthController, AdminUsersController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [
+    AuthService,
+    CaptchaVerificationService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+  ],
   exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule, JwtModule],
 })
 export class AuthModule {}

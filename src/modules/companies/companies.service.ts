@@ -5,11 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  AdPackageType,
-  CompanyProfileRequestStatus,
-  Prisma,
-} from '@prisma/client';
+import { AdPackageType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
 import type {
@@ -135,23 +131,8 @@ export class CompaniesService {
   }
 
   async getAdminApprovedCompanyStats(): Promise<{ approvedCount: number }> {
-    const approvedRequests = await this.prisma.companyProfileRequest.findMany({
-      where: { status: CompanyProfileRequestStatus.APPROVED },
-      select: { email: true },
-    });
-    const approvedEmails = [
-      ...new Set(
-        approvedRequests.map((request) =>
-          CompaniesService.normalizeCompanyEmail(request.email),
-        ),
-      ),
-    ];
-    if (approvedEmails.length === 0) {
-      return { approvedCount: 0 };
-    }
     const approvedCount = await this.prisma.company.count({
       where: {
-        email: { in: approvedEmails },
         ...CompaniesService.buildActiveUserCompanyWhere(),
       },
     });

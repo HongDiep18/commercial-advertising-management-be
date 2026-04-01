@@ -34,6 +34,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/enums';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { AuthService } from './auth.service';
+import { CaptchaVerificationService } from './captcha-verification.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -67,7 +68,8 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly fileUploadService: FileUploadService,
-  ) { }
+    private readonly captchaVerificationService: CaptchaVerificationService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -148,6 +150,25 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @Get('captcha')
+  @Public()
+  @ThrottleAuth()
+  @ApiOperation({
+    summary: 'Generate local text captcha challenge',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Returns captchaId + captchaText for frontend canvas rendering and submit verification.',
+  })
+  getCaptchaChallenge(): {
+    captchaId: string;
+    captchaText: string;
+    expiresInMs: number;
+  } {
+    return this.captchaVerificationService.createChallenge();
+  }
+
   @Post('forgot-password')
   @Public()
   @ThrottleAuth()
@@ -225,7 +246,10 @@ export class AuthController {
     status: 200,
     description: 'Industries selected successfully',
   })
-  @ApiResponse({ status: 400, description: 'Invalid request or already selected' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request or already selected',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updateIndustries(
     @CurrentUser('userId') userId: string,
@@ -237,10 +261,18 @@ export class AuthController {
   @Patch('profile-requests/:id/status')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Update a profile request status' })
-  @ApiResponse({ status: 200, description: 'Profile request updated' })
+  @ApiOperation({
+    summary:
+      'Update company registration status (pending / approved / rejected)',
+    description:
+      ':id is the company UUID (same id as in GET all-profile-requests).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Company registration status updated',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Profile request not found' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
   updateProfileRequestStatus(
     @Param('id') id: string,
     @Body() body: UpdateProfileRequestStatusDto,
@@ -253,9 +285,15 @@ export class AuthController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'Get all profile requests (optional filter by status)',
+    summary: 'List companies by registration status (optional filter)',
+    description:
+      'Returns companies with status and user linkage when approved. Query status=PENDING|APPROVED|REJECTED.',
   })
-  @ApiResponse({ status: 200, description: 'Returns user profile requests' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Companies (registration workflow) with user fields when applicable',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getAllProfileRequests(
     @Query('status') status?: string,

@@ -94,11 +94,6 @@ export class UpdateProfileDto {
   @MinLength(1)
   @MaxLength(32)
   membership_tier?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  captcha?: string;
 }
 
 export const UPDATE_PROFILE_FORM_KEYS = [
@@ -116,5 +111,4 @@ export const UPDATE_PROFILE_FORM_KEYS = [
   'website',
   'introduction',
   'membership_tier',
-  'captcha',
 ] as const;

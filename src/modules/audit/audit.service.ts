@@ -202,7 +202,7 @@ export class AuditService {
     if (requestIds.length === 0) {
       return new Map<string, string>();
     }
-    const requests = await this.prisma.companyProfileRequest.findMany({
+    const companies = await this.prisma.company.findMany({
       where: { id: { in: requestIds } },
       select: {
         id: true,
@@ -212,13 +212,13 @@ export class AuditService {
       },
     });
     const map = new Map<string, string>();
-    for (const request of requests) {
+    for (const company of companies) {
       const label =
-        request.companyNameVi ||
-        request.companyNameCn ||
-        request.email ||
-        request.id;
-      map.set(request.id, label);
+        company.companyNameVi ||
+        company.companyNameCn ||
+        company.email ||
+        company.id;
+      map.set(company.id, label);
     }
     return map;
   }

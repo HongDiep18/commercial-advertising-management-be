@@ -414,7 +414,9 @@ export class AdOrdersService {
     } = query;
 
     // Build where clause
-    const where: Prisma.AdOrderWhereInput = {};
+    const where: Prisma.AdOrderWhereInput = {
+      status: { not: AdOrderStatus.DRAFT },
+    };
 
     if (status) {
       where.status = status;

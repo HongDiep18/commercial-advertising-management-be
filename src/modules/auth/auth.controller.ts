@@ -154,16 +154,16 @@ export class AuthController {
   @Public()
   @ThrottleAuth()
   @ApiOperation({
-    summary: 'Generate local text captcha challenge',
+    summary: 'Generate local SVG image captcha challenge',
   })
   @ApiResponse({
     status: 200,
     description:
-      'Returns captchaId + captchaText for frontend canvas rendering and submit verification.',
+      'Returns captchaId + captchaSvg (inline SVG markup). Submit captchaId + user input on register.',
   })
   getCaptchaChallenge(): {
     captchaId: string;
-    captchaText: string;
+    captchaSvg: string;
     expiresInMs: number;
   } {
     return this.captchaVerificationService.createChallenge();

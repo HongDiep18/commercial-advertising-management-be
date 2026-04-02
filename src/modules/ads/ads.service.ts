@@ -12,7 +12,12 @@ import type {
 } from '@prisma/client';
 import { AdCategoryType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { SENTINEL_DATE, SLOT_CAPACITY } from './ads.constants';
+import {
+  SENTINEL_DATE,
+  SLOT_CAPACITY,
+  getPackageFormConfig,
+  type AdPackageFormConfig,
+} from './ads.constants';
 import { AdsErrors } from './ads.errors';
 import type { AdminCreateAdPackageCategoryDto } from './dto/admin-create-ad-package-category.dto';
 import type { AdminUpdateAdPackageCategoryDto } from './dto/admin-update-ad-package-category.dto';
@@ -55,6 +60,7 @@ export type AdPackageItem = {
   sortOrder: number;
   isActive: boolean;
   pricing: AdPackagePricingItem[];
+  formConfig: AdPackageFormConfig;
 };
 
 export type AdPackageCategoryItem = {
@@ -298,6 +304,7 @@ export class AdsService {
         metadata: (pkg.metadata as Record<string, unknown> | null) ?? null,
         sortOrder: pkg.sortOrder,
         isActive: pkg.isActive,
+        formConfig: getPackageFormConfig(pkg.type),
         pricing: pkg.pricing.map<AdPackagePricingItem>((p) => ({
           id: p.id,
           pricingModel: p.pricingModel,

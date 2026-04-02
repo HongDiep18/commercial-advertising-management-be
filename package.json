@@ -99,7 +99,6 @@
     "@types/passport-local": "^1.0.38",
     "@types/pg": "^8.18.0",
     "@types/supertest": "^6.0.2",
-
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "eslint": "^9.18.0",

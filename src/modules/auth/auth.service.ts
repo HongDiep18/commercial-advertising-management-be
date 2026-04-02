@@ -14,6 +14,7 @@ import {
   Prisma,
   PrismaClient,
 } from '@prisma/client';
+import type { Company } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
@@ -28,6 +29,7 @@ import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
 
 import { assertUserActive } from './auth.utils';
+import { CaptchaVerificationService } from './captcha-verification.service';
 
 import type { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -116,23 +118,6 @@ function companyProfileSelect(): { readonly id: true } & Record<
 
 const SET_PASSWORD_TOKEN_BYTES = 32;
 
-type ProfileRequestForCompany = Pick<
-  Prisma.CompanyProfileRequestGetPayload<object>,
-  | 'email'
-  | 'companyNameVi'
-  | 'companyNameCn'
-  | 'phone'
-  | 'taxId'
-  | 'contactName'
-  | 'contactPhone'
-  | 'companyAddress'
-  | 'country'
-  | 'region'
-  | 'industry'
-  | 'website'
-  | 'introduction'
->;
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -142,7 +127,8 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly auditService: AuditService,
     private readonly loyaltyService: LoyaltyService,
-  ) { }
+    private readonly captchaVerificationService: CaptchaVerificationService,
+  ) {}
 
   async login(email: string, password: string): Promise<LoginResult> {
     const normalizedEmail = email.trim().toLowerCase();
@@ -288,6 +274,10 @@ export class AuthService {
     message: string;
     status: string;
   }> {
+    this.captchaVerificationService.verifyAndConsumeChallenge(
+      data.captchaId,
+      data.captcha,
+    );
     const email = data.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -296,28 +286,46 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const existingPending = await this.prisma.companyProfileRequest.findFirst({
-      where: { email, status: CompanyProfileRequestStatus.PENDING },
+    const existingCompany = await this.prisma.company.findUnique({
+      where: { email },
     });
-    if (existingPending) {
-      throw new ConflictException(
-        'A request with this email is already pending approval.',
-      );
+    if (existingCompany) {
+      if (existingCompany.status === CompanyProfileRequestStatus.PENDING) {
+        throw new ConflictException(
+          'A request with this email is already pending approval.',
+        );
+      }
+      if (existingCompany.status === CompanyProfileRequestStatus.APPROVED) {
+        throw new ConflictException('Email already registered');
+      }
+      const company = await this.prisma.company.update({
+        where: { id: existingCompany.id },
+        data: AuthService.companyCreateDataFromRegisterDto(data, email),
+      });
+      await this.auditService.record({
+        action: AUDIT_ACTION.PROFILE_REQUEST_CREATED,
+        entityType: AUDIT_ENTITY.COMPANY,
+        entityId: company.id,
+        metadata: {
+          email,
+          companyNameVi: data.company_name_vi,
+          industry: data.industry,
+        },
+      });
+      return {
+        message: 'Request submitted. We will email you after approval.',
+        status: CompanyProfileRequestStatus.PENDING,
+      };
     }
 
-    const createData = AuthService.toCompanyProfileRequestCreateInput(data);
-    const request = await this.prisma.companyProfileRequest.create({
-      data: {
-        ...createData,
-        email,
-        status: CompanyProfileRequestStatus.PENDING,
-      },
+    const company = await this.prisma.company.create({
+      data: AuthService.companyCreateDataFromRegisterDto(data, email),
     });
 
     await this.auditService.record({
       action: AUDIT_ACTION.PROFILE_REQUEST_CREATED,
-      entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
-      entityId: request.id,
+      entityType: AUDIT_ENTITY.COMPANY,
+      entityId: company.id,
       metadata: {
         email,
         companyNameVi: data.company_name_vi,
@@ -331,27 +339,28 @@ export class AuthService {
     };
   }
 
-  private static toCompanyProfileRequestCreateInput(
+  private static companyCreateDataFromRegisterDto(
     data: RegisterDto,
-  ): Omit<Prisma.CompanyProfileRequestCreateInput, 'email' | 'status'> {
+    email: string,
+  ): Prisma.CompanyCreateInput {
     return {
+      email,
       companyNameVi: data.company_name_vi.trim(),
       companyNameCn: data.company_name_cn.trim(),
       phone: data.phone.trim(),
       taxId: data.tax_id.trim(),
       contactName: data.contact_person.trim(),
       contactPhone: data.contact_phone?.trim() || data.phone.trim(),
-      companyAddress: data.company_address.trim(),
+      address: data.company_address.trim(),
       country: data.country.trim(),
       ...(data.region && data.region.trim()
         ? { region: data.region.trim() }
-        : {}),
+        : { region: null }),
       industry: data.industry.trim(),
       website: data.website.trim(),
-      introduction: data.introduction.trim(),
-      captcha: data.captcha.trim(),
-      membershipTier: MembershipTier.BRONZE,
-    } as Omit<Prisma.CompanyProfileRequestCreateInput, 'email' | 'status'>;
+      description: data.introduction.trim(),
+      status: CompanyProfileRequestStatus.PENDING,
+    };
   }
 
   private static dtoToProfileData(
@@ -360,7 +369,7 @@ export class AuthService {
     const out: Record<string, string | null> = {};
     const dataRecord = data as unknown as Record<string, unknown>;
 
-    const skipKeys = new Set(['membership_tier', 'captcha']);
+    const skipKeys = new Set(['membership_tier']);
 
     Object.keys(data).forEach((key) => {
       if (dataRecord[key] === undefined || skipKeys.has(key)) return;
@@ -393,14 +402,16 @@ export class AuthService {
     return out;
   }
 
-  async getProfile(userId: string): Promise<ProfileResponse & {
-    primaryIndustry?: string | null;
-    selectedIndustries: string[];
-    industriesSelected: boolean;
-    loyaltyPoints: number;
-    totalSpending: string;
-    companyId?: string | null;
-  }> {
+  async getProfile(userId: string): Promise<
+    ProfileResponse & {
+      primaryIndustry?: string | null;
+      selectedIndustries: string[];
+      industriesSelected: boolean;
+      loyaltyPoints: number;
+      totalSpending: string;
+      companyId?: string | null;
+    }
+  > {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -592,30 +603,33 @@ export class AuthService {
     ) as readonly string[];
     const where =
       status && validStatuses.includes(status)
-        ? { status: status as CompanyProfileRequestStatus }
+        ? {
+            status: status as CompanyProfileRequestStatus,
+          }
         : undefined;
-    const requests = await this.prisma.companyProfileRequest.findMany({
+    const companies = await this.prisma.company.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
 
-    const approvedEmails = requests
-      .filter((r) => r.status === CompanyProfileRequestStatus.APPROVED)
-      .map((r) => r.email.trim().toLowerCase());
-    const userByEmail = new Map<
+    const companyIds = companies.map((company) => company.id);
+    const userByCompanyId = new Map<
       string,
       { id: string; companyId: string | null; isActive: boolean }
     >();
-    if (approvedEmails.length > 0) {
+    if (companyIds.length > 0) {
       const users = await this.prisma.user.findMany({
         where: {
-          email: { in: [...new Set(approvedEmails)] },
+          companyId: { in: companyIds },
           deletedAt: null,
         },
         select: { id: true, email: true, companyId: true, isActive: true },
       });
       for (const u of users) {
-        userByEmail.set(u.email.trim().toLowerCase(), {
+        if (!u.companyId) {
+          continue;
+        }
+        userByCompanyId.set(u.companyId, {
           id: u.id,
           companyId: u.companyId,
           isActive: u.isActive,
@@ -623,25 +637,17 @@ export class AuthService {
       }
     }
 
-    return requests
-      .filter((r) => {
-        if (r.status !== CompanyProfileRequestStatus.APPROVED) return true;
-        const emailKey = r.email.trim().toLowerCase();
-        // Hide approved requests whose user has been soft-deleted (no active user entry)
-        return userByEmail.has(emailKey);
-      })
-      .map((r) => {
-        const user =
-          r.status === CompanyProfileRequestStatus.APPROVED
-            ? userByEmail.get(r.email.trim().toLowerCase())
-            : undefined;
-        return {
-          ...r,
-          userId: user?.id ?? null,
-          companyId: user?.companyId ?? null,
-          isActive: user?.isActive ?? null,
-        };
-      });
+    return companies.map((c) => {
+      const user = userByCompanyId.get(c.id);
+      const { status: companyStatus, ...companyData } = c;
+      return {
+        ...companyData,
+        status: companyStatus,
+        userId: user?.id ?? null,
+        companyId: user?.companyId ?? null,
+        isActive: user?.isActive ?? null,
+      };
+    });
   }
 
   async setUserActive(
@@ -979,48 +985,27 @@ export class AuthService {
     };
   }
 
-  private static companyCreateInputFromProfileRequest(
-    request: ProfileRequestForCompany,
-  ): Prisma.CompanyCreateInput {
-    return {
-      email: request.email.trim().toLowerCase(),
-      phone: request.phone,
-      industry: request.industry,
-      address: request.companyAddress,
-      description: request.introduction,
-      logoUrl: null,
-      companyNameVi: request.companyNameVi,
-      companyNameCn: request.companyNameCn,
-      taxId: request.taxId,
-      country: request.country,
-      region: request.region,
-      website: request.website,
-      contactName: request.contactName,
-      contactPhone: request.contactPhone,
-    } as Prisma.CompanyCreateInput;
-  }
-
   async updateProfileRequestStatus(
     id: string,
     status: CompanyProfileRequestStatus,
     actorId?: string | null,
   ) {
-    const request = await this.prisma.companyProfileRequest.findUnique({
+    const company = await this.prisma.company.findUnique({
       where: { id },
     });
-    if (!request) {
-      throw new NotFoundException('Profile request not found');
+    if (!company) {
+      throw new NotFoundException('Company registration not found');
     }
 
-    const previousStatus = request.status;
-    const updated = await this.prisma.companyProfileRequest.update({
+    const previousStatus = company.status;
+    const updated = await this.prisma.company.update({
       where: { id },
       data: { status },
     });
 
     await this.auditService.record({
       action: AUDIT_ACTION.PROFILE_REQUEST_STATUS_CHANGED,
-      entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+      entityType: AUDIT_ENTITY.COMPANY,
       entityId: id,
       actorId: actorId ?? null,
       oldValue: previousStatus,
@@ -1030,54 +1015,37 @@ export class AuthService {
     if (status === CompanyProfileRequestStatus.APPROVED) {
       await this.auditService.record({
         action: AUDIT_ACTION.PROFILE_REQUEST_APPROVED,
-        entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+        entityType: AUDIT_ENTITY.COMPANY,
         entityId: id,
         actorId: actorId ?? null,
         metadata: {
-          email: request.email,
-          companyNameVi: request.companyNameVi,
+          email: company.email,
+          companyNameVi: company.companyNameVi ?? '',
         },
       });
-      await this.onProfileRequestApproved({
-        email: request.email,
-        membershipTier: request.membershipTier,
-        companyNameVi: request.companyNameVi,
-        companyNameCn: request.companyNameCn,
-        phone: request.phone,
-        taxId: request.taxId,
-        contactName: request.contactName,
-        contactPhone: request.contactPhone,
-        companyAddress: request.companyAddress,
-        country: request.country,
-        region: request.region,
-        industry: request.industry,
-        website: request.website,
-        introduction: request.introduction,
-      });
+      await this.onCompanyRegistrationApproved(updated);
     }
     if (status === CompanyProfileRequestStatus.REJECTED) {
       await this.auditService.record({
         action: AUDIT_ACTION.PROFILE_REQUEST_REJECTED,
-        entityType: AUDIT_ENTITY.COMPANY_PROFILE_REQUEST,
+        entityType: AUDIT_ENTITY.COMPANY,
         entityId: id,
         actorId: actorId ?? null,
         metadata: {
-          email: request.email,
-          companyNameVi: request.companyNameVi,
+          email: company.email,
+          companyNameVi: company.companyNameVi ?? '',
         },
       });
       await this.mailService.sendAccountRejectedEmail(
-        request.email.trim().toLowerCase(),
+        company.email.trim().toLowerCase(),
       );
     }
 
     return updated;
   }
 
-  private async onProfileRequestApproved(
-    request: ProfileRequestForCompany & { membershipTier: MembershipTier },
-  ): Promise<void> {
-    const normalizedEmail = request.email.trim().toLowerCase();
+  private async onCompanyRegistrationApproved(company: Company): Promise<void> {
+    const normalizedEmail = company.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true },
@@ -1087,15 +1055,6 @@ export class AuthService {
         'A user already exists for this email; cannot approve again.',
       );
     }
-
-    // Fetch the profile request to get the industry
-    const profileRequest = await this.prisma.companyProfileRequest.findFirst({
-      where: {
-        email: normalizedEmail,
-        status: CompanyProfileRequestStatus.APPROVED,
-      },
-      select: { industry: true },
-    });
 
     const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
     const expiryDays =
@@ -1111,17 +1070,11 @@ export class AuthService {
           email: normalizedEmail,
           password: placeholderPassword,
           role: Role.MEMBER,
-          membershipTier: request.membershipTier,
-          primaryIndustry: request.industry ?? null,
+          membershipTier: MembershipTier.BRONZE,
+          primaryIndustry: company.industry ?? null,
           setPasswordToken: token,
           setPasswordTokenExpiresAt: expiresAt,
         } as Prisma.UserUncheckedCreateInput,
-      });
-      const companyData =
-        AuthService.companyCreateInputFromProfileRequest(request);
-      const company = await tx.company.create({
-        data: companyData,
-        select: { id: true },
       });
       await tx.user.update({
         where: { id: user.id },
@@ -1131,7 +1084,6 @@ export class AuthService {
       return user;
     });
 
-    // Award loyalty points for registration
     try {
       const registrationPoints = POINTS_VALUES[PointsSource.REGISTRATION];
       if (typeof registrationPoints === 'number') {
@@ -1143,7 +1095,6 @@ export class AuthService {
         });
       }
     } catch (error) {
-      // Log error but don't fail the approval process
       console.error('Failed to award registration bonus:', error);
     }
 

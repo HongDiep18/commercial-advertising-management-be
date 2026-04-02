@@ -12,6 +12,18 @@ export class RegisterDto {
   @IsNotEmpty()
   @IsString()
   @MinLength(1)
+  @MaxLength(64)
+  captchaId: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2048)
+  captcha: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(1)
   @MaxLength(255)
   company_name_vi: string;
 
@@ -26,7 +38,8 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(32)
   @Matches(/^[+\d\s()-]+$/, {
-    message: 'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
+    message:
+      'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
   })
   phone: string;
 
@@ -47,7 +60,8 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(32)
   @Matches(/^[+\d\s()-]+$/, {
-    message: 'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
+    message:
+      'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
   })
   contact_phone: string;
 
@@ -93,10 +107,4 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(4000)
   introduction: string;
-
-  @IsNotEmpty()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(32)
-  captcha: string;
 }

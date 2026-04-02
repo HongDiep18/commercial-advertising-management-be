@@ -5,11 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  AdPackageType,
-  CompanyProfileRequestStatus,
-  Prisma,
-} from '@prisma/client';
+import { AdPackageType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
 import type {
@@ -134,24 +130,41 @@ export class CompaniesService {
     return { OR: orGroup };
   }
 
+  private static splitSearchTokens(search: string): string[] {
+    return search
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+  }
+
+  private static readonly DIRECTORY_SEARCH_FIELDS = [
+    'companyNameVi',
+    'companyNameCn',
+    'industry',
+    'description',
+    'region',
+  ] as const;
+
+  private static buildDirectorySearchWhere(
+    tokens: readonly string[],
+  ): Prisma.CompanyWhereInput {
+    const mode = 'insensitive' as const;
+    return {
+      OR: CompaniesService.DIRECTORY_SEARCH_FIELDS.map((field) => ({
+        AND: tokens.map((token) => ({
+          OR: [
+            { [field]: { startsWith: token, mode } },
+            { [field]: { contains: ` ${token}`, mode } },
+          ],
+        })),
+      })),
+    };
+  }
+
   async getAdminApprovedCompanyStats(): Promise<{ approvedCount: number }> {
-    const approvedRequests = await this.prisma.companyProfileRequest.findMany({
-      where: { status: CompanyProfileRequestStatus.APPROVED },
-      select: { email: true },
-    });
-    const approvedEmails = [
-      ...new Set(
-        approvedRequests.map((request) =>
-          CompaniesService.normalizeCompanyEmail(request.email),
-        ),
-      ),
-    ];
-    if (approvedEmails.length === 0) {
-      return { approvedCount: 0 };
-    }
     const approvedCount = await this.prisma.company.count({
       where: {
-        email: { in: approvedEmails },
         ...CompaniesService.buildActiveUserCompanyWhere(),
       },
     });
@@ -650,15 +663,10 @@ export class CompaniesService {
       : [];
 
     if (search) {
-      andConditions.push({
-        OR: [
-          { companyNameVi: { contains: search, mode: 'insensitive' } },
-          { companyNameCn: { contains: search, mode: 'insensitive' } },
-          { industry: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-          { region: { contains: search, mode: 'insensitive' } },
-        ],
-      });
+      const tokens = CompaniesService.splitSearchTokens(search);
+      if (tokens.length > 0) {
+        andConditions.push(CompaniesService.buildDirectorySearchWhere(tokens));
+      }
     }
 
     // Industry group OR-values, AND-ed with region group.

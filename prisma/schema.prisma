@@ -95,7 +95,7 @@ model NewsArticle {
   @@map("news_articles")
 }
 
-// ─── Company Profile Request
+// ─── Company registration / profile (merged former company_profile_requests)
 
 enum CompanyProfileRequestStatus {
   PENDING
@@ -109,34 +109,6 @@ enum MembershipTier {
   SILVER
   GOLD
   DIAMOND
-}
-
-model CompanyProfileRequest {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  email          String         @db.VarChar(255)
-  companyNameVi  String         @db.VarChar(255)
-  companyNameCn  String         @db.VarChar(255)
-  phone          String         @db.VarChar(32)
-  taxId          String         @db.VarChar(64)
-  contactName    String         @map("contact_name") @db.VarChar(255)
-  contactPhone   String         @db.VarChar(32)
-  companyAddress String         @db.VarChar(512)
-  country        String         @db.VarChar(128)
-  region         String?        @db.VarChar(128)
-  industry       String         @db.VarChar(128)
-  website        String         @db.VarChar(2048)
-  introduction   String         @db.Text
-  captcha        String?        @db.VarChar(32)
-  membershipTier MembershipTier @default(BRONZE)
-
-  status CompanyProfileRequestStatus @default(PENDING)
-
-  @@index([email])
-  @@index([status])
-  @@map("company_profile_requests")
 }
 
 // ─── Users & Authentication ──────────────────────────────────────────────
@@ -304,9 +276,13 @@ model Company {
   email       String   @unique @db.VarChar(255)
   phone       String   @db.VarChar(50)
   industry    String   @db.VarChar(255)
-  address     String   @db.VarChar(255)
+  address     String   @db.VarChar(512)
   description String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  status CompanyProfileRequestStatus @default(APPROVED) @map("registration_status")
+  membershipTier     MembershipTier              @default(BRONZE) @map("membership_tier")
 
   // Profile fields (consolidated from UserProfile)
   logoUrl       String? @map("logo_url") @db.VarChar(2048)
@@ -323,6 +299,8 @@ model Company {
   adOrders  AdOrder[]
   activeAds ActiveAd[]
 
+  @@index([status])
+  @@index([email])
   @@map("companies")
 }
 

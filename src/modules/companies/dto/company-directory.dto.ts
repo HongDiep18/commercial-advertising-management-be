@@ -22,8 +22,9 @@ function parseListQueryValue(value: unknown): string[] | undefined {
 
 export class CompanyDirectoryQueryDto {
   @ApiPropertyOptional({
-    description: 'Search term for company name, industry, or description',
-    example: 'manufacturing',
+    description:
+      'Search: whitespace-separated tokens; each token matches only at word start (start of text or after a space) in name, industry, description, or region (case-insensitive).',
+    example: 'manufacturing north',
   })
   @IsOptional()
   @IsString()

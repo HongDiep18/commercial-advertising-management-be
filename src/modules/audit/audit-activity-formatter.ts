@@ -83,9 +83,12 @@ const ACTION_CONTENT_HANDLERS: Record<string, (c: ContentContext) => string> = {
   'user.password_changed': (c) => `Password updated for ${c.userAccountLabel}.`,
   'user.set_password_used': (c) =>
     `Set-password completed for ${c.userAccountLabel}.`,
-  'ad_order.approved': (c) => `Approved ad order ${c.shortEntityId}.`,
-  'ad_order.rejected': (c) => `Rejected ad order ${c.shortEntityId}.`,
-  'ad_order.created': (c) => `Created ad order ${c.shortEntityId}.`,
+  'ad_order.approved': (c) =>
+    `Approved ad order for ${c.companySubject} by ${c.userAccountLabel}.`,
+  'ad_order.rejected': (c) =>
+    `Rejected ad order for ${c.companySubject} by ${c.userAccountLabel}.`,
+  'ad_order.created': (c) =>
+    `Created ad order for ${c.companySubject} by ${c.userAccountLabel}.`,
   'property.created': (c) => `Created property ${c.propertySubject}.`,
   'property.updated': (c) => `Updated property ${c.propertySubject}.`,
   'property.deleted': (c) => `Deleted property ${c.propertySubject}.`,

@@ -38,6 +38,12 @@ import type {
   AdminListUsersResponseDto,
   AdminUserStatus,
 } from './dto/admin-list-users.dto';
+import {
+  PROFILE_REQUESTS_DEFAULT_LIMIT,
+  PROFILE_REQUESTS_DEFAULT_PAGE,
+  PROFILE_REQUESTS_DEFAULT_SORT_BY,
+  PROFILE_REQUESTS_DEFAULT_SORT_ORDER,
+} from './profile-requests-list.query';
 
 export type AuthUser = {
   id: string;
@@ -597,7 +603,39 @@ export class AuthService {
     };
   }
 
-  async getAllProfileRequests(status?: string) {
+  async getAllProfileRequests(input?: {
+    readonly status?: string;
+    readonly page?: number;
+    readonly limit?: number;
+    readonly sortBy?: string;
+    readonly sortOrder?: 'asc' | 'desc';
+  }): Promise<{
+    requests: Array<
+      {
+        userId: string | null;
+        companyId: string | null;
+        isActive: boolean | null;
+      } & Record<string, unknown>
+    >;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      sortBy: string;
+      sortOrder: 'asc' | 'desc';
+    };
+  }> {
+    const page = input?.page ?? PROFILE_REQUESTS_DEFAULT_PAGE;
+    const limit = input?.limit ?? PROFILE_REQUESTS_DEFAULT_LIMIT;
+    const sortBy = input?.sortBy?.trim() || PROFILE_REQUESTS_DEFAULT_SORT_BY;
+    const sortOrder = input?.sortOrder ?? PROFILE_REQUESTS_DEFAULT_SORT_ORDER;
+    const orderBy = this.resolveCompanyProfileRequestsOrderBy(
+      sortBy,
+      sortOrder,
+    );
+    const skip = (page - 1) * limit;
+    const status = input?.status;
     const validStatuses = Object.values(
       CompanyProfileRequestStatus,
     ) as readonly string[];
@@ -607,10 +645,15 @@ export class AuthService {
             status: status as CompanyProfileRequestStatus,
           }
         : undefined;
-    const companies = await this.prisma.company.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
+    const [total, companies] = await Promise.all([
+      this.prisma.company.count({ where }),
+      this.prisma.company.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+    ]);
 
     const companyIds = companies.map((company) => company.id);
     const userByCompanyId = new Map<
@@ -637,7 +680,8 @@ export class AuthService {
       }
     }
 
-    return companies.map((c) => {
+    const totalPages = Math.ceil(total / limit);
+    const requests = companies.map((c) => {
       const user = userByCompanyId.get(c.id);
       const { status: companyStatus, ...companyData } = c;
       return {
@@ -648,6 +692,37 @@ export class AuthService {
         isActive: user?.isActive ?? null,
       };
     });
+
+    return {
+      requests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        sortBy,
+        sortOrder,
+      },
+    };
+  }
+
+  private resolveCompanyProfileRequestsOrderBy(
+    sortBy: string,
+    sortOrder: 'asc' | 'desc',
+  ): Prisma.CompanyOrderByWithRelationInput {
+    if (sortBy === 'updatedAt') {
+      return { updatedAt: sortOrder };
+    }
+    if (sortBy === 'email') {
+      return { email: sortOrder };
+    }
+    if (sortBy === 'companyNameVi') {
+      return { companyNameVi: sortOrder };
+    }
+    if (sortBy === 'status') {
+      return { status: sortOrder };
+    }
+    return { createdAt: sortOrder };
   }
 
   async setUserActive(

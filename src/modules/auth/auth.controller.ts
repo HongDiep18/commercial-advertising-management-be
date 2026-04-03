@@ -34,6 +34,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '../../common/enums';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { AuthService } from './auth.service';
+import { parseProfileRequestsListQuery } from './profile-requests-list.query';
 import { CaptchaVerificationService } from './captcha-verification.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -287,7 +288,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'List companies by registration status (optional filter)',
     description:
-      'Returns companies with status and user linkage when approved. Query status=PENDING|APPROVED|REJECTED.',
+      'Returns companies with status and user linkage when approved. Query status=PENDING|APPROVED|REJECTED. Defaults: page=1, limit=10, max limit=100, sortBy=createdAt, sortOrder=desc. Optional sortBy: createdAt|updatedAt|email|companyNameVi|status.',
   })
   @ApiResponse({
     status: 200,
@@ -297,8 +298,34 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getAllProfileRequests(
     @Query('status') status?: string,
-  ): Promise<unknown> {
-    return this.authService.getAllProfileRequests(status);
+    @Query('page') pageRaw?: string,
+    @Query('limit') limitRaw?: string,
+    @Query('sortBy') sortByRaw?: string,
+    @Query('sortOrder') sortOrderRaw?: string,
+  ): Promise<{
+    requests: unknown[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      sortBy: string;
+      sortOrder: 'asc' | 'desc';
+    };
+  }> {
+    const { page, limit, sortBy, sortOrder } = parseProfileRequestsListQuery({
+      pageRaw,
+      limitRaw,
+      sortByRaw,
+      sortOrderRaw,
+    });
+    return this.authService.getAllProfileRequests({
+      status,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Patch('users/:id/active')

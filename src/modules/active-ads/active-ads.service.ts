@@ -10,7 +10,11 @@ import {
   type Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { SENTINEL_DATE, SLOT_CAPACITY } from '../ads/ads.constants';
+import {
+  getPackageFormConfig,
+  SENTINEL_DATE,
+  SLOT_CAPACITY,
+} from '../ads/ads.constants';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
@@ -278,6 +282,7 @@ export class ActiveAdsService {
         endDate: ad.endDate,
         isActive: ad.isActive,
         status,
+        formConfig: getPackageFormConfig(ad.packageType),
       };
     });
     return {

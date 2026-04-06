@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AdOrderStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -12,7 +13,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { AdOrderStatus } from '@prisma/client';
 
 export class AdminApproveOrderDto {
   @ApiPropertyOptional({
@@ -43,7 +43,10 @@ export class AdminEditOrderAssetDto {
   assetType: string;
 
   @ApiProperty({ description: 'Publicly accessible URL of the uploaded file' })
-  @IsUrl()
+  @IsUrl({
+    require_tld: false,
+    require_protocol: true,
+  })
   fileUrl: string;
 
   @ApiPropertyOptional()
@@ -104,14 +107,20 @@ export class AdminNewOrderItemDto {
   @IsBoolean()
   designServiceRequired: boolean;
 
-  @ApiPropertyOptional({ description: 'Destination URL for the ad (not required for PER_ACTION packages)' })
+  @ApiPropertyOptional({
+    description:
+      'Destination URL for the ad (not required for PER_ACTION packages)',
+  })
   @IsOptional()
   @IsUrl()
   adLinkUrl?: string;
 }
 
 export class AdminEditPendingOrderDto {
-  @ApiPropertyOptional({ description: 'Update order-level notes', maxLength: 2000 })
+  @ApiPropertyOptional({
+    description: 'Update order-level notes',
+    maxLength: 2000,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -128,7 +137,8 @@ export class AdminEditPendingOrderDto {
   items?: AdminEditOrderItemDto[];
 
   @ApiPropertyOptional({
-    description: 'Item IDs to remove from the order. Blocked if all items would be removed.',
+    description:
+      'Item IDs to remove from the order. Blocked if all items would be removed.',
     type: [String],
   })
   @IsOptional()
@@ -137,7 +147,8 @@ export class AdminEditPendingOrderDto {
   deleteItemIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Homepage Popup add-on items to append (POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK, or POPUP_RANKING_ADJUSTMENT only)',
+    description:
+      'Homepage Popup add-on items to append (POPUP_PRIORITY_DETAILS_LINK, POPUP_ROTATION_DETAILS_LINK, or POPUP_RANKING_ADJUSTMENT only)',
     type: [AdminNewOrderItemDto],
   })
   @IsOptional()

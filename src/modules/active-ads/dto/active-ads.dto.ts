@@ -1,4 +1,5 @@
 import { AdPackageType, PricingModel } from '@prisma/client';
+import type { AdPackageFormConfig } from '../../ads/ads.constants';
 
 export enum AdStatus {
   EXPIRED = 'expired',
@@ -20,6 +21,7 @@ export type ActiveAdItem = {
   endDate: Date | null;
   isActive: boolean;
   status: AdStatus;
+  formConfig: AdPackageFormConfig;
 };
 
 export type ActiveAdDto = {

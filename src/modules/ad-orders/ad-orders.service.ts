@@ -13,11 +13,11 @@ import {
 } from '@prisma/client';
 import { Readable } from 'stream';
 import { PointsSource } from '../../common/enums/points-source.enum';
-import { ROLE_HIERARCHY, Role } from '../../common/enums/role.enum';
+import { Role, ROLE_HIERARCHY } from '../../common/enums/role.enum';
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
 import { PrismaService } from '../../database/prisma.service';
 import { ActiveAdsService } from '../active-ads/active-ads.service';
-import { SLOT_CAPACITY } from '../ads/ads.constants';
+import { getPackageFormConfig, SLOT_CAPACITY } from '../ads/ads.constants';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
@@ -572,6 +572,7 @@ export class AdOrdersService {
         })),
         packageMetadata:
           (item.pricing.package.metadata as Record<string, unknown>) ?? null,
+        formConfig: getPackageFormConfig(item.pricing.package.type),
       })),
     }));
 
@@ -742,6 +743,7 @@ export class AdOrdersService {
                 package: {
                   select: {
                     name: true,
+                    type: true,
                   },
                 },
               },
@@ -768,6 +770,7 @@ export class AdOrdersService {
         id: item.id,
         pricingId: item.pricingId,
         packageName: item.pricing.package.name,
+        packageType: item.pricing.package.type,
         pricingName: `${item.pricing.durationValue || 'N/A'} ${
           item.pricing.durationUnit || ''
         }`.trim(),
@@ -1283,6 +1286,7 @@ export class AdOrdersService {
         })),
         packageMetadata:
           (item.pricing.package.metadata as Record<string, unknown>) ?? null,
+        formConfig: getPackageFormConfig(item.pricing.package.type),
       })),
     };
   }

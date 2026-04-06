@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import type { AdPackageFormConfig } from '../../ads/ads.constants';
 
 export class AdminListOrdersQueryDto {
   @ApiPropertyOptional({
@@ -139,6 +140,11 @@ export class AdminOrderItemDto {
     description: 'Raw metadata from the related ad package',
   })
   packageMetadata?: Record<string, unknown> | null;
+
+  @ApiPropertyOptional({
+    description: 'Form field visibility config for this package type',
+  })
+  formConfig: AdPackageFormConfig;
 }
 
 export class AdminOrderDto {

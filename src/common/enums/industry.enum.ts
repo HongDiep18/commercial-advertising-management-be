@@ -23,6 +23,7 @@ export enum Industry {
   TOURISM = 'tourism', // Du lịch, nhà hàng, thể thao
   FOOD = 'food', // Thực phẩm, nước giải khát
   EDUCATION = 'education', // Giáo dục, Y tế & thiết bị y tế
+  LEGAL = 'legal', // Tư vấn pháp lý và tài chính
   OTHER = 'other', // Các ngành phục vụ khác
 }
 
@@ -47,6 +48,7 @@ export const VALID_INDUSTRIES = [
   Industry.TOURISM,
   Industry.FOOD,
   Industry.EDUCATION,
+  Industry.LEGAL,
   Industry.OTHER,
 ];
 

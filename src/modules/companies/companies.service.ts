@@ -508,14 +508,83 @@ export class CompaniesService {
       const contactView = CompaniesService.buildCompanyContactView(
         company.companyContacts,
       );
+
+      const rawEmails = CompaniesService.buildEmailsFromContacts(
+        company.companyContacts,
+      );
+      const rawContactPhonesByName = CompaniesService.buildContactPhonesByName(
+        company.companyContacts,
+      );
+      const primaryIndustry = CompaniesService.getPrimaryIndustry(
+        company.industry,
+      );
+      const baseForMasking = {
+        id: company.id,
+        companyNameVi: company.companyNameVi,
+        companyNameZh: company.companyNameZh,
+        taxId: contactView.taxId,
+        phone: contactView.phone,
+        email: contactView.email,
+        industry: primaryIndustry,
+        contactName: contactView.contactName,
+        contactPhone: contactView.contactPhone,
+        website: contactView.website,
+        address: contactView.address,
+        region: company.region,
+        country: company.country,
+        description: company.description,
+        logoUrl: company.logoUrl,
+      };
+
       const masked = this.maskingService.maskCompanyData(
-        {
-          ...company,
-          industry: CompaniesService.getPrimaryIndustry(company.industry),
-          ...contactView,
-        },
+        baseForMasking,
         maskingContext,
       );
+      const maskedEmailsBuffer: string[] = [];
+      for (const emailValue of rawEmails) {
+        const maskedEmail = this.maskingService.maskCompanyData(
+          {
+            ...baseForMasking,
+            email: emailValue,
+          },
+          maskingContext,
+        ).email;
+        if (!maskedEmailsBuffer.includes(maskedEmail)) {
+          maskedEmailsBuffer.push(maskedEmail);
+        }
+      }
+      const maskedContactPhonesByNameMap = new Map<string, string[]>();
+      for (const group of rawContactPhonesByName) {
+        for (const phoneValue of group.contactPhones) {
+          const maskedContact = this.maskingService.maskCompanyData(
+            {
+              ...baseForMasking,
+              phone: phoneValue,
+              contactName: group.contactName,
+              contactPhone: phoneValue,
+            },
+            maskingContext,
+          );
+          const maskedName =
+            maskedContact.contactName &&
+            maskedContact.contactName.trim().length > 0
+              ? maskedContact.contactName.trim()
+              : 'Unknown';
+          const maskedPhone = maskedContact.contactPhone ?? '';
+          const existing = maskedContactPhonesByNameMap.get(maskedName) ?? [];
+          if (maskedPhone && !existing.includes(maskedPhone)) {
+            existing.push(maskedPhone);
+            maskedContactPhonesByNameMap.set(maskedName, existing);
+          }
+        }
+      }
+      const maskedContactPhonesByName = Array.from(
+        maskedContactPhonesByNameMap.entries(),
+      ).map(([contactName, contactPhones]) => ({
+        contactName,
+        contactPhones,
+      }));
+
       return {
         id: masked.id,
         logoUrl: masked.logoUrl ?? null,
@@ -532,8 +601,8 @@ export class CompaniesService {
         website: masked.website ?? null,
         contactName: masked.contactName ?? null,
         contactPhone: null,
-        emails: masked.email ? [masked.email] : [],
-        contactPhonesByName: [],
+        emails: maskedEmailsBuffer,
+        contactPhonesByName: maskedContactPhonesByName,
       };
     }
 
@@ -1240,10 +1309,7 @@ export class CompaniesService {
         'Contacts payload contains no valid contact rows',
       );
     }
-    if (
-      Object.keys(companyUpdateData).length === 0 &&
-      !replaceContacts
-    ) {
+    if (Object.keys(companyUpdateData).length === 0 && !replaceContacts) {
       throw new BadRequestException('No valid company fields provided');
     }
 
@@ -1414,7 +1480,11 @@ export class CompaniesService {
 
   private toAdminCompanyUpdatePayload(data: AdminUpdateCompanyDto): {
     companyUpdateData: Prisma.CompanyUpdateInput;
-    contactRows: Array<{ type: string; value: string; contactName: string | null }>;
+    contactRows: Array<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>;
     replaceContacts: boolean;
   } {
     const companyUpdateData: Prisma.CompanyUpdateInput = {};

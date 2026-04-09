@@ -21,6 +21,7 @@ import { getPackageFormConfig, SLOT_CAPACITY } from '../ads/ads.constants';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
+import { CONTACT_TYPE } from '../companies/company-contact.constants';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
@@ -94,14 +95,6 @@ type UpdatedOrderType = Prisma.AdOrderGetPayload<{
 
 @Injectable()
 export class AdOrdersService {
-  private static readonly CONTACT_TYPE = {
-    EMAIL: 'email',
-    PHONE: 'phone',
-    CONTACT_PHONE: 'contact_phone',
-    ADDRESS: 'address',
-    TAX_ID: 'tax_id',
-  } as const;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileGeneratingService: FileGeneratingService,
@@ -131,11 +124,7 @@ export class AdOrdersService {
       contactName: string | null;
     }>,
   ): string {
-    const priorityTypes = [
-      AdOrdersService.CONTACT_TYPE.EMAIL,
-      AdOrdersService.CONTACT_TYPE.PHONE,
-      AdOrdersService.CONTACT_TYPE.CONTACT_PHONE,
-    ];
+    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
     for (const contactType of priorityTypes) {
       const row = contacts.find(
         (contact) =>
@@ -158,6 +147,7 @@ export class AdOrdersService {
   private mapCompanyContactView(
     company:
       | {
+          taxId?: string | null;
           companyContacts?: Array<{
             type: string;
             value: string;
@@ -176,25 +166,13 @@ export class AdOrdersService {
     const contacts = company?.companyContacts ?? [];
     return {
       email:
-        this.getCompanyContactValue(
-          contacts,
-          AdOrdersService.CONTACT_TYPE.EMAIL,
-        ) ?? '',
+        this.getCompanyContactValue(contacts, CONTACT_TYPE.EMAIL) ?? '',
       contactName: this.getContactNameFromContacts(contacts),
       phone:
-        this.getCompanyContactValue(
-          contacts,
-          AdOrdersService.CONTACT_TYPE.PHONE,
-        ) ?? '',
+        this.getCompanyContactValue(contacts, CONTACT_TYPE.TEL) ?? '',
       address:
-        this.getCompanyContactValue(
-          contacts,
-          AdOrdersService.CONTACT_TYPE.ADDRESS,
-        ) ?? '',
-      taxId: this.getCompanyContactValue(
-        contacts,
-        AdOrdersService.CONTACT_TYPE.TAX_ID,
-      ),
+        this.getCompanyContactValue(contacts, CONTACT_TYPE.ADDRESS) ?? '',
+      taxId: company?.taxId ?? null,
     };
   }
 
@@ -580,6 +558,7 @@ export class AdOrdersService {
             id: true,
             companyNameVi: true,
             companyNameZh: true,
+            taxId: true,
             companyContacts: {
               select: {
                 type: true,
@@ -914,6 +893,7 @@ export class AdOrdersService {
           select: {
             companyNameVi: true,
             companyNameZh: true,
+            taxId: true,
             companyContacts: {
               select: {
                 type: true,
@@ -1308,6 +1288,7 @@ export class AdOrdersService {
             id: true,
             companyNameVi: true,
             companyNameZh: true,
+            taxId: true,
             companyContacts: {
               select: {
                 type: true,
@@ -1643,6 +1624,7 @@ export class AdOrdersService {
             id: true,
             companyNameVi: true,
             companyNameZh: true,
+            taxId: true,
             logoUrl: true,
             industry: true,
             country: true,

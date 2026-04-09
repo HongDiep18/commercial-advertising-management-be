@@ -23,12 +23,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import {
-  UpdateProfileDto,
-  UPDATE_PROFILE_FORM_KEYS,
-} from '../auth/dto/update-profile.dto';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { CompaniesService } from './companies.service';
+import { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
+import { AdminUpdateCompanyDto } from './dto/admin-update-company.dto';
 import { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
 import { AddCompanyContactsResponseDto } from './dto/add-company-contacts-response.dto';
 import { AdminCompanyStatsResponseDto } from './dto/admin-company-stats.dto';
@@ -42,9 +40,51 @@ const ADMIN_UPDATE_COMPANY_SCHEMA = {
       format: 'binary',
       description: 'Logo image file (optional)',
     },
-    ...Object.fromEntries(
-      UPDATE_PROFILE_FORM_KEYS.map((k) => [k, { type: 'string' }]),
-    ),
+    logoUrl: {
+      type: 'string',
+      description: 'Logo URL override when not uploading a file',
+    },
+    companyNameVi: { type: 'string' },
+    companyNameEn: { type: 'string' },
+    companyNameZh: { type: 'string' },
+    taxId: { type: 'string' },
+    country: { type: 'string' },
+    region: { type: 'string' },
+    industry: {
+      oneOf: [
+        {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        {
+          type: 'string',
+          description:
+            'JSON-stringified array or comma-separated string when sent as multipart/form-data',
+        },
+      ],
+    },
+    description: { type: 'string' },
+    contacts: {
+      oneOf: [
+        {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' },
+              value: { type: 'string' },
+              contactName: { type: 'string', nullable: true },
+            },
+            required: ['type', 'value'],
+          },
+        },
+        {
+          type: 'string',
+          description:
+            'JSON-stringified contact array when sent as multipart/form-data',
+        },
+      ],
+    },
   },
 };
 
@@ -87,37 +127,59 @@ export class AdminCompaniesController {
     return this.companiesService.getCompanyContactTypes();
   }
 
+  @Get(':companyId')
+  @ApiOperation({
+    summary: 'Get company detail for admin management',
+    description:
+      'Returns scalar company fields plus raw company_contacts rows for admin management screens.',
+  })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company detail for admin management',
+    type: AdminCompanyDetailResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async getCompanyDetailForAdmin(
+    @Param('companyId') companyId: string,
+  ): Promise<AdminCompanyDetailResponseDto> {
+    return this.companiesService.getAdminCompanyDetail(companyId);
+  }
+
   @Patch(':companyId')
   @UseInterceptors(FileInterceptor('logo_url'))
   @ApiOperation({
     summary: 'Update a company (admin)',
     description:
-      'Same fields as PATCH /auth/update-profile. Target company by id; ' +
-      'requires a user linked to that company. Records audit log company.updated_by_admin.',
+      'Updates scalar company fields and optionally replaces all company_contacts rows. ' +
+      'Supports JSON requests and multipart/form-data requests with optional `logo_url` upload.',
   })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ schema: ADMIN_UPDATE_COMPANY_SCHEMA })
-  @ApiResponse({ status: 200, description: 'Company profile updated' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company profile updated',
+    type: AdminCompanyDetailResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Company or linked user not found' })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
   async updateCompany(
     @Param('companyId') companyId: string,
-    @Body() dto: UpdateProfileDto,
+    @Body() dto: AdminUpdateCompanyDto,
     @UploadedFile() logoFile: Express.Multer.File,
     @CurrentUser('userId') adminUserId: string,
-  ) {
-    const body = { ...dto };
+  ): Promise<AdminCompanyDetailResponseDto> {
+    const body: AdminUpdateCompanyDto = { ...dto };
     if (logoFile) {
       const { url } = await this.fileUploadService.uploadFile(
         logoFile,
         'company-logos',
       );
-      body.upload_logo = url;
+      body.logoUrl = url;
     }
-    return await this.companiesService.adminUpdateCompany(
+    return this.companiesService.adminUpdateCompany(
       adminUserId,
       companyId,
       body,

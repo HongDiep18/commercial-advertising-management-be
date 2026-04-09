@@ -40,12 +40,12 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'phone'
   ) THEN
     INSERT INTO "public"."company_contacts" ("company_id", "type", "value")
-    SELECT "id", 'phone', "phone"
+    SELECT "id", 'tel', "phone"
     FROM "public"."companies"
     WHERE "phone" IS NOT NULL AND btrim("phone") <> ''
       AND NOT EXISTS (
         SELECT 1 FROM "public"."company_contacts" cc
-        WHERE cc."company_id" = "companies"."id" AND cc."type" = 'phone' AND cc."value" = "companies"."phone"
+        WHERE cc."company_id" = "companies"."id" AND cc."type" = 'tel' AND cc."value" = "companies"."phone"
       );
   END IF;
 
@@ -91,33 +91,9 @@ BEGIN
       );
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'contact_name'
-  ) THEN
-    INSERT INTO "public"."company_contacts" ("company_id", "type", "value")
-    SELECT "id", 'contact_name', "contact_name"
-    FROM "public"."companies"
-    WHERE "contact_name" IS NOT NULL AND btrim("contact_name") <> ''
-      AND NOT EXISTS (
-        SELECT 1 FROM "public"."company_contacts" cc
-        WHERE cc."company_id" = "companies"."id" AND cc."type" = 'contact_name' AND cc."value" = "companies"."contact_name"
-      );
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'contact_phone'
-  ) THEN
-    INSERT INTO "public"."company_contacts" ("company_id", "type", "value")
-    SELECT "id", 'contact_phone', "contact_phone"
-    FROM "public"."companies"
-    WHERE "contact_phone" IS NOT NULL AND btrim("contact_phone") <> ''
-      AND NOT EXISTS (
-        SELECT 1 FROM "public"."company_contacts" cc
-        WHERE cc."company_id" = "companies"."id" AND cc."type" = 'contact_phone' AND cc."value" = "companies"."contact_phone"
-      );
-  END IF;
+  -- contact_name and contact_phone are no longer stored as EAV rows;
+  -- contact_name is now the `label` field on each contact row,
+  -- contact_phone is merged into the `tel` type.
 END $$;
 
 ALTER TABLE "public"."companies" DROP COLUMN IF EXISTS "email";

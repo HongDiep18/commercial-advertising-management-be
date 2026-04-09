@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
+import { CONTACT_TYPE } from '../companies/company-contact.constants';
 
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
@@ -44,17 +45,6 @@ export class MailService {
     }
   }
 
-  private static readonly CONTACT_TYPE = {
-    EMAIL: 'email',
-    PHONE: 'phone',
-    ADDRESS: 'address',
-    TAX_ID: 'tax_id',
-    WEBSITE: 'website',
-    CONTACT_PHONE: 'contact_phone',
-    FAX: 'fax',
-    SKYPE: 'skype',
-  } as const;
-
   private getCompanyContactValue(
     contacts: ReadonlyArray<{
       type: string;
@@ -74,11 +64,7 @@ export class MailService {
       contactName: string | null;
     }>,
   ): string {
-    const priorityTypes = [
-      MailService.CONTACT_TYPE.EMAIL,
-      MailService.CONTACT_TYPE.PHONE,
-      MailService.CONTACT_TYPE.CONTACT_PHONE,
-    ];
+    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
     for (const contactType of priorityTypes) {
       const row = contacts.find(
         (contact) =>
@@ -187,6 +173,7 @@ export class MailService {
             select: {
               companyNameVi: true,
               companyNameZh: true,
+              taxId: true,
               companyContacts: {
                 select: {
                   type: true,
@@ -225,7 +212,7 @@ export class MailService {
       }
       const companyEmail = this.getCompanyContactValue(
         order.company.companyContacts,
-        MailService.CONTACT_TYPE.EMAIL,
+        CONTACT_TYPE.EMAIL,
       )?.trim();
       if (!companyEmail) {
         console.log(
@@ -247,7 +234,7 @@ export class MailService {
           email:
             this.getCompanyContactValue(
               order.company.companyContacts,
-              MailService.CONTACT_TYPE.EMAIL,
+              CONTACT_TYPE.EMAIL,
             ) ?? '',
           contactName: this.getContactNameFromContacts(
             order.company.companyContacts,
@@ -255,17 +242,14 @@ export class MailService {
           phone:
             this.getCompanyContactValue(
               order.company.companyContacts,
-              MailService.CONTACT_TYPE.PHONE,
+              CONTACT_TYPE.TEL,
             ) ?? '',
           address:
             this.getCompanyContactValue(
               order.company.companyContacts,
-              MailService.CONTACT_TYPE.ADDRESS,
+              CONTACT_TYPE.ADDRESS,
             ) ?? '',
-          taxId: this.getCompanyContactValue(
-            order.company.companyContacts,
-            MailService.CONTACT_TYPE.TAX_ID,
-          ),
+          taxId: order.company.taxId ?? null,
         },
         items: order.items.map((item) => ({
           id: item.id,

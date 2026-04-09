@@ -28,6 +28,7 @@ import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
 
 import { assertUserActive } from './auth.utils';
+import { CONTACT_TYPE } from '../companies/company-contact.constants';
 import { CaptchaVerificationService } from './captcha-verification.service';
 
 import type { RegisterDto } from './dto/register.dto';
@@ -81,8 +82,7 @@ type ProfileField =
   | 'website'
   | 'fax'
   | 'skype'
-  | 'contactName'
-  | 'contactPhone';
+  | 'contactName';
 
 export type ProfileResponse = {
   id: string;
@@ -91,12 +91,44 @@ export type ProfileResponse = {
   role: string;
 } & Partial<Record<ProfileField, string | null>>;
 
+export type ProvisionCompanyUserResult =
+  | {
+      status: 'created';
+      userId: string;
+      email: string;
+      companyId: string;
+      setPasswordEmailSent: boolean;
+    }
+  | {
+      status: 'linked_existing';
+      userId: string;
+      email: string;
+      companyId: string;
+      setPasswordEmailSent: boolean;
+    }
+  | {
+      status: 'existing_same_company';
+      userId: string;
+      email: string;
+      companyId: string;
+      setPasswordEmailSent: false;
+    }
+  | {
+      status: 'conflict_other_company';
+      userId: string;
+      email: string;
+      companyId: string | null;
+      conflictingCompanyId: string;
+      setPasswordEmailSent: false;
+    };
+
 type CompanyProfileSelectResult = {
   readonly id: string;
   readonly logoUrl: string | null;
   readonly companyNameVi: string | null;
   readonly companyNameEn: string | null;
   readonly companyNameZh: string | null;
+  readonly taxId: string | null;
   readonly industry: string[];
   readonly description: string;
   readonly country: string | null;
@@ -108,18 +140,8 @@ type CompanyProfileSelectResult = {
   }>;
 };
 
-const CONTACT_TYPE = {
-  EMAIL: 'email',
-  PHONE: 'phone',
-  ADDRESS: 'address',
-  TAX_ID: 'tax_id',
-  WEBSITE: 'website',
-  FAX: 'fax',
-  SKYPE: 'skype',
-  NOTE: 'note',
-  CONTACT_NAME: 'contact_name',
-  CONTACT_PHONE: 'contact_phone',
-} as const;
+/** Sentinel key used in contactData to carry the contact-person name (not a DB contact type). */
+const CONTACT_LABEL_KEY = 'contactName' as const;
 
 function companyProfileSelect() {
   return {
@@ -128,6 +150,7 @@ function companyProfileSelect() {
     companyNameVi: true,
     companyNameEn: true,
     companyNameZh: true,
+    taxId: true,
     industry: true,
     description: true,
     country: true,
@@ -168,6 +191,21 @@ export class AuthService {
     return found?.value ?? null;
   }
 
+  private buildSetPasswordTokenData(): {
+    token: string;
+    expiresAt: Date;
+  } {
+    const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
+    const expiryDays =
+      this.config.get<number>('mail.setPasswordTokenExpiryDays') ?? 7;
+    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+    return { token, expiresAt };
+  }
+
+  private async buildPlaceholderPassword(): Promise<string> {
+    return bcrypt.hash(randomBytes(32).toString('hex'), 10);
+  }
+
   private static getContactNameFromContacts(
     contacts: ReadonlyArray<{
       type: string;
@@ -175,11 +213,7 @@ export class AuthService {
       contactName: string | null;
     }>,
   ): string | null {
-    const priorityTypes = [
-      CONTACT_TYPE.EMAIL,
-      CONTACT_TYPE.PHONE,
-      CONTACT_TYPE.CONTACT_PHONE,
-    ];
+    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
     for (const contactType of priorityTypes) {
       const row = contacts.find(
         (contact) =>
@@ -205,17 +239,12 @@ export class AuthService {
     }>,
   ): Partial<Record<ProfileField, string | null>> {
     return {
-      phone: AuthService.getContactValue(contacts, CONTACT_TYPE.PHONE),
+      phone: AuthService.getContactValue(contacts, CONTACT_TYPE.TEL),
       address: AuthService.getContactValue(contacts, CONTACT_TYPE.ADDRESS),
-      taxId: AuthService.getContactValue(contacts, CONTACT_TYPE.TAX_ID),
       website: AuthService.getContactValue(contacts, CONTACT_TYPE.WEBSITE),
       fax: AuthService.getContactValue(contacts, CONTACT_TYPE.FAX),
       skype: AuthService.getContactValue(contacts, CONTACT_TYPE.SKYPE),
       contactName: AuthService.getContactNameFromContacts(contacts),
-      contactPhone: AuthService.getContactValue(
-        contacts,
-        CONTACT_TYPE.CONTACT_PHONE,
-      ),
     };
   }
 
@@ -439,6 +468,7 @@ export class AuthService {
       companyNameVi: data.company_name_vi.trim(),
       companyNameEn: data.company_name_en?.trim() || null,
       companyNameZh: data.company_name_zh.trim(),
+      taxId: data.tax_id.trim(),
       country: data.country.trim(),
       ...(data.region && data.region.trim()
         ? { region: data.region.trim() }
@@ -456,20 +486,20 @@ export class AuthService {
               contactName,
             },
             {
-              type: CONTACT_TYPE.PHONE,
+              type: CONTACT_TYPE.TEL,
               value: data.phone.trim(),
               contactName,
             },
-            {
-              type: CONTACT_TYPE.TAX_ID,
-              value: data.tax_id.trim(),
-              contactName,
-            },
-            {
-              type: CONTACT_TYPE.CONTACT_PHONE,
-              value: data.contact_phone?.trim() || data.phone.trim(),
-              contactName,
-            },
+            ...(data.contact_phone?.trim() &&
+            data.contact_phone.trim() !== data.phone.trim()
+              ? [
+                  {
+                    type: CONTACT_TYPE.TEL,
+                    value: data.contact_phone.trim(),
+                    contactName,
+                  },
+                ]
+              : []),
             {
               type: CONTACT_TYPE.ADDRESS,
               value: data.company_address.trim(),
@@ -494,15 +524,6 @@ export class AuthService {
                   {
                     type: CONTACT_TYPE.SKYPE,
                     value: data.skype.trim(),
-                    contactName,
-                  },
-                ]
-              : []),
-            ...(data.note?.trim()
-              ? [
-                  {
-                    type: CONTACT_TYPE.NOTE,
-                    value: data.note.trim(),
                     contactName,
                   },
                 ]
@@ -1180,9 +1201,9 @@ export class AuthService {
             select: { id: true },
           });
         }
-        const contactNameFromPayload = contactData[CONTACT_TYPE.CONTACT_NAME];
+        const contactNameFromPayload = contactData[CONTACT_LABEL_KEY];
         const typeValueEntries = Object.entries(contactData).filter(
-          ([contactType]) => contactType !== CONTACT_TYPE.CONTACT_NAME,
+          ([contactType]) => contactType !== CONTACT_LABEL_KEY,
         );
         const existingRows = await tx.companyContact.findMany({
           where: { companyId: input.companyId! },
@@ -1268,17 +1289,16 @@ export class AuthService {
       'country',
       'region',
       'industry',
+      'taxId',
     ]);
     const contactFieldToType: Readonly<Record<string, string>> = {
       email: CONTACT_TYPE.EMAIL,
-      phone: CONTACT_TYPE.PHONE,
+      phone: CONTACT_TYPE.TEL,
       address: CONTACT_TYPE.ADDRESS,
-      taxId: CONTACT_TYPE.TAX_ID,
       website: CONTACT_TYPE.WEBSITE,
       fax: CONTACT_TYPE.FAX,
       skype: CONTACT_TYPE.SKYPE,
-      contactName: CONTACT_TYPE.CONTACT_NAME,
-      contactPhone: CONTACT_TYPE.CONTACT_PHONE,
+      contactName: CONTACT_LABEL_KEY,
     };
     const companyData: Record<string, string | string[]> = {};
     const contactData: Record<string, string> = {};
@@ -1316,7 +1336,7 @@ export class AuthService {
     const missing = requiredKeys.filter((k) => {
       const v =
         k === 'phone'
-          ? contactData[CONTACT_TYPE.PHONE]
+          ? contactData[CONTACT_TYPE.TEL]
           : k === 'address'
             ? contactData[CONTACT_TYPE.ADDRESS]
             : updateData[k];
@@ -1330,7 +1350,7 @@ export class AuthService {
         `Cannot create company profile; missing required fields: ${missing.join(', ')}`,
       );
     }
-    const personRaw = contactData[CONTACT_TYPE.CONTACT_NAME];
+    const personRaw = contactData[CONTACT_LABEL_KEY];
     const contactName =
       typeof personRaw === 'string' && personRaw.trim().length > 0
         ? personRaw.trim()
@@ -1342,6 +1362,7 @@ export class AuthService {
       companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
       companyNameEn: (updateData.companyNameEn as string | undefined) ?? null,
       companyNameZh: (updateData.companyNameZh as string | undefined) ?? null,
+      taxId: (updateData.taxId as string | undefined) ?? null,
       country: (updateData.country as string | undefined) ?? null,
       region: (updateData.region as string | undefined) ?? null,
       companyContacts: {
@@ -1351,11 +1372,11 @@ export class AuthService {
             value: input.userEmail.trim().toLowerCase(),
             contactName,
           },
-          ...(contactData[CONTACT_TYPE.PHONE]
+          ...(contactData[CONTACT_TYPE.TEL]
             ? [
                 {
-                  type: CONTACT_TYPE.PHONE,
-                  value: contactData[CONTACT_TYPE.PHONE],
+                  type: CONTACT_TYPE.TEL,
+                  value: contactData[CONTACT_TYPE.TEL],
                   contactName,
                 },
               ]
@@ -1365,15 +1386,6 @@ export class AuthService {
                 {
                   type: CONTACT_TYPE.ADDRESS,
                   value: contactData[CONTACT_TYPE.ADDRESS],
-                  contactName,
-                },
-              ]
-            : []),
-          ...(contactData[CONTACT_TYPE.TAX_ID]
-            ? [
-                {
-                  type: CONTACT_TYPE.TAX_ID,
-                  value: contactData[CONTACT_TYPE.TAX_ID],
                   contactName,
                 },
               ]
@@ -1405,15 +1417,6 @@ export class AuthService {
                 },
               ]
             : []),
-          ...(contactData[CONTACT_TYPE.CONTACT_PHONE]
-            ? [
-                {
-                  type: CONTACT_TYPE.CONTACT_PHONE,
-                  value: contactData[CONTACT_TYPE.CONTACT_PHONE],
-                  contactName,
-                },
-              ]
-            : []),
         ],
       },
     } as Prisma.CompanyCreateInput;
@@ -1434,7 +1437,7 @@ export class AuthService {
       phone: contactFields.phone ?? null,
       address: contactFields.address ?? null,
       description: company.description,
-      taxId: contactFields.taxId ?? null,
+      taxId: company.taxId,
       country: company.country,
       region: company.region,
       industry: company.industry[0] ?? null,
@@ -1442,7 +1445,6 @@ export class AuthService {
       fax: contactFields.fax ?? null,
       skype: contactFields.skype ?? null,
       contactName: contactFields.contactName ?? null,
-      contactPhone: contactFields.contactPhone ?? null,
     };
   }
 
@@ -1541,14 +1543,8 @@ export class AuthService {
       );
     }
 
-    const token = randomBytes(SET_PASSWORD_TOKEN_BYTES).toString('hex');
-    const expiryDays =
-      this.config.get<number>('mail.setPasswordTokenExpiryDays') ?? 7;
-    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
-    const placeholderPassword = await bcrypt.hash(
-      randomBytes(32).toString('hex'),
-      10,
-    );
+    const { token, expiresAt } = this.buildSetPasswordTokenData();
+    const placeholderPassword = await this.buildPlaceholderPassword();
     const createdUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -1584,6 +1580,100 @@ export class AuthService {
     }
 
     await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
+  }
+
+  async provisionImportedCompanyUser(input: {
+    companyId: string;
+    industry: string[];
+    email: string;
+    sendSetPasswordEmail: boolean;
+  }): Promise<ProvisionCompanyUserResult> {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        companyId: true,
+      },
+    });
+
+    if (existingUser?.companyId && existingUser.companyId !== input.companyId) {
+      return {
+        status: 'conflict_other_company',
+        userId: existingUser.id,
+        email: normalizedEmail,
+        companyId: existingUser.companyId,
+        conflictingCompanyId: input.companyId,
+        setPasswordEmailSent: false,
+      };
+    }
+
+    if (existingUser?.companyId === input.companyId) {
+      return {
+        status: 'existing_same_company',
+        userId: existingUser.id,
+        email: normalizedEmail,
+        companyId: input.companyId,
+        setPasswordEmailSent: false,
+      };
+    }
+
+    const { token, expiresAt } = this.buildSetPasswordTokenData();
+    let setPasswordEmailSent = false;
+
+    if (existingUser) {
+      await this.prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          companyId: input.companyId,
+          role: Role.MEMBER,
+          primaryIndustry: input.industry[0] ?? null,
+          setPasswordToken: token,
+          setPasswordTokenExpiresAt: expiresAt,
+        } as Prisma.UserUncheckedUpdateInput,
+      });
+
+      if (input.sendSetPasswordEmail) {
+        await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
+        setPasswordEmailSent = true;
+      }
+
+      return {
+        status: 'linked_existing',
+        userId: existingUser.id,
+        email: normalizedEmail,
+        companyId: input.companyId,
+        setPasswordEmailSent,
+      };
+    }
+
+    const placeholderPassword = await this.buildPlaceholderPassword();
+    const createdUser = await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: placeholderPassword,
+        role: Role.MEMBER,
+        membershipTier: MembershipTier.BRONZE,
+        primaryIndustry: input.industry[0] ?? null,
+        companyId: input.companyId,
+        setPasswordToken: token,
+        setPasswordTokenExpiresAt: expiresAt,
+      } as Prisma.UserUncheckedCreateInput,
+      select: { id: true },
+    });
+
+    if (input.sendSetPasswordEmail) {
+      await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
+      setPasswordEmailSent = true;
+    }
+
+    return {
+      status: 'created',
+      userId: createdUser.id,
+      email: normalizedEmail,
+      companyId: input.companyId,
+      setPasswordEmailSent,
+    };
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {

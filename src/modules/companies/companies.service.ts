@@ -13,7 +13,6 @@ import type {
 } from '../ad-effects/interfaces/ad-effect.interface';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
-import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import {
   CompanyMaskingService,
   type MaskingContext,
@@ -30,14 +29,22 @@ import type { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
 import type { AddCompanyContactsResponseDto } from './dto/add-company-contacts-response.dto';
 import type { CompanyContactTypesResponseDto } from './dto/company-contact-types-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
+import { CONTACT_TYPE } from './company-contact.constants';
+import type {
+  AdminCompanyContactDto,
+  AdminUpdateCompanyDto,
+} from './dto/admin-update-company.dto';
+import type { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
 
 type CompanyAuditSnapshot = {
   id: string;
   logoUrl: string | null;
   companyNameVi: string | null;
+  companyNameEn: string | null;
   companyNameZh: string | null;
   industry: string[];
   description: string;
+  taxId: string | null;
   country: string | null;
   region: string | null;
   companyContacts: Array<{
@@ -51,8 +58,10 @@ const ADMIN_AUDIT_COMPANY_SELECT = {
   id: true,
   logoUrl: true,
   companyNameVi: true,
+  companyNameEn: true,
   companyNameZh: true,
   description: true,
+  taxId: true,
   country: true,
   region: true,
   industry: true,
@@ -63,15 +72,6 @@ const ADMIN_AUDIT_COMPANY_SELECT = {
       contactName: true,
     },
   },
-} as const;
-
-const CONTACT_TYPE = {
-  EMAIL: 'email',
-  PHONE: 'phone',
-  ADDRESS: 'address',
-  TAX_ID: 'tax_id',
-  WEBSITE: 'website',
-  CONTACT_PHONE: 'contact_phone',
 } as const;
 
 type CompanyWithActiveAdsRecord = {
@@ -139,11 +139,7 @@ export class CompaniesService {
       contactName: string | null;
     }>,
   ): string | null {
-    const priorityTypes = [
-      CONTACT_TYPE.EMAIL,
-      CONTACT_TYPE.PHONE,
-      CONTACT_TYPE.CONTACT_PHONE,
-    ];
+    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
     for (const contactType of priorityTypes) {
       const row = contacts.find(
         (item) =>
@@ -171,42 +167,23 @@ export class CompaniesService {
     email: string;
     phone: string;
     address: string;
-    taxId: string | null;
     website: string | null;
     contactName: string | null;
-    contactPhone: string | null;
   } {
     const email =
       CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.EMAIL) ??
       '';
     const phone =
-      CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.PHONE) ??
-      '';
+      CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.TEL) ?? '';
     const address =
       CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.ADDRESS) ??
       '';
-    const taxId = CompaniesService.getPrimaryContactValue(
-      contacts,
-      CONTACT_TYPE.TAX_ID,
-    );
     const website = CompaniesService.getPrimaryContactValue(
       contacts,
       CONTACT_TYPE.WEBSITE,
     );
     const contactName = CompaniesService.getPrimaryContactName(contacts);
-    const contactPhone = CompaniesService.getPrimaryContactValue(
-      contacts,
-      CONTACT_TYPE.CONTACT_PHONE,
-    );
-    return {
-      email,
-      phone,
-      address,
-      taxId,
-      website,
-      contactName,
-      contactPhone,
-    };
+    return { email, phone, address, website, contactName };
   }
 
   private static buildEmailsFromContacts(
@@ -231,7 +208,7 @@ export class CompaniesService {
   ): Array<{ contactName: string; contactPhones: string[] }> {
     const grouped = new Map<string, string[]>();
     for (const item of contacts) {
-      if (item.type !== CONTACT_TYPE.CONTACT_PHONE) {
+      if (item.type !== CONTACT_TYPE.TEL) {
         continue;
       }
       const name =
@@ -250,6 +227,119 @@ export class CompaniesService {
         contactPhones,
       }),
     );
+  }
+
+  private static normalizeAdminContactRows(
+    contacts: ReadonlyArray<AdminCompanyContactDto>,
+  ): Array<{ type: string; value: string; contactName: string | null }> {
+    const deduped = new Map<
+      string,
+      { type: string; value: string; contactName: string | null }
+    >();
+    for (const contact of contacts) {
+      const type = contact.type.trim();
+      const value =
+        type === CONTACT_TYPE.EMAIL
+          ? contact.value.trim().toLowerCase()
+          : contact.value.trim();
+      if (value.length === 0) {
+        continue;
+      }
+      const key = `${type}\0${value}`;
+      const existing = deduped.get(key);
+      const contactName =
+        contact.contactName && contact.contactName.trim().length > 0
+          ? contact.contactName.trim()
+          : null;
+      if (!existing) {
+        deduped.set(key, { type, value, contactName });
+        continue;
+      }
+      if (!existing.contactName && contactName) {
+        existing.contactName = contactName;
+      }
+    }
+    return Array.from(deduped.values());
+  }
+
+  private static mapAdminCompanyDetail(company: {
+    id: string;
+    logoUrl: string | null;
+    companyNameVi: string | null;
+    companyNameEn: string | null;
+    companyNameZh: string | null;
+    industry: string[];
+    description: string;
+    taxId: string | null;
+    country: string | null;
+    region: string | null;
+    companyContacts: Array<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>;
+  }): AdminCompanyDetailResponseDto {
+    const contactView = CompaniesService.buildCompanyContactView(
+      company.companyContacts,
+    );
+    return {
+      id: company.id,
+      logoUrl: company.logoUrl,
+      companyNameVi: company.companyNameVi,
+      companyNameEn: company.companyNameEn,
+      companyNameZh: company.companyNameZh,
+      industry: [...company.industry],
+      email: contactView.email,
+      phone: contactView.phone,
+      address: contactView.address,
+      description: company.description,
+      taxId: company.taxId ?? null,
+      country: company.country,
+      region: company.region,
+      website: contactView.website,
+      contactName: contactView.contactName,
+      contactPhone: null,
+      emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
+      contactPhonesByName: CompaniesService.buildContactPhonesByName(
+        company.companyContacts,
+      ),
+      contacts: company.companyContacts.map((contact) => ({
+        type: contact.type,
+        value: contact.value,
+        contactName: contact.contactName,
+      })),
+    };
+  }
+
+  async getAdminCompanyDetail(
+    companyId: string,
+  ): Promise<AdminCompanyDetailResponseDto> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        logoUrl: true,
+        companyNameVi: true,
+        companyNameEn: true,
+        companyNameZh: true,
+        industry: true,
+        description: true,
+        taxId: true,
+        country: true,
+        region: true,
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
+      },
+    });
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    return CompaniesService.mapAdminCompanyDetail(company);
   }
 
   private static buildActiveUserCompanyWhere(): Prisma.CompanyWhereInput {
@@ -343,7 +433,7 @@ export class CompaniesService {
               contactName: dto.contactName,
             },
             {
-              type: CONTACT_TYPE.PHONE,
+              type: CONTACT_TYPE.TEL,
               value: dto.phone,
               contactName: dto.contactName,
             },
@@ -384,6 +474,7 @@ export class CompaniesService {
         companyNameZh: true,
         industry: true,
         description: true,
+        taxId: true,
         country: true,
         region: true,
         companyContacts: {
@@ -435,22 +526,14 @@ export class CompaniesService {
         phone: masked.phone,
         address: masked.address ?? '',
         description: masked.description ?? '',
-        taxId: masked.taxId ?? null,
+        taxId: company.taxId ?? null,
         country: masked.country ?? null,
         region: masked.region ?? null,
         website: masked.website ?? null,
         contactName: masked.contactName ?? null,
-        contactPhone: masked.contactPhone ?? null,
+        contactPhone: null,
         emails: masked.email ? [masked.email] : [],
-        contactPhonesByName:
-          masked.contactPhone && masked.contactName
-            ? [
-                {
-                  contactName: masked.contactName,
-                  contactPhones: [masked.contactPhone],
-                },
-              ]
-            : [],
+        contactPhonesByName: [],
       };
     }
 
@@ -467,12 +550,12 @@ export class CompaniesService {
       phone: contactView.phone,
       address: contactView.address,
       description: company.description,
-      taxId: contactView.taxId,
+      taxId: company.taxId ?? null,
       country: company.country,
       region: company.region,
       website: contactView.website,
       contactName: contactView.contactName,
-      contactPhone: contactView.contactPhone,
+      contactPhone: null,
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
       contactPhonesByName: CompaniesService.buildContactPhonesByName(
         company.companyContacts,
@@ -1136,8 +1219,8 @@ export class CompaniesService {
   async adminUpdateCompany(
     adminUserId: string,
     companyId: string,
-    data: UpdateProfileDto,
-  ): Promise<CompanyDetailResponseDto> {
+    data: AdminUpdateCompanyDto,
+  ): Promise<AdminCompanyDetailResponseDto> {
     const companyExists = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true },
@@ -1146,12 +1229,20 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    const { companyUpdateData, contactUpdates, contactName } =
+    const { companyUpdateData, contactRows, replaceContacts } =
       this.toAdminCompanyUpdatePayload(data);
     if (
+      replaceContacts &&
+      (data.contacts?.length ?? 0) > 0 &&
+      contactRows.length === 0
+    ) {
+      throw new BadRequestException(
+        'Contacts payload contains no valid contact rows',
+      );
+    }
+    if (
       Object.keys(companyUpdateData).length === 0 &&
-      Object.keys(contactUpdates).length === 0 &&
-      contactName === undefined
+      !replaceContacts
     ) {
       throw new BadRequestException('No valid company fields provided');
     }
@@ -1168,40 +1259,20 @@ export class CompaniesService {
           select: { id: true },
         });
       }
-      const entries = Object.entries(contactUpdates);
-      const existingRows = await tx.companyContact.findMany({
-        where: { companyId },
-        select: { contactName: true },
-      });
-      const fallbackName =
-        existingRows.find((row) => row.contactName)?.contactName ?? null;
-      const resolvedPersonName =
-        contactName !== undefined ? contactName : fallbackName;
-      const resolvedOrNull =
-        resolvedPersonName && resolvedPersonName.trim().length > 0
-          ? resolvedPersonName.trim()
-          : null;
-      for (const [type, value] of entries) {
+      if (replaceContacts) {
         await tx.companyContact.deleteMany({
-          where: { companyId, type },
-        });
-        await tx.companyContact.create({
-          data: {
-            companyId,
-            type,
-            value,
-            contactName: resolvedOrNull,
-          },
-        });
-      }
-      if (contactName !== undefined && entries.length === 0) {
-        await tx.companyContact.updateMany({
           where: { companyId },
-          data: {
-            contactName:
-              contactName.trim().length > 0 ? contactName.trim() : null,
-          },
         });
+        if (contactRows.length > 0) {
+          await tx.companyContact.createMany({
+            data: contactRows.map((row) => ({
+              companyId,
+              type: row.type,
+              value: row.value,
+              contactName: row.contactName,
+            })),
+          });
+        }
       }
     });
 
@@ -1219,8 +1290,7 @@ export class CompaniesService {
       newValue: CompaniesService.serializeCompanyAuditPayload(companyAfter),
     });
 
-    const company = await this.getCompanyDetail(companyId);
-    return company;
+    return this.getAdminCompanyDetail(companyId);
   }
 
   /**
@@ -1262,7 +1332,7 @@ export class CompaniesService {
       if (trimmed.length === 0) {
         continue;
       }
-      pushUnique(CONTACT_TYPE.CONTACT_PHONE, trimmed);
+      pushUnique(CONTACT_TYPE.TEL, trimmed);
     }
     if (normalizedRows.length === 0) {
       throw new BadRequestException(
@@ -1324,95 +1394,63 @@ export class CompaniesService {
           email: contactView?.email ?? '',
           logoUrl: company.logoUrl,
           companyNameVi: company.companyNameVi,
+          companyNameEn: company.companyNameEn,
           companyNameZh: company.companyNameZh,
           phone: contactView?.phone ?? '',
           address: contactView?.address ?? '',
           description: company.description,
-          taxId: contactView?.taxId ?? null,
+          taxId: company.taxId,
           country: company.country,
           region: company.region,
           industry: CompaniesService.getPrimaryIndustry(company.industry),
           website: contactView?.website ?? null,
           contactName: contactView?.contactName ?? null,
-          contactPhone: contactView?.contactPhone ?? null,
+          contactPhone: null,
           contacts: company.companyContacts,
         }
       : null;
     return JSON.stringify({ company: companyPayload });
   }
 
-  private toAdminCompanyUpdatePayload(data: UpdateProfileDto): {
+  private toAdminCompanyUpdatePayload(data: AdminUpdateCompanyDto): {
     companyUpdateData: Prisma.CompanyUpdateInput;
-    contactUpdates: Record<string, string>;
-    contactName?: string;
+    contactRows: Array<{ type: string; value: string; contactName: string | null }>;
+    replaceContacts: boolean;
   } {
     const companyUpdateData: Prisma.CompanyUpdateInput = {};
-    const contactUpdates: Record<string, string> = {};
-    type CompanyMapper = {
-      from: keyof UpdateProfileDto;
-      to: keyof Prisma.CompanyUpdateInput;
-      transform?: (value: string) => string;
-    };
-    type ContactMapper = {
-      from: keyof UpdateProfileDto;
-      contactType: string;
-      transform?: (value: string) => string;
-    };
-    const companyMappers: readonly CompanyMapper[] = [
-      { from: 'upload_logo', to: 'logoUrl' },
-      { from: 'company_name_vi', to: 'companyNameVi' },
-      { from: 'company_name_zh', to: 'companyNameZh' },
-      { from: 'country', to: 'country' },
-      { from: 'region', to: 'region' },
-      { from: 'industry', to: 'industry' },
-      { from: 'introduction', to: 'description' },
-    ];
-    const contactMappers: readonly ContactMapper[] = [
-      {
-        from: 'email',
-        contactType: CONTACT_TYPE.EMAIL,
-        transform: (value) => value.toLowerCase(),
-      },
-      { from: 'phone', contactType: CONTACT_TYPE.PHONE },
-      { from: 'company_address', contactType: CONTACT_TYPE.ADDRESS },
-      { from: 'tax_id', contactType: CONTACT_TYPE.TAX_ID },
-      { from: 'website', contactType: CONTACT_TYPE.WEBSITE },
-      { from: 'contact_phone', contactType: CONTACT_TYPE.CONTACT_PHONE },
-    ];
-
-    for (const mapper of companyMappers) {
-      const raw = data[mapper.from];
-      if (raw === undefined) continue;
-      if (mapper.from === 'industry') {
-        const normalizedIndustries = Array.isArray(raw)
-          ? raw
-              .filter((value): value is string => typeof value === 'string')
-              .map((value) => value.trim())
-              .filter((value) => value.length > 0)
-          : typeof raw === 'string'
-            ? [raw.trim()].filter((value) => value.length > 0)
-            : [];
-        (companyUpdateData as Record<string, unknown>)[mapper.to] =
-          normalizedIndustries;
-        continue;
+    const assignNullable = (
+      key: keyof Prisma.CompanyUpdateInput,
+      value: string | undefined,
+    ): void => {
+      if (value === undefined) {
+        return;
       }
-      const normalized = (raw as string).trim();
-      (companyUpdateData as Record<string, unknown>)[mapper.to] =
-        mapper.transform ? mapper.transform(normalized) : normalized;
+      const normalized = value.trim();
+      (companyUpdateData as Record<string, unknown>)[key] =
+        normalized.length > 0 ? normalized : null;
+    };
+
+    assignNullable('logoUrl', data.logoUrl);
+    assignNullable('companyNameVi', data.companyNameVi);
+    assignNullable('companyNameEn', data.companyNameEn);
+    assignNullable('companyNameZh', data.companyNameZh);
+    assignNullable('taxId', data.taxId);
+    assignNullable('country', data.country);
+    assignNullable('region', data.region);
+
+    if (data.industry !== undefined) {
+      companyUpdateData.industry = data.industry
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
     }
-    for (const mapper of contactMappers) {
-      const raw = data[mapper.from];
-      if (raw === undefined) continue;
-      const normalized = (raw as string).trim();
-      contactUpdates[mapper.contactType] = mapper.transform
-        ? mapper.transform(normalized)
-        : normalized;
+    if (data.description !== undefined) {
+      companyUpdateData.description = data.description.trim();
     }
-    const rawContactPerson = data.contact_person;
-    let contactName: string | undefined;
-    if (rawContactPerson !== undefined) {
-      contactName = rawContactPerson.trim();
-    }
-    return { companyUpdateData, contactUpdates, contactName };
+
+    const replaceContacts = data.contacts !== undefined;
+    const contactRows = replaceContacts
+      ? CompaniesService.normalizeAdminContactRows(data.contacts ?? [])
+      : [];
+    return { companyUpdateData, contactRows, replaceContacts };
   }
 }

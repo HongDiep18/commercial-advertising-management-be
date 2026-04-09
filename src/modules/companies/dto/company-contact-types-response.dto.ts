@@ -6,11 +6,17 @@ export class CompanyContactTypesResponseDto {
     description: 'Distinct company contact types from company_contacts table',
     example: [
       'address',
-      'contact_phone',
       'email',
-      'phone',
-      'tax_id',
+      'facebook',
+      'fax',
+      'hotline',
+      'line',
+      'skype',
+      'tel',
+      'viber',
       'website',
+      'wechat',
+      'zalo',
     ],
   })
   types!: string[];

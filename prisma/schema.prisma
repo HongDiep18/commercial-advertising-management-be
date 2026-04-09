@@ -285,6 +285,7 @@ model Company {
   companyNameVi String? @map("company_name_vi") @db.VarChar(255)
   companyNameEn String? @map("company_name_en") @db.VarChar(255)
   companyNameZh String? @map("company_name_zh") @db.VarChar(255)
+  taxId         String? @map("tax_id") @db.VarChar(64)
   country       String? @db.VarChar(128)
   region        String? @db.VarChar(128)
 
@@ -594,3 +595,54 @@ model PropertyContactInquiry {
   @@map("property_contact_inquiries")
 }
 
+// LangGraph PostgreSQL checkpointer tables — managed externally, not by Prisma.
+// Declared with @@ignore to prevent drift detection from trying to drop them.
+
+model CheckpointBlob {
+  threadId     String  @map("thread_id")
+  checkpointNs String  @default("") @map("checkpoint_ns")
+  channel      String
+  version      String
+  type         String
+  blob         Bytes?
+
+  @@id([threadId, checkpointNs, channel, version])
+  @@map("checkpoint_blobs")
+  @@ignore
+}
+
+model CheckpointMigration {
+  v Int @id
+
+  @@map("checkpoint_migrations")
+  @@ignore
+}
+
+model CheckpointWrite {
+  threadId     String @map("thread_id")
+  checkpointNs String @default("") @map("checkpoint_ns")
+  checkpointId String @map("checkpoint_id")
+  taskId       String @map("task_id")
+  idx          Int
+  channel      String
+  type         String?
+  blob         Bytes  @db.ByteA
+
+  @@id([threadId, checkpointNs, checkpointId, taskId, idx])
+  @@map("checkpoint_writes")
+  @@ignore
+}
+
+model Checkpoint {
+  threadId           String  @map("thread_id")
+  checkpointNs       String  @default("") @map("checkpoint_ns")
+  checkpointId       String  @map("checkpoint_id")
+  parentCheckpointId String? @map("parent_checkpoint_id")
+  type               String?
+  checkpoint         Json
+  metadata           Json    @default("{}")
+
+  @@id([threadId, checkpointNs, checkpointId])
+  @@map("checkpoints")
+  @@ignore
+}

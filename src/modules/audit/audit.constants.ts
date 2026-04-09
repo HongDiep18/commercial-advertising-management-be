@@ -60,4 +60,5 @@ export const AUDIT_ACTION = {
   PROPERTY_CONTACT_INQUIRY_CREATED: 'property.contact_inquiry_created',
 
   COMPANY_UPDATED_BY_ADMIN: 'company.updated_by_admin',
+  COMPANY_CONTACTS_ADDED: 'company.contacts_added',
 } as const;

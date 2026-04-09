@@ -135,7 +135,7 @@ export class CompanyMaskingService {
     company: {
       id: string;
       companyNameVi: string | null;
-      companyNameCn: string | null;
+      companyNameZh: string | null;
       taxId?: string | null;
       phone: string;
       email: string;
@@ -153,7 +153,7 @@ export class CompanyMaskingService {
   ): {
     id: string;
     companyNameVi: string | null;
-    companyNameCn: string | null;
+    companyNameZh: string | null;
     taxId?: string | null;
     phone: string;
     email: string;
@@ -183,7 +183,7 @@ export class CompanyMaskingService {
       return {
         id: company.id,
         companyNameVi: this.maskCompanyName(company.companyNameVi || ''),
-        companyNameCn: this.maskCompanyName(company.companyNameCn || ''),
+        companyNameZh: this.maskCompanyName(company.companyNameZh || ''),
         taxId: company.taxId !== undefined ? '****' : undefined,
         phone: '****',
         email: this.maskEmail(company.email),
@@ -203,7 +203,7 @@ export class CompanyMaskingService {
     return {
       id: company.id,
       companyNameVi: company.companyNameVi, // Visible
-      companyNameCn: company.companyNameCn, // Visible
+      companyNameZh: company.companyNameZh, // Visible
       taxId:
         company.taxId !== undefined ? this.maskTaxId(company.taxId) : undefined, // Masked (last 4)
       phone: this.maskPhone(company.phone), // Masked (last 4)
@@ -290,3 +290,4 @@ export class CompanyMaskingService {
     return { industries: [], hasAllAccess: false };
   }
 }
+

@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -27,57 +26,68 @@ import type {
   CompanyDirectoryResponseDto,
 } from './dto/company-directory.dto';
 import type { CompanyWithAdsResponseDto } from './dto/company-with-ads-response.dto';
+import type { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
+import type { AddCompanyContactsResponseDto } from './dto/add-company-contacts-response.dto';
+import type { CompanyContactTypesResponseDto } from './dto/company-contact-types-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
 
 type CompanyAuditSnapshot = {
   id: string;
-  email: string;
   logoUrl: string | null;
   companyNameVi: string | null;
-  companyNameCn: string | null;
-  phone: string;
-  industry: string;
-  address: string;
+  companyNameZh: string | null;
+  industry: string[];
   description: string;
-  taxId: string | null;
   country: string | null;
   region: string | null;
-  website: string | null;
-  contactName: string | null;
-  contactPhone: string | null;
+  companyContacts: Array<{
+    type: string;
+    value: string;
+    contactName: string | null;
+  }>;
 };
 
 const ADMIN_AUDIT_COMPANY_SELECT = {
   id: true,
-  email: true,
   logoUrl: true,
   companyNameVi: true,
-  companyNameCn: true,
-  phone: true,
-  address: true,
+  companyNameZh: true,
   description: true,
-  taxId: true,
   country: true,
   region: true,
   industry: true,
-  website: true,
-  contactName: true,
-  contactPhone: true,
+  companyContacts: {
+    select: {
+      type: true,
+      value: true,
+      contactName: true,
+    },
+  },
+} as const;
+
+const CONTACT_TYPE = {
+  EMAIL: 'email',
+  PHONE: 'phone',
+  ADDRESS: 'address',
+  TAX_ID: 'tax_id',
+  WEBSITE: 'website',
+  CONTACT_PHONE: 'contact_phone',
 } as const;
 
 type CompanyWithActiveAdsRecord = {
   id: string;
   companyNameVi: string | null;
-  companyNameCn: string | null;
+  companyNameZh: string | null;
   logoUrl: string | null;
-  email: string;
-  contactName: string | null;
-  phone: string;
-  industry: string;
+  industry: string[];
   region: string | null;
   country: string | null;
-  address: string;
   description: string;
+  companyContacts: Array<{
+    type: string;
+    value: string;
+    contactName: string | null;
+  }>;
   activeAds: Array<{
     id: string;
     companyId: string;
@@ -106,6 +116,142 @@ export class CompaniesService {
     return email.trim().toLowerCase();
   }
 
+  private static getPrimaryIndustry(industry: readonly string[]): string {
+    return industry[0] ?? '';
+  }
+
+  private static getPrimaryContactValue(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName?: string | null;
+    }>,
+    type: string,
+  ): string | null {
+    const entry = contacts.find((item) => item.type === type);
+    return entry?.value ?? null;
+  }
+
+  private static getPrimaryContactName(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): string | null {
+    const priorityTypes = [
+      CONTACT_TYPE.EMAIL,
+      CONTACT_TYPE.PHONE,
+      CONTACT_TYPE.CONTACT_PHONE,
+    ];
+    for (const contactType of priorityTypes) {
+      const row = contacts.find(
+        (item) =>
+          item.type === contactType &&
+          item.contactName &&
+          item.contactName.trim().length > 0,
+      );
+      if (row?.contactName) {
+        return row.contactName.trim();
+      }
+    }
+    const anyNamed = contacts.find(
+      (item) => item.contactName && item.contactName.trim().length > 0,
+    );
+    return anyNamed?.contactName?.trim() ?? null;
+  }
+
+  private static buildCompanyContactView(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): {
+    email: string;
+    phone: string;
+    address: string;
+    taxId: string | null;
+    website: string | null;
+    contactName: string | null;
+    contactPhone: string | null;
+  } {
+    const email =
+      CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.EMAIL) ??
+      '';
+    const phone =
+      CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.PHONE) ??
+      '';
+    const address =
+      CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.ADDRESS) ??
+      '';
+    const taxId = CompaniesService.getPrimaryContactValue(
+      contacts,
+      CONTACT_TYPE.TAX_ID,
+    );
+    const website = CompaniesService.getPrimaryContactValue(
+      contacts,
+      CONTACT_TYPE.WEBSITE,
+    );
+    const contactName = CompaniesService.getPrimaryContactName(contacts);
+    const contactPhone = CompaniesService.getPrimaryContactValue(
+      contacts,
+      CONTACT_TYPE.CONTACT_PHONE,
+    );
+    return {
+      email,
+      phone,
+      address,
+      taxId,
+      website,
+      contactName,
+      contactPhone,
+    };
+  }
+
+  private static buildEmailsFromContacts(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): string[] {
+    return contacts
+      .filter((item) => item.type === CONTACT_TYPE.EMAIL)
+      .map((item) => item.value)
+      .filter((value, index, all) => all.indexOf(value) === index);
+  }
+
+  private static buildContactPhonesByName(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): Array<{ contactName: string; contactPhones: string[] }> {
+    const grouped = new Map<string, string[]>();
+    for (const item of contacts) {
+      if (item.type !== CONTACT_TYPE.CONTACT_PHONE) {
+        continue;
+      }
+      const name =
+        item.contactName && item.contactName.trim().length > 0
+          ? item.contactName.trim()
+          : 'Unknown';
+      const current = grouped.get(name) ?? [];
+      if (!current.includes(item.value)) {
+        current.push(item.value);
+        grouped.set(name, current);
+      }
+    }
+    return Array.from(grouped.entries()).map(
+      ([contactName, contactPhones]) => ({
+        contactName,
+        contactPhones,
+      }),
+    );
+  }
+
   private static buildActiveUserCompanyWhere(): Prisma.CompanyWhereInput {
     return {
       users: {
@@ -117,6 +263,17 @@ export class CompaniesService {
     };
   }
 
+  async getCompanyContactTypes(): Promise<CompanyContactTypesResponseDto> {
+    const rows = await this.prisma.companyContact.findMany({
+      distinct: ['type'],
+      select: { type: true },
+      orderBy: { type: 'asc' },
+    });
+    return {
+      types: rows.map((row) => row.type),
+    };
+  }
+
   private static buildContainsOrGroup(
     field: 'industry' | 'region',
     values: readonly string[],
@@ -124,9 +281,11 @@ export class CompaniesService {
     if (values.length === 0) {
       return null;
     }
-    const orGroup: Prisma.CompanyWhereInput[] = values.map((value) => ({
-      [field]: { contains: value, mode: 'insensitive' },
-    }));
+    const orGroup: Prisma.CompanyWhereInput[] = values.map((value) =>
+      field === 'industry'
+        ? { industry: { has: value } }
+        : { region: { contains: value, mode: 'insensitive' } },
+    );
     return { OR: orGroup };
   }
 
@@ -140,8 +299,7 @@ export class CompaniesService {
 
   private static readonly DIRECTORY_SEARCH_FIELDS = [
     'companyNameVi',
-    'companyNameCn',
-    'industry',
+    'companyNameZh',
     'description',
     'region',
   ] as const;
@@ -175,12 +333,27 @@ export class CompaniesService {
     const company = await this.prisma.company.create({
       data: {
         companyNameVi: dto.name,
-        email: CompaniesService.normalizeCompanyEmail(dto.email),
-        contactName: dto.contactName,
-        phone: dto.phone,
         industry: dto.industry,
-        address: dto.address,
         description: dto.description,
+        companyContacts: {
+          create: [
+            {
+              type: CONTACT_TYPE.EMAIL,
+              value: CompaniesService.normalizeCompanyEmail(dto.email),
+              contactName: dto.contactName,
+            },
+            {
+              type: CONTACT_TYPE.PHONE,
+              value: dto.phone,
+              contactName: dto.contactName,
+            },
+            {
+              type: CONTACT_TYPE.ADDRESS,
+              value: dto.address,
+              contactName: dto.contactName,
+            },
+          ],
+        },
       },
     });
 
@@ -208,18 +381,18 @@ export class CompaniesService {
         id: true,
         logoUrl: true,
         companyNameVi: true,
-        companyNameCn: true,
+        companyNameZh: true,
         industry: true,
-        email: true,
-        phone: true,
-        address: true,
         description: true,
-        taxId: true,
         country: true,
         region: true,
-        website: true,
-        contactName: true,
-        contactPhone: true,
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
       },
     });
     if (!company) {
@@ -229,7 +402,10 @@ export class CompaniesService {
     // Check if user has access to this company's industry
     if (
       maskingContext &&
-      !this.maskingService.hasIndustryAccess(company.industry, maskingContext)
+      !this.maskingService.hasIndustryAccess(
+        CompaniesService.getPrimaryIndustry(company.industry),
+        maskingContext,
+      )
     ) {
       throw new ForbiddenException(
         'You do not have access to companies in this industry',
@@ -238,16 +414,23 @@ export class CompaniesService {
 
     // Apply masking if context is provided
     if (maskingContext) {
+      const contactView = CompaniesService.buildCompanyContactView(
+        company.companyContacts,
+      );
       const masked = this.maskingService.maskCompanyData(
-        company,
+        {
+          ...company,
+          industry: CompaniesService.getPrimaryIndustry(company.industry),
+          ...contactView,
+        },
         maskingContext,
       );
       return {
         id: masked.id,
         logoUrl: masked.logoUrl ?? null,
         companyNameVi: masked.companyNameVi,
-        companyNameCn: masked.companyNameCn,
-        industry: masked.industry,
+        companyNameZh: masked.companyNameZh,
+        industry: [...company.industry],
         email: masked.email,
         phone: masked.phone,
         address: masked.address ?? '',
@@ -258,25 +441,42 @@ export class CompaniesService {
         website: masked.website ?? null,
         contactName: masked.contactName ?? null,
         contactPhone: masked.contactPhone ?? null,
+        emails: masked.email ? [masked.email] : [],
+        contactPhonesByName:
+          masked.contactPhone && masked.contactName
+            ? [
+                {
+                  contactName: masked.contactName,
+                  contactPhones: [masked.contactPhone],
+                },
+              ]
+            : [],
       };
     }
 
+    const contactView = CompaniesService.buildCompanyContactView(
+      company.companyContacts,
+    );
     return {
       id: company.id,
       logoUrl: company.logoUrl,
       companyNameVi: company.companyNameVi,
-      companyNameCn: company.companyNameCn,
-      industry: company.industry,
-      email: company.email,
-      phone: company.phone,
-      address: company.address,
+      companyNameZh: company.companyNameZh,
+      industry: [...company.industry],
+      email: contactView.email,
+      phone: contactView.phone,
+      address: contactView.address,
       description: company.description,
-      taxId: company.taxId,
+      taxId: contactView.taxId,
       country: company.country,
       region: company.region,
-      website: company.website,
-      contactName: company.contactName,
-      contactPhone: company.contactPhone,
+      website: contactView.website,
+      contactName: contactView.contactName,
+      contactPhone: contactView.contactPhone,
+      emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
+      contactPhonesByName: CompaniesService.buildContactPhonesByName(
+        company.companyContacts,
+      ),
     };
   }
 
@@ -286,17 +486,20 @@ export class CompaniesService {
   private applyEffectsToCompany(
     company: CompanyWithActiveAdsRecord,
   ): CompanyData {
+    const contactView = CompaniesService.buildCompanyContactView(
+      company.companyContacts,
+    );
     const displayName =
-      company.companyNameVi ?? company.companyNameCn ?? company.email;
+      company.companyNameVi ?? company.companyNameZh ?? contactView.email;
     const companyData: CompanyData = {
       id: company.id,
       name: displayName,
-      email: company.email,
-      contactName: company.contactName ?? '',
-      phone: company.phone,
-      industry: company.industry,
+      email: contactView.email,
+      contactName: contactView.contactName ?? '',
+      phone: contactView.phone,
+      industry: CompaniesService.getPrimaryIndustry(company.industry),
       country: company.country ?? undefined,
-      address: company.address,
+      address: contactView.address,
       description: company.description,
       showDetailsButton: false,
     };
@@ -319,14 +522,19 @@ export class CompaniesService {
     company: {
       id: string;
       companyNameVi: string | null;
-      companyNameCn: string | null;
+      companyNameZh: string | null;
       logoUrl: string | null;
-      email: string;
-      contactName: string | null;
-      phone: string;
-      industry: string;
+      companyContacts?: Array<{
+        type: string;
+        value: string;
+        contactName: string | null;
+      }>;
+      email?: string;
+      contactName?: string | null;
+      phone?: string;
+      industry: string[];
       country: string | null;
-      address: string;
+      address?: string;
       description: string;
     },
     virtualAds: ActiveAdInfo[],
@@ -338,17 +546,28 @@ export class CompaniesService {
       assets: Array<{ fileUrl: string | null; assetType: string }>;
     }>,
   ): CompanyWithAdsResponseDto {
+    const contactView = company.companyContacts
+      ? CompaniesService.buildCompanyContactView(company.companyContacts)
+      : {
+          email: company.email ?? '',
+          phone: company.phone ?? '',
+          address: company.address ?? '',
+          taxId: null,
+          website: null,
+          contactName: company.contactName ?? null,
+          contactPhone: null,
+        };
     const name =
-      company.companyNameVi ?? company.companyNameCn ?? company.email;
+      company.companyNameVi ?? company.companyNameZh ?? contactView.email;
     const companyData: CompanyData = {
       id: company.id,
       name,
-      email: company.email,
-      contactName: company.contactName ?? '',
-      phone: company.phone,
-      industry: company.industry,
+      email: contactView.email,
+      contactName: contactView.contactName ?? '',
+      phone: contactView.phone,
+      industry: CompaniesService.getPrimaryIndustry(company.industry),
       country: company.country ?? undefined,
-      address: company.address,
+      address: contactView.address,
       description: company.description,
       showDetailsButton: false,
     };
@@ -373,12 +592,12 @@ export class CompaniesService {
       id: company.id,
       name,
       logoUrl: company.logoUrl,
-      email: company.email,
-      contactName: company.contactName ?? '',
-      phone: company.phone,
-      industry: company.industry,
+      email: contactView.email,
+      contactName: contactView.contactName ?? '',
+      phone: contactView.phone,
+      industry: [...company.industry],
       country: company.country,
-      address: company.address,
+      address: contactView.address,
       description: company.description,
       featuredHighlight: modified.featuredHighlight ?? false,
       companyInfoHighlight: modified.companyInfoHighlight ?? false,
@@ -450,6 +669,13 @@ export class CompaniesService {
         },
       },
       include: {
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
         activeAds: {
           where: {
             isActive: true,
@@ -488,8 +714,11 @@ export class CompaniesService {
 
     const responses: CompanyWithAdsResponseDto[] = companies.map((company) => {
       const modified = this.applyEffectsToCompany(company);
+      const contactView = CompaniesService.buildCompanyContactView(
+        company.companyContacts,
+      );
       const name =
-        company.companyNameVi ?? company.companyNameCn ?? company.email;
+        company.companyNameVi ?? company.companyNameZh ?? contactView.email;
       const requiredSlotTypeSet = new Set<AdPackageType>(requiredSlotTypes);
       const activeAdAssets = company.activeAds
         .filter((ad) => requiredSlotTypeSet.has(ad.packageType))
@@ -510,12 +739,12 @@ export class CompaniesService {
         id: company.id,
         name,
         logoUrl: company.logoUrl,
-        email: company.email,
-        contactName: company.contactName ?? '',
-        phone: company.phone,
-        industry: company.industry,
+        email: contactView.email,
+        contactName: contactView.contactName ?? '',
+        phone: contactView.phone,
+        industry: [...company.industry],
         country: company.country,
-        address: company.address,
+        address: contactView.address,
         description: company.description,
         featuredHighlight: modified.featuredHighlight ?? false,
         companyInfoHighlight: modified.companyInfoHighlight ?? false,
@@ -550,6 +779,13 @@ export class CompaniesService {
         },
       },
       include: {
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
         activeAds: {
           where: {
             isActive: true,
@@ -583,8 +819,11 @@ export class CompaniesService {
 
     const responses: CompanyWithAdsResponseDto[] = companies.map((company) => {
       const modified = this.applyEffectsToCompany(company);
+      const contactView = CompaniesService.buildCompanyContactView(
+        company.companyContacts,
+      );
       const name =
-        company.companyNameVi ?? company.companyNameCn ?? company.email;
+        company.companyNameVi ?? company.companyNameZh ?? contactView.email;
 
       const printPlacementAds = company.activeAds.filter(
         (ad) => ad.packageType === AdPackageType.PRINT_PLACEMENT,
@@ -601,11 +840,11 @@ export class CompaniesService {
         id: company.id,
         name,
         logoUrl: company.logoUrl,
-        email: company.email,
-        contactName: company.contactName ?? '',
-        phone: company.phone,
-        industry: company.industry,
-        address: company.address,
+        email: contactView.email,
+        contactName: contactView.contactName ?? '',
+        phone: contactView.phone,
+        industry: [...company.industry],
+        address: contactView.address,
         description: company.description,
         featuredHighlight: modified.featuredHighlight ?? false,
         companyInfoHighlight: modified.companyInfoHighlight ?? false,
@@ -699,7 +938,7 @@ export class CompaniesService {
     if (sortBy === 'name') {
       orderBy.companyNameVi = sortOrder;
     } else if (sortBy === 'industry') {
-      orderBy.industry = sortOrder;
+      orderBy.createdAt = sortOrder;
     } else if (sortBy === 'region') {
       orderBy.region = sortOrder;
     } else {
@@ -713,6 +952,13 @@ export class CompaniesService {
       take: limit,
       orderBy,
       include: {
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
         activeAds: {
           where: {
             packageType: {
@@ -753,6 +999,9 @@ export class CompaniesService {
     // Apply ad effects and transform to DTOs
     const companyItems: CompanyDirectoryItemDto[] = companies.map((company) => {
       const modified = this.applyEffectsToCompany(company);
+      const contactView = CompaniesService.buildCompanyContactView(
+        company.companyContacts,
+      );
 
       // Apply masking if context is provided
       const maskedCompany = maskingContext
@@ -760,13 +1009,13 @@ export class CompaniesService {
             {
               id: company.id,
               companyNameVi: company.companyNameVi,
-              companyNameCn: company.companyNameCn,
-              email: company.email,
-              contactName: company.contactName,
-              phone: company.phone,
-              industry: company.industry,
+              companyNameZh: company.companyNameZh,
+              email: contactView.email,
+              contactName: contactView.contactName,
+              phone: contactView.phone,
+              industry: CompaniesService.getPrimaryIndustry(company.industry),
               region: company.region,
-              address: company.address,
+              address: contactView.address,
               description: company.description,
               logoUrl: company.logoUrl,
             },
@@ -775,20 +1024,20 @@ export class CompaniesService {
         : {
             id: company.id,
             companyNameVi: company.companyNameVi,
-            companyNameCn: company.companyNameCn,
-            email: company.email,
-            contactName: company.contactName,
-            phone: company.phone,
-            industry: company.industry,
+            companyNameZh: company.companyNameZh,
+            email: contactView.email,
+            contactName: contactView.contactName,
+            phone: contactView.phone,
+            industry: CompaniesService.getPrimaryIndustry(company.industry),
             region: company.region,
-            address: company.address,
+            address: contactView.address,
             description: company.description,
             logoUrl: company.logoUrl,
           };
 
       const name =
         maskedCompany.companyNameVi ??
-        maskedCompany.companyNameCn ??
+        maskedCompany.companyNameZh ??
         maskedCompany.email;
 
       return {
@@ -798,7 +1047,7 @@ export class CompaniesService {
         email: maskedCompany.email,
         contactName: maskedCompany.contactName ?? '',
         phone: maskedCompany.phone,
-        industry: maskedCompany.industry,
+        industry: [...company.industry],
         region: maskedCompany.region ?? null,
         address: maskedCompany.address ?? '',
         description: maskedCompany.description ?? '',
@@ -833,19 +1082,21 @@ export class CompaniesService {
   async getCompanyCategories(
     maskingContext?: MaskingContext,
   ): Promise<CompanyCategoriesResponseDto> {
-    const grouped = await this.prisma.company.groupBy({
-      by: ['industry'],
+    const grouped = await this.prisma.company.findMany({
       where: CompaniesService.buildActiveUserCompanyWhere(),
-      _count: {
-        _all: true,
-      },
+      select: { industry: true },
     });
-
-    const allCategories: CompanyCategoriesResponseDto['categories'] = grouped
-      .filter((item) => item.industry !== null)
-      .map((item) => ({
-        industry: item.industry ?? '',
-        count: item._count._all,
+    const categoryCountMap = new Map<string, number>();
+    grouped.forEach((item) => {
+      item.industry.forEach((industryValue) => {
+        const previous = categoryCountMap.get(industryValue) ?? 0;
+        categoryCountMap.set(industryValue, previous + 1);
+      });
+    });
+    const allCategories: CompanyCategoriesResponseDto['categories'] =
+      Array.from(categoryCountMap.entries()).map(([industry, count]) => ({
+        industry,
+        count,
       }));
 
     // If no masking context (guest), return all with hasAllAccess: true
@@ -895,8 +1146,13 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    const updateData = this.toAdminCompanyUpdateData(data);
-    if (Object.keys(updateData).length === 0) {
+    const { companyUpdateData, contactUpdates, contactName } =
+      this.toAdminCompanyUpdatePayload(data);
+    if (
+      Object.keys(companyUpdateData).length === 0 &&
+      Object.keys(contactUpdates).length === 0 &&
+      contactName === undefined
+    ) {
       throw new BadRequestException('No valid company fields provided');
     }
 
@@ -904,21 +1160,50 @@ export class CompaniesService {
       where: { id: companyId },
       select: ADMIN_AUDIT_COMPANY_SELECT,
     });
-    try {
-      await this.prisma.company.update({
-        where: { id: companyId },
-        data: updateData,
-        select: { id: true },
-      });
-    } catch (error: unknown) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Cannot update duplicate email');
+    await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(companyUpdateData).length > 0) {
+        await tx.company.update({
+          where: { id: companyId },
+          data: companyUpdateData,
+          select: { id: true },
+        });
       }
-      throw error;
-    }
+      const entries = Object.entries(contactUpdates);
+      const existingRows = await tx.companyContact.findMany({
+        where: { companyId },
+        select: { contactName: true },
+      });
+      const fallbackName =
+        existingRows.find((row) => row.contactName)?.contactName ?? null;
+      const resolvedPersonName =
+        contactName !== undefined ? contactName : fallbackName;
+      const resolvedOrNull =
+        resolvedPersonName && resolvedPersonName.trim().length > 0
+          ? resolvedPersonName.trim()
+          : null;
+      for (const [type, value] of entries) {
+        await tx.companyContact.deleteMany({
+          where: { companyId, type },
+        });
+        await tx.companyContact.create({
+          data: {
+            companyId,
+            type,
+            value,
+            contactName: resolvedOrNull,
+          },
+        });
+      }
+      if (contactName !== undefined && entries.length === 0) {
+        await tx.companyContact.updateMany({
+          where: { companyId },
+          data: {
+            contactName:
+              contactName.trim().length > 0 ? contactName.trim() : null,
+          },
+        });
+      }
+    });
 
     const companyAfter = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -938,66 +1223,196 @@ export class CompaniesService {
     return company;
   }
 
+  /**
+   * Appends additional `company_contacts` rows for email and contact phone.
+   * Optional `contactName` is stored on each new row (DB column `contact_name`).
+   * Duplicates for the same company + type + value are skipped.
+   */
+  async addCompanyContacts(
+    adminUserId: string,
+    companyId: string,
+    dto: AddCompanyContactsDto,
+  ): Promise<AddCompanyContactsResponseDto> {
+    const companyExists = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+    if (!companyExists) {
+      throw new NotFoundException('Company not found');
+    }
+    const normalizedRows: Array<{ type: string; value: string }> = [];
+    const seenInRequest = new Set<string>();
+    const pushUnique = (type: string, value: string): void => {
+      const key = `${type}\0${value}`;
+      if (seenInRequest.has(key)) {
+        return;
+      }
+      seenInRequest.add(key);
+      normalizedRows.push({ type, value });
+    };
+    for (const raw of dto.emails ?? []) {
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      pushUnique(CONTACT_TYPE.EMAIL, trimmed.toLowerCase());
+    }
+    for (const raw of dto.contactPhones ?? []) {
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      pushUnique(CONTACT_TYPE.CONTACT_PHONE, trimmed);
+    }
+    if (normalizedRows.length === 0) {
+      throw new BadRequestException(
+        'At least one valid email or contact phone is required',
+      );
+    }
+    const contactName = dto.contactName?.trim().length
+      ? dto.contactName.trim()
+      : null;
+    const existing = await this.prisma.companyContact.findMany({
+      where: {
+        companyId,
+        OR: normalizedRows.map((row) => ({
+          AND: [{ type: row.type }, { value: row.value }],
+        })),
+      },
+      select: { type: true, value: true },
+    });
+    const existingSet = new Set(
+      existing.map((row) => `${row.type}\0${row.value}`),
+    );
+    const toCreate = normalizedRows.filter(
+      (row) => !existingSet.has(`${row.type}\0${row.value}`),
+    );
+    const skippedDuplicates = normalizedRows.length - toCreate.length;
+    const createResult = await this.prisma.companyContact.createMany({
+      data: toCreate.map((row) => ({
+        companyId,
+        type: row.type,
+        value: row.value,
+        contactName,
+      })),
+    });
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.COMPANY,
+      action: AUDIT_ACTION.COMPANY_CONTACTS_ADDED,
+      entityId: companyId,
+      actorId: adminUserId,
+      metadata: {
+        added: createResult.count,
+        skippedDuplicates,
+      },
+    });
+    return {
+      added: createResult.count,
+      skippedDuplicates,
+    };
+  }
+
   private static serializeCompanyAuditPayload(
     company: CompanyAuditSnapshot | null | undefined,
   ): string {
+    const contactView = company
+      ? CompaniesService.buildCompanyContactView(company.companyContacts)
+      : null;
     const companyPayload = company
       ? {
           id: company.id,
-          email: company.email,
+          email: contactView?.email ?? '',
           logoUrl: company.logoUrl,
           companyNameVi: company.companyNameVi,
-          companyNameCn: company.companyNameCn,
-          phone: company.phone,
-          address: company.address,
+          companyNameZh: company.companyNameZh,
+          phone: contactView?.phone ?? '',
+          address: contactView?.address ?? '',
           description: company.description,
-          taxId: company.taxId,
+          taxId: contactView?.taxId ?? null,
           country: company.country,
           region: company.region,
-          industry: company.industry,
-          website: company.website,
-          contactName: company.contactName,
-          contactPhone: company.contactPhone,
+          industry: CompaniesService.getPrimaryIndustry(company.industry),
+          website: contactView?.website ?? null,
+          contactName: contactView?.contactName ?? null,
+          contactPhone: contactView?.contactPhone ?? null,
+          contacts: company.companyContacts,
         }
       : null;
     return JSON.stringify({ company: companyPayload });
   }
 
-  private toAdminCompanyUpdateData(
-    data: UpdateProfileDto,
-  ): Prisma.CompanyUpdateInput {
-    const updateData: Prisma.CompanyUpdateInput = {};
-    type Mapper = {
+  private toAdminCompanyUpdatePayload(data: UpdateProfileDto): {
+    companyUpdateData: Prisma.CompanyUpdateInput;
+    contactUpdates: Record<string, string>;
+    contactName?: string;
+  } {
+    const companyUpdateData: Prisma.CompanyUpdateInput = {};
+    const contactUpdates: Record<string, string> = {};
+    type CompanyMapper = {
       from: keyof UpdateProfileDto;
       to: keyof Prisma.CompanyUpdateInput;
       transform?: (value: string) => string;
     };
-    const mappers: readonly Mapper[] = [
+    type ContactMapper = {
+      from: keyof UpdateProfileDto;
+      contactType: string;
+      transform?: (value: string) => string;
+    };
+    const companyMappers: readonly CompanyMapper[] = [
       { from: 'upload_logo', to: 'logoUrl' },
       { from: 'company_name_vi', to: 'companyNameVi' },
-      { from: 'company_name_cn', to: 'companyNameCn' },
-      { from: 'phone', to: 'phone' },
-      { from: 'tax_id', to: 'taxId' },
-      { from: 'contact_person', to: 'contactName' },
-      { from: 'contact_phone', to: 'contactPhone' },
-      { from: 'company_address', to: 'address' },
-      { from: 'email', to: 'email', transform: (value) => value.toLowerCase() },
+      { from: 'company_name_zh', to: 'companyNameZh' },
       { from: 'country', to: 'country' },
       { from: 'region', to: 'region' },
       { from: 'industry', to: 'industry' },
-      { from: 'website', to: 'website' },
       { from: 'introduction', to: 'description' },
     ];
+    const contactMappers: readonly ContactMapper[] = [
+      {
+        from: 'email',
+        contactType: CONTACT_TYPE.EMAIL,
+        transform: (value) => value.toLowerCase(),
+      },
+      { from: 'phone', contactType: CONTACT_TYPE.PHONE },
+      { from: 'company_address', contactType: CONTACT_TYPE.ADDRESS },
+      { from: 'tax_id', contactType: CONTACT_TYPE.TAX_ID },
+      { from: 'website', contactType: CONTACT_TYPE.WEBSITE },
+      { from: 'contact_phone', contactType: CONTACT_TYPE.CONTACT_PHONE },
+    ];
 
-    for (const mapper of mappers) {
+    for (const mapper of companyMappers) {
       const raw = data[mapper.from];
       if (raw === undefined) continue;
-      const normalized = raw.trim();
-      (updateData as Record<string, unknown>)[mapper.to] = mapper.transform
+      if (mapper.from === 'industry') {
+        const normalizedIndustries = Array.isArray(raw)
+          ? raw
+              .filter((value): value is string => typeof value === 'string')
+              .map((value) => value.trim())
+              .filter((value) => value.length > 0)
+          : typeof raw === 'string'
+            ? [raw.trim()].filter((value) => value.length > 0)
+            : [];
+        (companyUpdateData as Record<string, unknown>)[mapper.to] =
+          normalizedIndustries;
+        continue;
+      }
+      const normalized = (raw as string).trim();
+      (companyUpdateData as Record<string, unknown>)[mapper.to] =
+        mapper.transform ? mapper.transform(normalized) : normalized;
+    }
+    for (const mapper of contactMappers) {
+      const raw = data[mapper.from];
+      if (raw === undefined) continue;
+      const normalized = (raw as string).trim();
+      contactUpdates[mapper.contactType] = mapper.transform
         ? mapper.transform(normalized)
         : normalized;
     }
-
-    return updateData;
+    const rawContactPerson = data.contact_person;
+    let contactName: string | undefined;
+    if (rawContactPerson !== undefined) {
+      contactName = rawContactPerson.trim();
+    }
+    return { companyUpdateData, contactUpdates, contactName };
   }
 }

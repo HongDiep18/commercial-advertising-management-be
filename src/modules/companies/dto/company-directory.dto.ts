@@ -124,8 +124,12 @@ export class CompanyDirectoryItemDto {
   @ApiProperty({ example: '+84 28 1234 5678' })
   phone!: string;
 
-  @ApiProperty({ example: 'Manufacturing' })
-  industry!: string;
+  @ApiProperty({
+    type: [String],
+    description: 'Company industries (multi-select)',
+    example: ['Manufacturing', 'Textile'],
+  })
+  industry!: string[];
 
   @ApiPropertyOptional({ example: 'Hai Phong' })
   region?: string | null;

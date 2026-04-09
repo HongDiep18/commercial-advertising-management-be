@@ -44,6 +44,60 @@ export class MailService {
     }
   }
 
+  private static readonly CONTACT_TYPE = {
+    EMAIL: 'email',
+    PHONE: 'phone',
+    ADDRESS: 'address',
+    TAX_ID: 'tax_id',
+    WEBSITE: 'website',
+    CONTACT_PHONE: 'contact_phone',
+    FAX: 'fax',
+    SKYPE: 'skype',
+  } as const;
+
+  private getCompanyContactValue(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName?: string | null;
+    }>,
+    type: string,
+  ): string | null {
+    const found = contacts.find((contact) => contact.type === type);
+    return found?.value ?? null;
+  }
+
+  private getContactNameFromContacts(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): string {
+    const priorityTypes = [
+      MailService.CONTACT_TYPE.EMAIL,
+      MailService.CONTACT_TYPE.PHONE,
+      MailService.CONTACT_TYPE.CONTACT_PHONE,
+    ];
+    for (const contactType of priorityTypes) {
+      const row = contacts.find(
+        (contact) =>
+          contact.type === contactType &&
+          contact.contactName &&
+          contact.contactName.trim().length > 0,
+      );
+      if (row?.contactName) {
+        return row.contactName.trim();
+      }
+    }
+    const anyNamed = contacts.find(
+      (contact) =>
+        contact.contactName &&
+        contact.contactName.trim().length > 0,
+    );
+    return anyNamed?.contactName?.trim() ?? '';
+  }
+
   buildSetPasswordLink(token: string): string {
     const base = this.frontendUrl.replace(/\/$/, '');
     return `${base}/set-password?token=${encodeURIComponent(token)}`;
@@ -132,12 +186,14 @@ export class MailService {
           company: {
             select: {
               companyNameVi: true,
-              companyNameCn: true,
-              email: true,
-              contactName: true,
-              phone: true,
-              address: true,
-              taxId: true,
+              companyNameZh: true,
+              companyContacts: {
+                select: {
+                  type: true,
+                  value: true,
+                  contactName: true,
+                },
+              },
             },
           },
           items: {
@@ -167,7 +223,10 @@ export class MailService {
         );
         return;
       }
-      const companyEmail = order.company.email?.trim();
+      const companyEmail = this.getCompanyContactValue(
+        order.company.companyContacts,
+        MailService.CONTACT_TYPE.EMAIL,
+      )?.trim();
       if (!companyEmail) {
         console.log(
           `[Mail] Company email missing for order ${orderId} – skipping notification email`,
@@ -184,12 +243,29 @@ export class MailService {
         user: { email: order.user.email },
         company: {
           companyNameVi: order.company.companyNameVi,
-          companyNameCn: order.company.companyNameCn,
-          email: order.company.email,
-          contactName: order.company.contactName ?? '',
-          phone: order.company.phone,
-          address: order.company.address ?? '',
-          taxId: order.company.taxId,
+          companyNameZh: order.company.companyNameZh,
+          email:
+            this.getCompanyContactValue(
+              order.company.companyContacts,
+              MailService.CONTACT_TYPE.EMAIL,
+            ) ?? '',
+          contactName: this.getContactNameFromContacts(
+            order.company.companyContacts,
+          ),
+          phone:
+            this.getCompanyContactValue(
+              order.company.companyContacts,
+              MailService.CONTACT_TYPE.PHONE,
+            ) ?? '',
+          address:
+            this.getCompanyContactValue(
+              order.company.companyContacts,
+              MailService.CONTACT_TYPE.ADDRESS,
+            ) ?? '',
+          taxId: this.getCompanyContactValue(
+            order.company.companyContacts,
+            MailService.CONTACT_TYPE.TAX_ID,
+          ),
         },
         items: order.items.map((item) => ({
           id: item.id,

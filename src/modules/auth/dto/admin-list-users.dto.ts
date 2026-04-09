@@ -70,7 +70,7 @@ export class AdminUserListItemDto {
   companyNameVi!: string | null;
 
   @ApiPropertyOptional()
-  companyNameCn!: string | null;
+  companyNameZh!: string | null;
 
   @ApiProperty()
   role!: string;
@@ -102,3 +102,4 @@ export class AdminListUsersResponseDto {
     totalPages: number;
   };
 }
+

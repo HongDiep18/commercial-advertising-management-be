@@ -357,17 +357,17 @@ export class AuditActivityFormatter {
       (_, m) =>
         AuditActivityFormatter.readString(m, [
           'companyNameVi',
-          'companyNameCn',
+          'companyNameZh',
         ]),
       (r) =>
         AuditActivityFormatter.readNestedStringFromJson(r.newValue, 'company', [
           'companyNameVi',
-          'companyNameCn',
+          'companyNameZh',
         ]),
       (r) =>
         AuditActivityFormatter.readNestedStringFromJson(r.oldValue, 'company', [
           'companyNameVi',
-          'companyNameCn',
+          'companyNameZh',
         ]),
     ];
     for (const extract of extractors) {
@@ -494,3 +494,4 @@ export class AuditActivityFormatter {
     return `${value.slice(0, 8)}...`;
   }
 }
+

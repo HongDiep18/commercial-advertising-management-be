@@ -273,35 +273,45 @@ enum AdOrderStatus {
 
 model Company {
   id          String   @id @default(uuid()) @db.Uuid
-  email       String   @unique @db.VarChar(255)
-  phone       String   @db.VarChar(50)
-  industry    String   @db.VarChar(255)
-  address     String   @db.VarChar(512)
+  industry    String[] @db.VarChar(255)
   description String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   status CompanyProfileRequestStatus @default(APPROVED) @map("registration_status")
-  membershipTier     MembershipTier              @default(BRONZE) @map("membership_tier")
 
   // Profile fields (consolidated from UserProfile)
   logoUrl       String? @map("logo_url") @db.VarChar(2048)
   companyNameVi String? @map("company_name_vi") @db.VarChar(255)
-  companyNameCn String? @map("company_name_cn") @db.VarChar(255)
-  taxId         String? @map("tax_id") @db.VarChar(64)
+  companyNameEn String? @map("company_name_en") @db.VarChar(255)
+  companyNameZh String? @map("company_name_zh") @db.VarChar(255)
   country       String? @db.VarChar(128)
   region        String? @db.VarChar(128)
-  website       String? @db.VarChar(2048)
-  contactName   String? @map("contact_name") @db.VarChar(255)
-  contactPhone  String? @map("contact_phone") @db.VarChar(32)
 
-  users     User[]
-  adOrders  AdOrder[]
-  activeAds ActiveAd[]
+  users           User[]
+  adOrders        AdOrder[]
+  activeAds       ActiveAd[]
+  companyContacts CompanyContact[]
 
   @@index([status])
-  @@index([email])
   @@map("companies")
+}
+
+model CompanyContact {
+  id                String   @id @default(uuid()) @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  type              String   @db.VarChar(64)
+  value             String   @db.Text
+  /// Display / grouping name for this channel row (replaces former type = contact_name rows).
+  contactName String? @map("contact_name") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@map("company_contacts")
 }
 
 model AdPackageCategory {
@@ -583,3 +593,4 @@ model PropertyContactInquiry {
   @@index([propertyId])
   @@map("property_contact_inquiries")
 }
+

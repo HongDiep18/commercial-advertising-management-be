@@ -14,7 +14,6 @@ import {
   Prisma,
   PrismaClient,
 } from '@prisma/client';
-import type { Company } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
@@ -67,23 +66,23 @@ export type LoginResult = {
   };
 };
 
-const PROFILE_SELECT_KEYS = [
-  'logoUrl',
-  'companyNameVi',
-  'companyNameCn',
-  'phone',
-  'address',
-  'description',
-  'taxId',
-  'country',
-  'region',
-  'industry',
-  'website',
-  'contactName',
-  'contactPhone',
-] as const;
-
-type ProfileField = (typeof PROFILE_SELECT_KEYS)[number];
+type ProfileField =
+  | 'logoUrl'
+  | 'companyNameVi'
+  | 'companyNameEn'
+  | 'companyNameZh'
+  | 'phone'
+  | 'address'
+  | 'description'
+  | 'taxId'
+  | 'country'
+  | 'region'
+  | 'industry'
+  | 'website'
+  | 'fax'
+  | 'skype'
+  | 'contactName'
+  | 'contactPhone';
 
 export type ProfileResponse = {
   id: string;
@@ -92,34 +91,55 @@ export type ProfileResponse = {
   role: string;
 } & Partial<Record<ProfileField, string | null>>;
 
-function profileSelect(): Record<ProfileField, true> {
-  return Object.fromEntries(
-    PROFILE_SELECT_KEYS.map((k) => [k, true]),
-  ) as Record<ProfileField, true>;
-}
-
 type CompanyProfileSelectResult = {
   readonly id: string;
   readonly logoUrl: string | null;
   readonly companyNameVi: string | null;
-  readonly companyNameCn: string | null;
-  readonly phone: string;
-  readonly industry: string;
-  readonly address: string;
+  readonly companyNameEn: string | null;
+  readonly companyNameZh: string | null;
+  readonly industry: string[];
   readonly description: string;
-  readonly taxId: string | null;
   readonly country: string | null;
   readonly region: string | null;
-  readonly website: string | null;
-  readonly contactName: string | null;
-  readonly contactPhone: string | null;
+  readonly companyContacts: ReadonlyArray<{
+    readonly type: string;
+    readonly value: string;
+    readonly contactName: string | null;
+  }>;
 };
 
-function companyProfileSelect(): { readonly id: true } & Record<
-  ProfileField,
-  true
-> {
-  return { id: true, ...profileSelect() };
+const CONTACT_TYPE = {
+  EMAIL: 'email',
+  PHONE: 'phone',
+  ADDRESS: 'address',
+  TAX_ID: 'tax_id',
+  WEBSITE: 'website',
+  FAX: 'fax',
+  SKYPE: 'skype',
+  NOTE: 'note',
+  CONTACT_NAME: 'contact_name',
+  CONTACT_PHONE: 'contact_phone',
+} as const;
+
+function companyProfileSelect() {
+  return {
+    id: true,
+    logoUrl: true,
+    companyNameVi: true,
+    companyNameEn: true,
+    companyNameZh: true,
+    industry: true,
+    description: true,
+    country: true,
+    region: true,
+    companyContacts: {
+      select: {
+        type: true,
+        value: true,
+        contactName: true,
+      },
+    },
+  } as const;
 }
 
 const SET_PASSWORD_TOKEN_BYTES = 32;
@@ -135,6 +155,69 @@ export class AuthService {
     private readonly loyaltyService: LoyaltyService,
     private readonly captchaVerificationService: CaptchaVerificationService,
   ) {}
+
+  private static getContactValue(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName?: string | null;
+    }>,
+    type: string,
+  ): string | null {
+    const found = contacts.find((contact) => contact.type === type);
+    return found?.value ?? null;
+  }
+
+  private static getContactNameFromContacts(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): string | null {
+    const priorityTypes = [
+      CONTACT_TYPE.EMAIL,
+      CONTACT_TYPE.PHONE,
+      CONTACT_TYPE.CONTACT_PHONE,
+    ];
+    for (const contactType of priorityTypes) {
+      const row = contacts.find(
+        (contact) =>
+          contact.type === contactType &&
+          contact.contactName &&
+          contact.contactName.trim().length > 0,
+      );
+      if (row?.contactName) {
+        return row.contactName.trim();
+      }
+    }
+    const anyNamed = contacts.find(
+      (contact) => contact.contactName && contact.contactName.trim().length > 0,
+    );
+    return anyNamed?.contactName?.trim() ?? null;
+  }
+
+  private static mapCompanyContactsToProfileFields(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): Partial<Record<ProfileField, string | null>> {
+    return {
+      phone: AuthService.getContactValue(contacts, CONTACT_TYPE.PHONE),
+      address: AuthService.getContactValue(contacts, CONTACT_TYPE.ADDRESS),
+      taxId: AuthService.getContactValue(contacts, CONTACT_TYPE.TAX_ID),
+      website: AuthService.getContactValue(contacts, CONTACT_TYPE.WEBSITE),
+      fax: AuthService.getContactValue(contacts, CONTACT_TYPE.FAX),
+      skype: AuthService.getContactValue(contacts, CONTACT_TYPE.SKYPE),
+      contactName: AuthService.getContactNameFromContacts(contacts),
+      contactPhone: AuthService.getContactValue(
+        contacts,
+        CONTACT_TYPE.CONTACT_PHONE,
+      ),
+    };
+  }
 
   async login(email: string, password: string): Promise<LoginResult> {
     const normalizedEmail = email.trim().toLowerCase();
@@ -284,17 +367,20 @@ export class AuthService {
       data.captchaId,
       data.captcha,
     );
-    const email = data.email.trim().toLowerCase();
+    const companyEmail = data.company_email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: companyEmail },
     });
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
 
-    const existingCompany = await this.prisma.company.findUnique({
-      where: { email },
-    });
+    const existingCompanyEmailContact =
+      await this.prisma.companyContact.findFirst({
+        where: { type: CONTACT_TYPE.EMAIL, value: companyEmail },
+        select: { company: true },
+      });
+    const existingCompany = existingCompanyEmailContact?.company ?? null;
     if (existingCompany) {
       if (existingCompany.status === CompanyProfileRequestStatus.PENDING) {
         throw new ConflictException(
@@ -306,14 +392,14 @@ export class AuthService {
       }
       const company = await this.prisma.company.update({
         where: { id: existingCompany.id },
-        data: AuthService.companyCreateDataFromRegisterDto(data, email),
+        data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail),
       });
       await this.auditService.record({
         action: AUDIT_ACTION.PROFILE_REQUEST_CREATED,
         entityType: AUDIT_ENTITY.COMPANY,
         entityId: company.id,
         metadata: {
-          email,
+          email: companyEmail,
           companyNameVi: data.company_name_vi,
           industry: data.industry,
         },
@@ -325,7 +411,7 @@ export class AuthService {
     }
 
     const company = await this.prisma.company.create({
-      data: AuthService.companyCreateDataFromRegisterDto(data, email),
+      data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail),
     });
 
     await this.auditService.record({
@@ -333,7 +419,7 @@ export class AuthService {
       entityType: AUDIT_ENTITY.COMPANY,
       entityId: company.id,
       metadata: {
-        email,
+        email: companyEmail,
         companyNameVi: data.company_name_vi,
         industry: data.industry,
       },
@@ -347,32 +433,90 @@ export class AuthService {
 
   private static companyCreateDataFromRegisterDto(
     data: RegisterDto,
-    email: string,
+    companyEmail: string,
   ): Prisma.CompanyCreateInput {
     return {
-      email,
       companyNameVi: data.company_name_vi.trim(),
-      companyNameCn: data.company_name_cn.trim(),
-      phone: data.phone.trim(),
-      taxId: data.tax_id.trim(),
-      contactName: data.contact_person.trim(),
-      contactPhone: data.contact_phone?.trim() || data.phone.trim(),
-      address: data.company_address.trim(),
+      companyNameEn: data.company_name_en?.trim() || null,
+      companyNameZh: data.company_name_zh.trim(),
       country: data.country.trim(),
       ...(data.region && data.region.trim()
         ? { region: data.region.trim() }
         : { region: null }),
-      industry: data.industry.trim(),
-      website: data.website.trim(),
+      industry: data.industry.map((value) => value.trim()).filter(Boolean),
       description: data.introduction.trim(),
       status: CompanyProfileRequestStatus.PENDING,
+      companyContacts: {
+        create: (() => {
+          const contactName = data.contact_person.trim();
+          return [
+            {
+              type: CONTACT_TYPE.EMAIL,
+              value: companyEmail,
+              contactName,
+            },
+            {
+              type: CONTACT_TYPE.PHONE,
+              value: data.phone.trim(),
+              contactName,
+            },
+            {
+              type: CONTACT_TYPE.TAX_ID,
+              value: data.tax_id.trim(),
+              contactName,
+            },
+            {
+              type: CONTACT_TYPE.CONTACT_PHONE,
+              value: data.contact_phone?.trim() || data.phone.trim(),
+              contactName,
+            },
+            {
+              type: CONTACT_TYPE.ADDRESS,
+              value: data.company_address.trim(),
+              contactName,
+            },
+            {
+              type: CONTACT_TYPE.WEBSITE,
+              value: data.website.trim(),
+              contactName,
+            },
+            ...(data.fax?.trim()
+              ? [
+                  {
+                    type: CONTACT_TYPE.FAX,
+                    value: data.fax.trim(),
+                    contactName,
+                  },
+                ]
+              : []),
+            ...(data.skype?.trim()
+              ? [
+                  {
+                    type: CONTACT_TYPE.SKYPE,
+                    value: data.skype.trim(),
+                    contactName,
+                  },
+                ]
+              : []),
+            ...(data.note?.trim()
+              ? [
+                  {
+                    type: CONTACT_TYPE.NOTE,
+                    value: data.note.trim(),
+                    contactName,
+                  },
+                ]
+              : []),
+          ];
+        })(),
+      },
     };
   }
 
   private static dtoToProfileData(
     data: UpdateProfileDto,
-  ): Record<string, string | null> {
-    const out: Record<string, string | null> = {};
+  ): Record<string, string | string[] | null> {
+    const out: Record<string, string | string[] | null> = {};
     const dataRecord = data as unknown as Record<string, unknown>;
 
     const skipKeys = new Set(['membership_tier']);
@@ -389,7 +533,15 @@ export class AuthService {
       if (key === 'company_address') camelKey = 'address';
       if (key === 'introduction') camelKey = 'description';
       const raw = dataRecord[key];
-      const val = typeof raw === 'string' ? raw.trim() || null : null;
+      const val =
+        typeof raw === 'string'
+          ? raw.trim() || null
+          : Array.isArray(raw) && key === 'industry'
+            ? raw
+                .filter((item): item is string => typeof item === 'string')
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0)
+            : null;
 
       if (key === 'upload_logo' && val === null) return;
       if (
@@ -639,12 +791,20 @@ export class AuthService {
     const validStatuses = Object.values(
       CompanyProfileRequestStatus,
     ) as readonly string[];
+    const linkageWhere: Prisma.CompanyWhereInput = {
+      OR: [{ users: { none: {} } }, { users: { some: { deletedAt: null } } }],
+    };
     const where =
       status && validStatuses.includes(status)
-        ? {
-            status: status as CompanyProfileRequestStatus,
-          }
-        : undefined;
+        ? ({
+            AND: [
+              {
+                status: status as CompanyProfileRequestStatus,
+              },
+              linkageWhere,
+            ],
+          } satisfies Prisma.CompanyWhereInput)
+        : linkageWhere;
     const [total, companies] = await Promise.all([
       this.prisma.company.count({ where }),
       this.prisma.company.findMany({
@@ -652,6 +812,12 @@ export class AuthService {
         orderBy,
         skip,
         take: limit,
+        include: {
+          companyContacts: {
+            where: { type: CONTACT_TYPE.EMAIL },
+            select: { type: true, value: true, contactName: true },
+          },
+        },
       }),
     ]);
 
@@ -681,12 +847,39 @@ export class AuthService {
     }
 
     const totalPages = Math.ceil(total / limit);
+    type CompanyContactRow = {
+      readonly type: string;
+      readonly value: string;
+      readonly contactName: string | null;
+    };
+    type CompanyWithContacts = {
+      readonly companyContacts?: ReadonlyArray<CompanyContactRow>;
+    };
+    const getCompanyContactValue = (
+      company: CompanyWithContacts,
+      type: string,
+    ): string | null => {
+      const value = company.companyContacts?.find(
+        (cc) => cc.type === type,
+      )?.value;
+      return value ?? null;
+    };
     const requests = companies.map((c) => {
       const user = userByCompanyId.get(c.id);
+      const typedCompany = c as unknown as CompanyWithContacts;
+      const companyEmail = getCompanyContactValue(
+        typedCompany,
+        CONTACT_TYPE.EMAIL,
+      );
+      const contactName = AuthService.getContactNameFromContacts(
+        typedCompany.companyContacts ?? [],
+      );
       const { status: companyStatus, ...companyData } = c;
       return {
         ...companyData,
         status: companyStatus,
+        companyEmail,
+        contactName,
         userId: user?.id ?? null,
         companyId: user?.companyId ?? null,
         isActive: user?.isActive ?? null,
@@ -714,7 +907,7 @@ export class AuthService {
       return { updatedAt: sortOrder };
     }
     if (sortBy === 'email') {
-      return { email: sortOrder };
+      return { createdAt: sortOrder };
     }
     if (sortBy === 'companyNameVi') {
       return { companyNameVi: sortOrder };
@@ -829,9 +1022,18 @@ export class AuthService {
         {
           company: {
             OR: [
-              { contactName: { contains: search, mode: 'insensitive' } },
               { companyNameVi: { contains: search, mode: 'insensitive' } },
-              { companyNameCn: { contains: search, mode: 'insensitive' } },
+              { companyNameZh: { contains: search, mode: 'insensitive' } },
+              {
+                companyContacts: {
+                  some: {
+                    contactName: {
+                      contains: search,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
             ],
           },
         },
@@ -885,9 +1087,11 @@ export class AuthService {
           companyId: true,
           company: {
             select: {
-              contactName: true,
               companyNameVi: true,
-              companyNameCn: true,
+              companyNameZh: true,
+              companyContacts: {
+                select: { type: true, value: true, contactName: true },
+              },
             },
           },
         } as unknown as Prisma.UserSelect,
@@ -905,9 +1109,13 @@ export class AuthService {
       lastLoginAt: Date | null;
       companyId: string | null;
       company: {
-        contactName: string | null;
         companyNameVi: string | null;
-        companyNameCn: string | null;
+        companyNameZh: string | null;
+        companyContacts: Array<{
+          type: string;
+          value: string;
+          contactName: string | null;
+        }>;
       } | null;
     };
 
@@ -915,13 +1123,16 @@ export class AuthService {
       const statusVal: AdminUserStatus =
         u.deletedAt != null ? 'deleted' : u.isActive ? 'active' : 'suspended';
       const company = u.company;
+      const contactName = company
+        ? AuthService.getContactNameFromContacts(company.companyContacts)
+        : null;
       return {
         userId: u.id,
         companyId: u.companyId,
-        contactName: company?.contactName ?? null,
+        contactName,
         email: u.email,
         companyNameVi: company?.companyNameVi ?? null,
-        companyNameCn: company?.companyNameCn ?? null,
+        companyNameZh: company?.companyNameZh ?? null,
         role: u.role,
         lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
         status: statusVal,
@@ -945,7 +1156,7 @@ export class AuthService {
     readonly userId: string;
     readonly userEmail: string;
     readonly companyId: string | null;
-    readonly profileData: Record<string, string | null>;
+    readonly profileData: Record<string, string | string[] | null>;
   }): Promise<Partial<Record<ProfileField, string | null>>> {
     const { profileData } = input;
     if (Object.keys(profileData).length === 0) {
@@ -958,20 +1169,75 @@ export class AuthService {
         company as CompanyProfileSelectResult | null,
       );
     }
-    const updateData = AuthService.toCompanyUpdateData(profileData);
+    const { companyData, contactData } =
+      AuthService.toCompanyUpdateData(profileData);
     if (input.companyId) {
-      const company = await this.prisma.company.update({
-        where: { id: input.companyId },
-        data: updateData,
-        select: companyProfileSelect(),
+      const company = await this.prisma.$transaction(async (tx) => {
+        if (Object.keys(companyData).length > 0) {
+          await tx.company.update({
+            where: { id: input.companyId! },
+            data: companyData,
+            select: { id: true },
+          });
+        }
+        const contactNameFromPayload = contactData[CONTACT_TYPE.CONTACT_NAME];
+        const typeValueEntries = Object.entries(contactData).filter(
+          ([contactType]) => contactType !== CONTACT_TYPE.CONTACT_NAME,
+        );
+        const existingRows = await tx.companyContact.findMany({
+          where: { companyId: input.companyId! },
+          select: { contactName: true },
+        });
+        const fallbackName =
+          existingRows.find((row) => row.contactName)?.contactName ?? null;
+        const resolvedPersonName =
+          contactNameFromPayload !== undefined
+            ? contactNameFromPayload
+            : fallbackName;
+        const resolvedOrNull =
+          resolvedPersonName && resolvedPersonName.trim().length > 0
+            ? resolvedPersonName.trim()
+            : null;
+        for (const [type, value] of typeValueEntries) {
+          await tx.companyContact.deleteMany({
+            where: { companyId: input.companyId!, type },
+          });
+          await tx.companyContact.create({
+            data: {
+              companyId: input.companyId!,
+              type,
+              value,
+              contactName: resolvedOrNull,
+            },
+          });
+        }
+        if (
+          contactNameFromPayload !== undefined &&
+          typeValueEntries.length === 0
+        ) {
+          await tx.companyContact.updateMany({
+            where: { companyId: input.companyId! },
+            data: {
+              contactName:
+                contactNameFromPayload.trim().length > 0
+                  ? contactNameFromPayload.trim()
+                  : null,
+            },
+          });
+        }
+        return tx.company.findUnique({
+          where: { id: input.companyId! },
+          select: companyProfileSelect(),
+        });
       });
       return AuthService.mapCompanyToProfileResponse(
-        company as unknown as CompanyProfileSelectResult,
+        company as CompanyProfileSelectResult | null,
       );
     }
     const createData = AuthService.toCompanyCreateData({
       userEmail: input.userEmail,
-      updateData,
+      updateData: companyData,
+      contactData,
     });
     const company = await this.prisma.company.create({
       data: createData,
@@ -988,32 +1254,75 @@ export class AuthService {
   }
 
   private static toCompanyUpdateData(
-    profileData: Record<string, string | null>,
-  ): Prisma.CompanyUpdateInput {
-    const allowedKeys: ReadonlySet<string> = new Set(PROFILE_SELECT_KEYS);
-    const out: Record<string, string | null> = {};
+    profileData: Record<string, string | string[] | null>,
+  ): {
+    companyData: Prisma.CompanyUpdateInput;
+    contactData: Record<string, string>;
+  } {
+    const companyFieldKeys: ReadonlySet<string> = new Set([
+      'logoUrl',
+      'companyNameVi',
+      'companyNameEn',
+      'companyNameZh',
+      'description',
+      'country',
+      'region',
+      'industry',
+    ]);
+    const contactFieldToType: Readonly<Record<string, string>> = {
+      email: CONTACT_TYPE.EMAIL,
+      phone: CONTACT_TYPE.PHONE,
+      address: CONTACT_TYPE.ADDRESS,
+      taxId: CONTACT_TYPE.TAX_ID,
+      website: CONTACT_TYPE.WEBSITE,
+      fax: CONTACT_TYPE.FAX,
+      skype: CONTACT_TYPE.SKYPE,
+      contactName: CONTACT_TYPE.CONTACT_NAME,
+      contactPhone: CONTACT_TYPE.CONTACT_PHONE,
+    };
+    const companyData: Record<string, string | string[]> = {};
+    const contactData: Record<string, string> = {};
     Object.entries(profileData).forEach(([key, value]) => {
-      if (!allowedKeys.has(key)) return;
       if (value === null) return;
-      out[key] = value;
+      if (companyFieldKeys.has(key)) {
+        companyData[key] = value;
+        return;
+      }
+      if (Array.isArray(value)) return;
+      const type = contactFieldToType[key];
+      if (type) {
+        contactData[type] = value;
+      }
     });
-    return out as Prisma.CompanyUpdateInput;
+    return {
+      companyData: companyData as unknown as Prisma.CompanyUpdateInput,
+      contactData,
+    };
   }
 
   private static toCompanyCreateData(input: {
     readonly userEmail: string;
     readonly updateData: Prisma.CompanyUpdateInput;
+    readonly contactData: Record<string, string>;
   }): Prisma.CompanyCreateInput {
     const requiredKeys = [
-      'contactName',
       'phone',
       'industry',
       'address',
       'description',
     ] as const;
     const updateData = input.updateData as Record<string, unknown>;
+    const contactData = input.contactData;
     const missing = requiredKeys.filter((k) => {
-      const v = updateData[k];
+      const v =
+        k === 'phone'
+          ? contactData[CONTACT_TYPE.PHONE]
+          : k === 'address'
+            ? contactData[CONTACT_TYPE.ADDRESS]
+            : updateData[k];
+      if (k === 'industry') {
+        return !Array.isArray(v) || v.length === 0;
+      }
       return typeof v !== 'string' || v.trim() === '';
     });
     if (missing.length > 0) {
@@ -1021,21 +1330,92 @@ export class AuthService {
         `Cannot create company profile; missing required fields: ${missing.join(', ')}`,
       );
     }
+    const personRaw = contactData[CONTACT_TYPE.CONTACT_NAME];
+    const contactName =
+      typeof personRaw === 'string' && personRaw.trim().length > 0
+        ? personRaw.trim()
+        : null;
     return {
-      email: input.userEmail.trim().toLowerCase(),
-      phone: updateData.phone as string,
-      industry: updateData.industry as string,
-      address: updateData.address as string,
+      industry: updateData.industry as string[],
       description: updateData.description as string,
-      contactName: (updateData.contactName as string | undefined) ?? null,
-      contactPhone: (updateData.contactPhone as string | undefined) ?? null,
       logoUrl: (updateData.logoUrl as string | undefined) ?? null,
       companyNameVi: (updateData.companyNameVi as string | undefined) ?? null,
-      companyNameCn: (updateData.companyNameCn as string | undefined) ?? null,
-      taxId: (updateData.taxId as string | undefined) ?? null,
+      companyNameEn: (updateData.companyNameEn as string | undefined) ?? null,
+      companyNameZh: (updateData.companyNameZh as string | undefined) ?? null,
       country: (updateData.country as string | undefined) ?? null,
       region: (updateData.region as string | undefined) ?? null,
-      website: (updateData.website as string | undefined) ?? null,
+      companyContacts: {
+        create: [
+          {
+            type: CONTACT_TYPE.EMAIL,
+            value: input.userEmail.trim().toLowerCase(),
+            contactName,
+          },
+          ...(contactData[CONTACT_TYPE.PHONE]
+            ? [
+                {
+                  type: CONTACT_TYPE.PHONE,
+                  value: contactData[CONTACT_TYPE.PHONE],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.ADDRESS]
+            ? [
+                {
+                  type: CONTACT_TYPE.ADDRESS,
+                  value: contactData[CONTACT_TYPE.ADDRESS],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.TAX_ID]
+            ? [
+                {
+                  type: CONTACT_TYPE.TAX_ID,
+                  value: contactData[CONTACT_TYPE.TAX_ID],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.WEBSITE]
+            ? [
+                {
+                  type: CONTACT_TYPE.WEBSITE,
+                  value: contactData[CONTACT_TYPE.WEBSITE],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.FAX]
+            ? [
+                {
+                  type: CONTACT_TYPE.FAX,
+                  value: contactData[CONTACT_TYPE.FAX],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.SKYPE]
+            ? [
+                {
+                  type: CONTACT_TYPE.SKYPE,
+                  value: contactData[CONTACT_TYPE.SKYPE],
+                  contactName,
+                },
+              ]
+            : []),
+          ...(contactData[CONTACT_TYPE.CONTACT_PHONE]
+            ? [
+                {
+                  type: CONTACT_TYPE.CONTACT_PHONE,
+                  value: contactData[CONTACT_TYPE.CONTACT_PHONE],
+                  contactName,
+                },
+              ]
+            : []),
+        ],
+      },
     } as Prisma.CompanyCreateInput;
   }
 
@@ -1043,20 +1423,26 @@ export class AuthService {
     company: CompanyProfileSelectResult | null,
   ): Partial<Record<ProfileField, string | null>> {
     if (!company) return {};
+    const contactFields = AuthService.mapCompanyContactsToProfileFields(
+      company.companyContacts,
+    );
     return {
       logoUrl: company.logoUrl,
       companyNameVi: company.companyNameVi,
-      companyNameCn: company.companyNameCn,
-      phone: company.phone,
-      address: company.address,
+      companyNameEn: company.companyNameEn,
+      companyNameZh: company.companyNameZh,
+      phone: contactFields.phone ?? null,
+      address: contactFields.address ?? null,
       description: company.description,
-      taxId: company.taxId,
+      taxId: contactFields.taxId ?? null,
       country: company.country,
       region: company.region,
-      industry: company.industry,
-      website: company.website,
-      contactName: company.contactName,
-      contactPhone: company.contactPhone,
+      industry: company.industry[0] ?? null,
+      website: contactFields.website ?? null,
+      fax: contactFields.fax ?? null,
+      skype: contactFields.skype ?? null,
+      contactName: contactFields.contactName ?? null,
+      contactPhone: contactFields.contactPhone ?? null,
     };
   }
 
@@ -1067,9 +1453,25 @@ export class AuthService {
   ) {
     const company = await this.prisma.company.findUnique({
       where: { id },
+      select: {
+        id: true,
+        status: true,
+        companyNameVi: true,
+        industry: true,
+        companyContacts: {
+          select: { type: true, value: true, contactName: true },
+        },
+      },
     });
     if (!company) {
       throw new NotFoundException('Company registration not found');
+    }
+    const companyEmail = AuthService.getContactValue(
+      company.companyContacts,
+      CONTACT_TYPE.EMAIL,
+    );
+    if (!companyEmail) {
+      throw new BadRequestException('Company email contact is missing');
     }
 
     const previousStatus = company.status;
@@ -1094,11 +1496,15 @@ export class AuthService {
         entityId: id,
         actorId: actorId ?? null,
         metadata: {
-          email: company.email,
+          email: companyEmail,
           companyNameVi: company.companyNameVi ?? '',
         },
       });
-      await this.onCompanyRegistrationApproved(updated);
+      await this.onCompanyRegistrationApproved({
+        id: updated.id,
+        industry: updated.industry,
+        email: companyEmail,
+      });
     }
     if (status === CompanyProfileRequestStatus.REJECTED) {
       await this.auditService.record({
@@ -1107,19 +1513,23 @@ export class AuthService {
         entityId: id,
         actorId: actorId ?? null,
         metadata: {
-          email: company.email,
+          email: companyEmail,
           companyNameVi: company.companyNameVi ?? '',
         },
       });
       await this.mailService.sendAccountRejectedEmail(
-        company.email.trim().toLowerCase(),
+        companyEmail.trim().toLowerCase(),
       );
     }
 
     return updated;
   }
 
-  private async onCompanyRegistrationApproved(company: Company): Promise<void> {
+  private async onCompanyRegistrationApproved(company: {
+    id: string;
+    industry: string[];
+    email: string;
+  }): Promise<void> {
     const normalizedEmail = company.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -1146,7 +1556,7 @@ export class AuthService {
           password: placeholderPassword,
           role: Role.MEMBER,
           membershipTier: MembershipTier.BRONZE,
-          primaryIndustry: company.industry ?? null,
+          primaryIndustry: company.industry[0] ?? null,
           setPasswordToken: token,
           setPasswordTokenExpiresAt: expiresAt,
         } as Prisma.UserUncheckedCreateInput,

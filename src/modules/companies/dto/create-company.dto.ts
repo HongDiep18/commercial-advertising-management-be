@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateCompanyDto {
   @ApiProperty({ description: 'Company name', example: 'VN Buyer Guide Co.' })
@@ -34,11 +41,16 @@ export class CreateCompanyDto {
   @MaxLength(50)
   phone: string;
 
-  @ApiProperty({ description: 'Company industry', example: 'Manufacturing' })
-  @IsString()
+  @ApiProperty({
+    description: 'Company industries',
+    example: ['Manufacturing', 'Textile'],
+    type: [String],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
   @IsNotEmpty()
-  @MaxLength(255)
-  industry: string;
+  industry: string[];
 
   @ApiProperty({
     description: 'Company address',

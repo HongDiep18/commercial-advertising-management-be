@@ -94,6 +94,14 @@ type UpdatedOrderType = Prisma.AdOrderGetPayload<{
 
 @Injectable()
 export class AdOrdersService {
+  private static readonly CONTACT_TYPE = {
+    EMAIL: 'email',
+    PHONE: 'phone',
+    CONTACT_PHONE: 'contact_phone',
+    ADDRESS: 'address',
+    TAX_ID: 'tax_id',
+  } as const;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileGeneratingService: FileGeneratingService,
@@ -103,6 +111,92 @@ export class AdOrdersService {
     private readonly activeAdsService: ActiveAdsService,
     private readonly companiesService: CompaniesService,
   ) {}
+
+  private getCompanyContactValue(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName?: string | null;
+    }>,
+    type: string,
+  ): string | null {
+    const found = contacts.find((contact) => contact.type === type);
+    return found?.value ?? null;
+  }
+
+  private getContactNameFromContacts(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>,
+  ): string {
+    const priorityTypes = [
+      AdOrdersService.CONTACT_TYPE.EMAIL,
+      AdOrdersService.CONTACT_TYPE.PHONE,
+      AdOrdersService.CONTACT_TYPE.CONTACT_PHONE,
+    ];
+    for (const contactType of priorityTypes) {
+      const row = contacts.find(
+        (contact) =>
+          contact.type === contactType &&
+          contact.contactName &&
+          contact.contactName.trim().length > 0,
+      );
+      if (row?.contactName) {
+        return row.contactName.trim();
+      }
+    }
+    const anyNamed = contacts.find(
+      (contact) =>
+        contact.contactName &&
+        contact.contactName.trim().length > 0,
+    );
+    return anyNamed?.contactName?.trim() ?? '';
+  }
+
+  private mapCompanyContactView(
+    company:
+      | {
+          companyContacts?: Array<{
+            type: string;
+            value: string;
+            contactName: string | null;
+          }>;
+        }
+      | null
+      | undefined,
+  ): {
+    email: string;
+    contactName: string;
+    phone: string;
+    address: string;
+    taxId: string | null;
+  } {
+    const contacts = company?.companyContacts ?? [];
+    return {
+      email:
+        this.getCompanyContactValue(
+          contacts,
+          AdOrdersService.CONTACT_TYPE.EMAIL,
+        ) ?? '',
+      contactName: this.getContactNameFromContacts(contacts),
+      phone:
+        this.getCompanyContactValue(
+          contacts,
+          AdOrdersService.CONTACT_TYPE.PHONE,
+        ) ?? '',
+      address:
+        this.getCompanyContactValue(
+          contacts,
+          AdOrdersService.CONTACT_TYPE.ADDRESS,
+        ) ?? '',
+      taxId: this.getCompanyContactValue(
+        contacts,
+        AdOrdersService.CONTACT_TYPE.TAX_ID,
+      ),
+    };
+  }
 
   /**
    * Create a draft ad order with its items in a single transaction.
@@ -442,7 +536,7 @@ export class AdOrdersService {
                 },
               },
               {
-                companyNameCn: {
+                companyNameZh: {
                   contains: search,
                   mode: 'insensitive',
                 },
@@ -485,10 +579,14 @@ export class AdOrdersService {
           select: {
             id: true,
             companyNameVi: true,
-            companyNameCn: true,
-            email: true,
-            contactName: true,
-            phone: true,
+            companyNameZh: true,
+            companyContacts: {
+              select: {
+                type: true,
+                value: true,
+                contactName: true,
+              },
+            },
           },
         },
         items: {
@@ -534,10 +632,10 @@ export class AdOrdersService {
         ? {
             id: order.company.id,
             nameVi: order.company.companyNameVi,
-            nameCn: order.company.companyNameCn,
-            email: order.company.email,
-            contactName: order.company.contactName ?? '',
-            phone: order.company.phone,
+            nameCn: order.company.companyNameZh,
+            email: this.mapCompanyContactView(order.company).email,
+            contactName: this.mapCompanyContactView(order.company).contactName,
+            phone: this.mapCompanyContactView(order.company).phone,
           }
         : {
             id: '',
@@ -815,12 +913,14 @@ export class AdOrdersService {
         company: {
           select: {
             companyNameVi: true,
-            companyNameCn: true,
-            email: true,
-            contactName: true,
-            phone: true,
-            address: true,
-            taxId: true,
+            companyNameZh: true,
+            companyContacts: {
+              select: {
+                type: true,
+                value: true,
+                contactName: true,
+              },
+            },
           },
         },
         items: {
@@ -849,6 +949,7 @@ export class AdOrdersService {
       throw new NotFoundException(AdOrdersErrors.COMPANY_NOT_FOUND);
     }
 
+    const companyContactView = this.mapCompanyContactView(order.company);
     const invoiceData = {
       id: order.id,
       status: order.status,
@@ -859,12 +960,12 @@ export class AdOrdersService {
       user: { email: order.user.email },
       company: {
         companyNameVi: order.company.companyNameVi,
-        companyNameCn: order.company.companyNameCn,
-        email: order.company.email,
-        contactName: order.company.contactName ?? '',
-        phone: order.company.phone,
-        address: order.company.address ?? '',
-        taxId: order.company.taxId,
+        companyNameZh: order.company.companyNameZh,
+        email: companyContactView.email,
+        contactName: companyContactView.contactName,
+        phone: companyContactView.phone,
+        address: companyContactView.address,
+        taxId: companyContactView.taxId,
       },
       items: order.items.map((item) => ({
         id: item.id,
@@ -1206,10 +1307,14 @@ export class AdOrdersService {
           select: {
             id: true,
             companyNameVi: true,
-            companyNameCn: true,
-            email: true,
-            contactName: true,
-            phone: true,
+            companyNameZh: true,
+            companyContacts: {
+              select: {
+                type: true,
+                value: true,
+                contactName: true,
+              },
+            },
           },
         },
         items: {
@@ -1249,10 +1354,10 @@ export class AdOrdersService {
         ? {
             id: order.company.id,
             nameVi: order.company.companyNameVi,
-            nameCn: order.company.companyNameCn,
-            email: order.company.email,
-            contactName: order.company.contactName ?? '',
-            phone: order.company.phone,
+            nameCn: order.company.companyNameZh,
+            email: this.mapCompanyContactView(order.company).email,
+            contactName: this.mapCompanyContactView(order.company).contactName,
+            phone: this.mapCompanyContactView(order.company).phone,
           }
         : {
             id: '',
@@ -1533,7 +1638,24 @@ export class AdOrdersService {
     const order = await this.prisma.adOrder.findUnique({
       where: { id: orderId },
       include: {
-        company: true,
+        company: {
+          select: {
+            id: true,
+            companyNameVi: true,
+            companyNameZh: true,
+            logoUrl: true,
+            industry: true,
+            country: true,
+            description: true,
+            companyContacts: {
+              select: {
+                type: true,
+                value: true,
+                contactName: true,
+              },
+            },
+          },
+        },
         items: {
           include: {
             package: { select: { type: true, metadata: true } },

@@ -4,7 +4,7 @@
  */
 export type OrderInvoiceCompanyData = {
   companyNameVi: string | null;
-  companyNameCn: string | null;
+  companyNameZh: string | null;
   email: string;
   contactName: string;
   phone: string;
@@ -38,3 +38,4 @@ export type OrderInvoiceData = {
   company: OrderInvoiceCompanyData;
   items: OrderInvoiceItemData[];
 };
+

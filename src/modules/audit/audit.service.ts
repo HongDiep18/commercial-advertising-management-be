@@ -26,6 +26,9 @@ export type AuditRecordInput = {
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
+  private static readonly CONTACT_TYPE_EMAIL = 'email';
+  private static readonly CONTACT_TYPE_PHONE = 'phone';
+  private static readonly CONTACT_TYPE_CONTACT_PHONE = 'contact_phone';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -148,6 +151,59 @@ export class AuditService {
     };
   }
 
+  private getCompanyContactValue(
+    contacts:
+      | ReadonlyArray<{
+          type: string;
+          value: string;
+          contactName?: string | null;
+        }>
+      | null
+      | undefined,
+    type: string,
+  ): string | null {
+    if (!contacts || contacts.length === 0) {
+      return null;
+    }
+    const found = contacts.find((contact) => contact.type === type);
+    return found?.value ?? null;
+  }
+
+  private getContactNameFromContacts(
+    contacts:
+      | ReadonlyArray<{
+          type: string;
+          value: string;
+          contactName: string | null;
+        }>
+      | null
+      | undefined,
+  ): string | null {
+    if (!contacts || contacts.length === 0) {
+      return null;
+    }
+    const priorityTypes = [
+      AuditService.CONTACT_TYPE_EMAIL,
+      AuditService.CONTACT_TYPE_PHONE,
+      AuditService.CONTACT_TYPE_CONTACT_PHONE,
+    ];
+    for (const contactType of priorityTypes) {
+      const row = contacts.find(
+        (contact) =>
+          contact.type === contactType &&
+          contact.contactName &&
+          contact.contactName.trim().length > 0,
+      );
+      if (row?.contactName) {
+        return row.contactName.trim();
+      }
+    }
+    const anyNamed = contacts.find(
+      (contact) => contact.contactName && contact.contactName.trim().length > 0,
+    );
+    return anyNamed?.contactName?.trim() ?? null;
+  }
+
   private async buildUserLabelMap(
     rows: readonly AuditLogRow[],
   ): Promise<Map<string, string>> {
@@ -171,18 +227,27 @@ export class AuditService {
         company: {
           select: {
             companyNameVi: true,
-            companyNameCn: true,
-            contactName: true,
+            companyNameZh: true,
+            companyContacts: {
+              select: {
+                type: true,
+                value: true,
+                contactName: true,
+              },
+            },
           },
         },
       } as Prisma.UserSelect,
     });
     const map = new Map<string, string>();
     for (const user of users as Array<UserLabelRow>) {
+      const contactName = this.getContactNameFromContacts(
+        user.company?.companyContacts,
+      );
       const companyName =
         user.company?.companyNameVi ??
-        user.company?.companyNameCn ??
-        user.company?.contactName;
+        user.company?.companyNameZh ??
+        contactName;
       const label = user.email || companyName || user.id;
       map.set(user.id, label);
     }
@@ -207,17 +272,24 @@ export class AuditService {
       select: {
         id: true,
         companyNameVi: true,
-        companyNameCn: true,
-        email: true,
+        companyNameZh: true,
+        companyContacts: {
+          select: {
+            type: true,
+            value: true,
+            contactName: true,
+          },
+        },
       },
     });
     const map = new Map<string, string>();
     for (const company of companies) {
+      const email = this.getCompanyContactValue(
+        company.companyContacts,
+        AuditService.CONTACT_TYPE_EMAIL,
+      );
       const label =
-        company.companyNameVi ||
-        company.companyNameCn ||
-        company.email ||
-        company.id;
+        company.companyNameVi || company.companyNameZh || email || company.id;
       map.set(company.id, label);
     }
     return map;
@@ -246,8 +318,14 @@ export class AuditService {
             company: {
               select: {
                 companyNameVi: true,
-                companyNameCn: true,
-                contactName: true,
+                companyNameZh: true,
+                companyContacts: {
+                  select: {
+                    type: true,
+                    value: true,
+                    contactName: true,
+                  },
+                },
               },
             },
           },
@@ -256,10 +334,13 @@ export class AuditService {
     });
     const map = new Map<string, string>();
     for (const transaction of transactions) {
+      const contactName = this.getContactNameFromContacts(
+        transaction.user.company?.companyContacts,
+      );
       const companyName =
         transaction.user.company?.companyNameVi ??
-        transaction.user.company?.companyNameCn ??
-        transaction.user.company?.contactName;
+        transaction.user.company?.companyNameZh ??
+        contactName;
       const label = companyName || transaction.user.email || transaction.id;
       map.set(transaction.id, label);
     }
@@ -335,7 +416,11 @@ type UserLabelRow = {
   email: string;
   company: {
     companyNameVi: string | null;
-    companyNameCn: string | null;
-    contactName: string | null;
+    companyNameZh: string | null;
+    companyContacts: Array<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }>;
   } | null;
 };

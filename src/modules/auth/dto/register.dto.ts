@@ -1,4 +1,6 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -27,11 +29,17 @@ export class RegisterDto {
   @MaxLength(255)
   company_name_vi: string;
 
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  company_name_en?: string;
+
   @IsNotEmpty()
   @IsString()
   @MinLength(1)
   @MaxLength(255)
-  company_name_cn: string;
+  company_name_zh: string;
 
   @IsNotEmpty()
   @IsString()
@@ -73,7 +81,7 @@ export class RegisterDto {
 
   @IsEmail()
   @MaxLength(255)
-  email: string;
+  company_email: string;
 
   @IsNotEmpty()
   @IsString()
@@ -88,10 +96,10 @@ export class RegisterDto {
   region?: string;
 
   @IsNotEmpty()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(128)
-  industry: string;
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  industry: string[];
 
   @IsNotEmpty()
   @IsString()
@@ -102,9 +110,32 @@ export class RegisterDto {
   })
   website: string;
 
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  @Matches(/^[+\d\s()-]+$/, {
+    message:
+      'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
+  })
+  fax?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  skype?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(4000)
+  note?: string;
+
   @IsNotEmpty()
   @IsString()
   @MinLength(1)
   @MaxLength(4000)
   introduction: string;
 }
+

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsOptional,
   IsString,
@@ -22,7 +23,13 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(1)
   @MaxLength(255)
-  company_name_cn?: string;
+  company_name_en?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  company_name_zh?: string;
 
   @IsOptional()
   @IsString()
@@ -72,16 +79,27 @@ export class UpdateProfileDto {
   region?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(128)
-  industry?: string;
+  @IsArray()
+  @IsString({ each: true })
+  industry?: string[];
 
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(2048)
   website?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  fax?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  skype?: string;
 
   @IsOptional()
   @IsString()
@@ -98,7 +116,8 @@ export class UpdateProfileDto {
 
 export const UPDATE_PROFILE_FORM_KEYS = [
   'company_name_vi',
-  'company_name_cn',
+  'company_name_en',
+  'company_name_zh',
   'phone',
   'tax_id',
   'contact_person',
@@ -109,6 +128,8 @@ export const UPDATE_PROFILE_FORM_KEYS = [
   'region',
   'industry',
   'website',
+  'fax',
+  'skype',
   'introduction',
   'membership_tier',
 ] as const;

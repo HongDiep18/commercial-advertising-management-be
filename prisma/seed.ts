@@ -62,257 +62,257 @@ const subcategories: {
   nameEn: string;
   categorySlug: string;
 }[] = [
-    // NEWS
-    {
-      slug: 'tin-moi-nhat',
-      nameVi: 'Tin mới nhất',
-      nameZhTw: '最新消息',
-      nameEn: 'Latest News',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'thoi-su',
-      nameVi: 'Thời sự',
-      nameZhTw: '時事',
-      nameEn: 'Current Affairs',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'the-gioi',
-      nameVi: 'Thế giới',
-      nameZhTw: '世界',
-      nameEn: 'World',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'phap-luat',
-      nameVi: 'Pháp luật',
-      nameZhTw: '法律',
-      nameEn: 'Law',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'giao-duc',
-      nameVi: 'Giáo dục',
-      nameZhTw: '教育',
-      nameEn: 'Education',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'the-thao',
-      nameVi: 'Thể thao',
-      nameZhTw: '體育',
-      nameEn: 'Sports',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'xa-hoi',
-      nameVi: 'Xã hội',
-      nameZhTw: '社會',
-      nameEn: 'Society',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'viet-nam',
-      nameVi: 'Việt Nam',
-      nameZhTw: '越南',
-      nameEn: 'Vietnam',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'tin-moi-nhat',
-      nameVi: 'Tin mới nhất',
-      nameZhTw: '最新消息',
-      nameEn: 'Latest News',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'thoi-su',
-      nameVi: 'Thời sự',
-      nameZhTw: '時事',
-      nameEn: 'Current Affairs',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'the-gioi',
-      nameVi: 'Thế giới',
-      nameZhTw: '世界',
-      nameEn: 'World',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'phap-luat',
-      nameVi: 'Pháp luật',
-      nameZhTw: '法律',
-      nameEn: 'Law',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'giao-duc',
-      nameVi: 'Giáo dục',
-      nameZhTw: '教育',
-      nameEn: 'Education',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'the-thao',
-      nameVi: 'Thể thao',
-      nameZhTw: '體育',
-      nameEn: 'Sports',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'xa-hoi',
-      nameVi: 'Xã hội',
-      nameZhTw: '社會',
-      nameEn: 'Society',
-      categorySlug: 'NEWS',
-    },
-    {
-      slug: 'viet-nam',
-      nameVi: 'Việt Nam',
-      nameZhTw: '越南',
-      nameEn: 'Vietnam',
-      categorySlug: 'NEWS',
-    },
-    // BUSINESS
-    {
-      slug: 'kinh-doanh',
-      nameVi: 'Kinh doanh',
-      nameZhTw: '商業',
-      nameEn: 'Business',
-      categorySlug: 'BUSINESS',
-    },
-    {
-      slug: 'bat-dong-san',
-      nameVi: 'Bất động sản',
-      nameZhTw: '房地產',
-      nameEn: 'Real Estate',
-      categorySlug: 'BUSINESS',
-    },
-    {
-      slug: 'kinh-te',
-      nameVi: 'Kinh tế',
-      nameZhTw: '經濟',
-      nameEn: 'Economy',
-      categorySlug: 'BUSINESS',
-    },
-    {
-      slug: 'vi-mo',
-      nameVi: 'Vĩ mô',
-      nameZhTw: '宏觀經濟',
-      nameEn: 'Macroeconomics',
-      categorySlug: 'BUSINESS',
-    },
-    // TECH
-    {
-      slug: 'so-hoa',
-      nameVi: 'Số hóa',
-      nameZhTw: '數位化',
-      nameEn: 'Digital',
-      categorySlug: 'TECH',
-    },
-    {
-      slug: 'khoa-hoc',
-      nameVi: 'Khoa học',
-      nameZhTw: '科學',
-      nameEn: 'Science',
-      categorySlug: 'TECH',
-    },
-    {
-      slug: 'cong-nghe',
-      nameVi: 'Công nghệ',
-      nameZhTw: '科技',
-      nameEn: 'Technology',
-      categorySlug: 'TECH',
-    },
-    {
-      slug: 'xe',
-      nameVi: 'Xe',
-      nameZhTw: '汽車',
-      nameEn: 'Automotive',
-      categorySlug: 'TECH',
-    },
-    {
-      slug: 'oto-xe-may',
-      nameVi: 'Ô tô - Xe máy',
-      nameZhTw: '汽機車',
-      nameEn: 'Automotive',
-      categorySlug: 'TECH',
-    },
-    // ENTERTAINMENT
-    {
-      slug: 'giai-tri',
-      nameVi: 'Giải trí',
-      nameZhTw: '娛樂',
-      nameEn: 'Entertainment',
-      categorySlug: 'ENTERTAINMENT',
-    },
-    {
-      slug: 'van-hoa',
-      nameVi: 'Văn hóa',
-      nameZhTw: '文化',
-      nameEn: 'Culture',
-      categorySlug: 'ENTERTAINMENT',
-    },
-    // LIFESTYLE
-    {
-      slug: 'doi-song',
-      nameVi: 'Đời sống',
-      nameZhTw: '生活',
-      nameEn: 'Lifestyle',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'suc-khoe',
-      nameVi: 'Sức khỏe',
-      nameZhTw: '健康',
-      nameEn: 'Health',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'du-lich',
-      nameVi: 'Du lịch',
-      nameZhTw: '旅遊',
-      nameEn: 'Travel',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'y-kien',
-      nameVi: 'Ý kiến',
-      nameZhTw: '觀點',
-      nameEn: 'Opinion',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'tam-su',
-      nameVi: 'Tâm sự',
-      nameZhTw: '心情',
-      nameEn: 'Personal',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'cuoi',
-      nameVi: 'Cười',
-      nameZhTw: '搞笑',
-      nameEn: 'Humor',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'nhip-song-tre',
-      nameVi: 'Nhịp sống trẻ',
-      nameZhTw: '年輕生活',
-      nameEn: 'Youth Life',
-      categorySlug: 'LIFESTYLE',
-    },
-    {
-      slug: 'ban-doc',
-      nameVi: 'Bạn đọc',
-      nameZhTw: '讀者',
-      nameEn: 'Readers',
-      categorySlug: 'LIFESTYLE',
-    },
-  ];
+  // NEWS
+  {
+    slug: 'tin-moi-nhat',
+    nameVi: 'Tin mới nhất',
+    nameZhTw: '最新消息',
+    nameEn: 'Latest News',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'thoi-su',
+    nameVi: 'Thời sự',
+    nameZhTw: '時事',
+    nameEn: 'Current Affairs',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'the-gioi',
+    nameVi: 'Thế giới',
+    nameZhTw: '世界',
+    nameEn: 'World',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'phap-luat',
+    nameVi: 'Pháp luật',
+    nameZhTw: '法律',
+    nameEn: 'Law',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'giao-duc',
+    nameVi: 'Giáo dục',
+    nameZhTw: '教育',
+    nameEn: 'Education',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'the-thao',
+    nameVi: 'Thể thao',
+    nameZhTw: '體育',
+    nameEn: 'Sports',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'xa-hoi',
+    nameVi: 'Xã hội',
+    nameZhTw: '社會',
+    nameEn: 'Society',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'viet-nam',
+    nameVi: 'Việt Nam',
+    nameZhTw: '越南',
+    nameEn: 'Vietnam',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'tin-moi-nhat',
+    nameVi: 'Tin mới nhất',
+    nameZhTw: '最新消息',
+    nameEn: 'Latest News',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'thoi-su',
+    nameVi: 'Thời sự',
+    nameZhTw: '時事',
+    nameEn: 'Current Affairs',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'the-gioi',
+    nameVi: 'Thế giới',
+    nameZhTw: '世界',
+    nameEn: 'World',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'phap-luat',
+    nameVi: 'Pháp luật',
+    nameZhTw: '法律',
+    nameEn: 'Law',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'giao-duc',
+    nameVi: 'Giáo dục',
+    nameZhTw: '教育',
+    nameEn: 'Education',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'the-thao',
+    nameVi: 'Thể thao',
+    nameZhTw: '體育',
+    nameEn: 'Sports',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'xa-hoi',
+    nameVi: 'Xã hội',
+    nameZhTw: '社會',
+    nameEn: 'Society',
+    categorySlug: 'NEWS',
+  },
+  {
+    slug: 'viet-nam',
+    nameVi: 'Việt Nam',
+    nameZhTw: '越南',
+    nameEn: 'Vietnam',
+    categorySlug: 'NEWS',
+  },
+  // BUSINESS
+  {
+    slug: 'kinh-doanh',
+    nameVi: 'Kinh doanh',
+    nameZhTw: '商業',
+    nameEn: 'Business',
+    categorySlug: 'BUSINESS',
+  },
+  {
+    slug: 'bat-dong-san',
+    nameVi: 'Bất động sản',
+    nameZhTw: '房地產',
+    nameEn: 'Real Estate',
+    categorySlug: 'BUSINESS',
+  },
+  {
+    slug: 'kinh-te',
+    nameVi: 'Kinh tế',
+    nameZhTw: '經濟',
+    nameEn: 'Economy',
+    categorySlug: 'BUSINESS',
+  },
+  {
+    slug: 'vi-mo',
+    nameVi: 'Vĩ mô',
+    nameZhTw: '宏觀經濟',
+    nameEn: 'Macroeconomics',
+    categorySlug: 'BUSINESS',
+  },
+  // TECH
+  {
+    slug: 'so-hoa',
+    nameVi: 'Số hóa',
+    nameZhTw: '數位化',
+    nameEn: 'Digital',
+    categorySlug: 'TECH',
+  },
+  {
+    slug: 'khoa-hoc',
+    nameVi: 'Khoa học',
+    nameZhTw: '科學',
+    nameEn: 'Science',
+    categorySlug: 'TECH',
+  },
+  {
+    slug: 'cong-nghe',
+    nameVi: 'Công nghệ',
+    nameZhTw: '科技',
+    nameEn: 'Technology',
+    categorySlug: 'TECH',
+  },
+  {
+    slug: 'xe',
+    nameVi: 'Xe',
+    nameZhTw: '汽車',
+    nameEn: 'Automotive',
+    categorySlug: 'TECH',
+  },
+  {
+    slug: 'oto-xe-may',
+    nameVi: 'Ô tô - Xe máy',
+    nameZhTw: '汽機車',
+    nameEn: 'Automotive',
+    categorySlug: 'TECH',
+  },
+  // ENTERTAINMENT
+  {
+    slug: 'giai-tri',
+    nameVi: 'Giải trí',
+    nameZhTw: '娛樂',
+    nameEn: 'Entertainment',
+    categorySlug: 'ENTERTAINMENT',
+  },
+  {
+    slug: 'van-hoa',
+    nameVi: 'Văn hóa',
+    nameZhTw: '文化',
+    nameEn: 'Culture',
+    categorySlug: 'ENTERTAINMENT',
+  },
+  // LIFESTYLE
+  {
+    slug: 'doi-song',
+    nameVi: 'Đời sống',
+    nameZhTw: '生活',
+    nameEn: 'Lifestyle',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'suc-khoe',
+    nameVi: 'Sức khỏe',
+    nameZhTw: '健康',
+    nameEn: 'Health',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'du-lich',
+    nameVi: 'Du lịch',
+    nameZhTw: '旅遊',
+    nameEn: 'Travel',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'y-kien',
+    nameVi: 'Ý kiến',
+    nameZhTw: '觀點',
+    nameEn: 'Opinion',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'tam-su',
+    nameVi: 'Tâm sự',
+    nameZhTw: '心情',
+    nameEn: 'Personal',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'cuoi',
+    nameVi: 'Cười',
+    nameZhTw: '搞笑',
+    nameEn: 'Humor',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'nhip-song-tre',
+    nameVi: 'Nhịp sống trẻ',
+    nameZhTw: '年輕生活',
+    nameEn: 'Youth Life',
+    categorySlug: 'LIFESTYLE',
+  },
+  {
+    slug: 'ban-doc',
+    nameVi: 'Bạn đọc',
+    nameZhTw: '讀者',
+    nameEn: 'Readers',
+    categorySlug: 'LIFESTYLE',
+  },
+];
 
 async function main() {
   console.log('Seeding news categories...');
@@ -397,7 +397,7 @@ async function main() {
       companyEmail: 'contact@bronze-vietnam.com',
       companyName: 'Bronze Vietnam Ltd.',
       companyNameVi: 'Công ty TNHH Bronze Việt Nam',
-      companyNameCn: '越南青銅有限公司',
+      companyNameZh: '越南青銅有限公司',
       phone: '+84 28 1234 5001',
       taxId: '0123456789',
       contactName: 'Nguyễn Văn Bronze',
@@ -420,7 +420,7 @@ async function main() {
       companyEmail: 'contact@silver-corp.com',
       companyName: 'Silver Corporation',
       companyNameVi: 'Công ty CP Bạc Silver',
-      companyNameCn: '銀業股份有限公司',
+      companyNameZh: '銀業股份有限公司',
       phone: '+84 28 1234 5002',
       taxId: '0123456790',
       contactName: 'Trần Thị Silver',
@@ -443,7 +443,7 @@ async function main() {
       companyEmail: 'contact@gold-group.com',
       companyName: 'Gold Group International',
       companyNameVi: 'Tập đoàn Vàng Gold',
-      companyNameCn: '金業集團',
+      companyNameZh: '金業集團',
       phone: '+84 28 1234 5003',
       taxId: '0123456791',
       contactName: 'Lê Văn Gold',
@@ -466,7 +466,7 @@ async function main() {
       companyEmail: 'contact@diamond-global.com',
       companyName: 'Diamond Global Technology',
       companyNameVi: 'Công ty Kim cương Diamond Global',
-      companyNameCn: '鑽石全球有限公司',
+      companyNameZh: '鑽石全球有限公司',
       phone: '+84 28 1234 5004',
       taxId: '0123456792',
       contactName: 'Phạm Thị Diamond',
@@ -484,6 +484,39 @@ async function main() {
     },
   ];
 
+  const syncCompanyContacts = async (input: {
+    companyId: string;
+    email: string;
+    contactName: string;
+    phone: string;
+    address: string;
+    taxId: string;
+    website: string;
+  }): Promise<void> => {
+    const contactPairs: Array<{ type: string; value: string }> = [
+      { type: 'email', value: input.email },
+      { type: 'phone', value: input.phone },
+      { type: 'contact_phone', value: input.phone },
+      { type: 'address', value: input.address },
+      { type: 'tax_id', value: input.taxId },
+      { type: 'website', value: input.website },
+    ];
+    await prisma.companyContact.deleteMany({
+      where: {
+        companyId: input.companyId,
+        type: { in: contactPairs.map((pair) => pair.type) },
+      },
+    });
+    await prisma.companyContact.createMany({
+      data: contactPairs.map((pair) => ({
+        companyId: input.companyId,
+        type: pair.type,
+        value: pair.value,
+        contactName: input.contactName,
+      })),
+    });
+  };
+
   for (const u of companyUsers) {
     const existing = await prisma.user.findUnique({
       where: { email: u.email },
@@ -494,36 +527,45 @@ async function main() {
       continue;
     }
 
-    // Create or find company first
-    const company = await prisma.company.upsert({
-      where: { email: u.companyEmail },
-      update: {
-        contactName: u.contactName,
-        phone: u.phone,
-        industry: u.industry,
-        address: u.address,
-        description: u.description,
-        companyNameVi: u.companyNameVi,
-        companyNameCn: u.companyNameCn,
-        taxId: u.taxId,
-        country: u.country,
-        region: u.region,
-        website: u.website,
+    const existingCompanyEmailContact = await prisma.companyContact.findFirst({
+      where: {
+        type: 'email',
+        value: u.companyEmail,
       },
-      create: {
-        email: u.companyEmail,
-        contactName: u.contactName,
-        phone: u.phone,
-        industry: u.industry,
-        address: u.address,
-        description: u.description,
-        companyNameVi: u.companyNameVi,
-        companyNameCn: u.companyNameCn,
-        taxId: u.taxId,
-        country: u.country,
-        region: u.region,
-        website: u.website,
+      select: {
+        companyId: true,
       },
+    });
+    const company = existingCompanyEmailContact
+      ? await prisma.company.update({
+          where: { id: existingCompanyEmailContact.companyId },
+          data: {
+            industry: [u.industry],
+            description: u.description,
+            companyNameVi: u.companyNameVi,
+            companyNameZh: u.companyNameZh,
+            country: u.country,
+            region: u.region,
+          },
+        })
+      : await prisma.company.create({
+          data: {
+            industry: [u.industry],
+            description: u.description,
+            companyNameVi: u.companyNameVi,
+            companyNameZh: u.companyNameZh,
+            country: u.country,
+            region: u.region,
+          },
+        });
+    await syncCompanyContacts({
+      companyId: company.id,
+      email: u.companyEmail,
+      contactName: u.contactName,
+      phone: u.phone,
+      address: u.address,
+      taxId: u.taxId,
+      website: u.website,
     });
 
     // Create user linked to company
@@ -553,37 +595,76 @@ async function main() {
 async function seedDefaultCompany(): Promise<string> {
   const companyEmail = 'contact@alibaba.com';
   const companyName = 'Alibaba Group Holding Limited';
-  const company = await prisma.company.upsert({
-    where: { email: companyEmail },
-    update: {
-      contactName: 'Corporate Communications',
-      phone: '+86-571-8502-2088',
-      industry: 'electronics',
-      address:
-        '969 West Wen Yi Road, Yuhang District, Hangzhou, Zhejiang, China',
-      description:
-        'Alibaba Group is a global technology company specializing in e-commerce, retail, internet, and technology services.',
-      companyNameVi: 'Tập đoàn Alibaba',
-      companyNameCn: '阿里巴巴集團控股有限公司',
-      country: 'China',
-      region: 'Zhejiang',
-      website: 'https://www.alibaba.com',
+  const existingCompanyEmailContact = await prisma.companyContact.findFirst({
+    where: { type: 'email', value: companyEmail },
+    select: { companyId: true },
+  });
+  const company = existingCompanyEmailContact
+    ? await prisma.company.update({
+        where: { id: existingCompanyEmailContact.companyId },
+        data: {
+          industry: ['electronics'],
+          description:
+            'Alibaba Group is a global technology company specializing in e-commerce, retail, internet, and technology services.',
+          companyNameVi: 'Tập đoàn Alibaba',
+          companyNameZh: '阿里巴巴集團控股有限公司',
+          country: 'China',
+          region: 'Zhejiang',
+        },
+      })
+    : await prisma.company.create({
+        data: {
+          industry: ['electronics'],
+          description:
+            'Alibaba Group is a global technology company specializing in e-commerce, retail, internet, and technology services.',
+          companyNameVi: 'Tập đoàn Alibaba',
+          companyNameZh: '阿里巴巴集團控股有限公司',
+          country: 'China',
+          region: 'Zhejiang',
+        },
+      });
+  await prisma.companyContact.deleteMany({
+    where: {
+      companyId: company.id,
+      type: {
+        in: ['email', 'phone', 'contact_phone', 'address', 'website'],
+      },
     },
-    create: {
-      email: companyEmail,
-      contactName: 'Corporate Communications',
-      phone: '+86-571-8502-2088',
-      industry: 'electronics',
-      address:
-        '969 West Wen Yi Road, Yuhang District, Hangzhou, Zhejiang, China',
-      description:
-        'Alibaba Group is a global technology company specializing in e-commerce, retail, internet, and technology services.',
-      companyNameVi: 'Tập đoàn Alibaba',
-      companyNameCn: '阿里巴巴集團控股有限公司',
-      country: 'China',
-      region: 'Zhejiang',
-      website: 'https://www.alibaba.com',
-    },
+  });
+  await prisma.companyContact.createMany({
+    data: [
+      {
+        companyId: company.id,
+        type: 'email',
+        value: companyEmail,
+        contactName: 'Corporate Communications',
+      },
+      {
+        companyId: company.id,
+        type: 'phone',
+        value: '+86-571-8502-2088',
+        contactName: 'Corporate Communications',
+      },
+      {
+        companyId: company.id,
+        type: 'contact_phone',
+        value: '+86-571-8502-2088',
+        contactName: 'Corporate Communications',
+      },
+      {
+        companyId: company.id,
+        type: 'address',
+        value:
+          '969 West Wen Yi Road, Yuhang District, Hangzhou, Zhejiang, China',
+        contactName: 'Corporate Communications',
+      },
+      {
+        companyId: company.id,
+        type: 'website',
+        value: 'https://www.alibaba.com',
+        contactName: 'Corporate Communications',
+      },
+    ],
   });
   console.log(`  ✓ Default company ensured: ${companyName} (${companyEmail})`);
   return company.id;
@@ -631,37 +712,37 @@ async function seedAdPackages(): Promise<void> {
     nameZh: string | null;
     sortOrder: number;
   }[] = [
-      {
-        type: AdCategoryType.HOMEPAGE_POPUP,
-        name: 'Homepage Popup Advertising',
-        nameZh: '首頁彈窗廣告',
-        sortOrder: 1,
-      },
-      {
-        type: AdCategoryType.FEATURED_COMPANY,
-        name: 'Featured Company Exposure',
-        nameZh: '精選企業曝光',
-        sortOrder: 2,
-      },
-      {
-        type: AdCategoryType.COMPANY_DIRECTORY,
-        name: 'Company Name Advertising',
-        nameZh: '企業名錄廣告',
-        sortOrder: 3,
-      },
-      {
-        type: AdCategoryType.PLATFORM_PRINT,
-        name: 'Platform Advertising Rate Card',
-        nameZh: null,
-        sortOrder: 4,
-      },
-      {
-        type: AdCategoryType.PRODUCT_LISTING,
-        name: 'Product Listing Packages',
-        nameZh: null,
-        sortOrder: 5,
-      },
-    ];
+    {
+      type: AdCategoryType.HOMEPAGE_POPUP,
+      name: 'Homepage Popup Advertising',
+      nameZh: '首頁彈窗廣告',
+      sortOrder: 1,
+    },
+    {
+      type: AdCategoryType.FEATURED_COMPANY,
+      name: 'Featured Company Exposure',
+      nameZh: '精選企業曝光',
+      sortOrder: 2,
+    },
+    {
+      type: AdCategoryType.COMPANY_DIRECTORY,
+      name: 'Company Name Advertising',
+      nameZh: '企業名錄廣告',
+      sortOrder: 3,
+    },
+    {
+      type: AdCategoryType.PLATFORM_PRINT,
+      name: 'Platform Advertising Rate Card',
+      nameZh: null,
+      sortOrder: 4,
+    },
+    {
+      type: AdCategoryType.PRODUCT_LISTING,
+      name: 'Product Listing Packages',
+      nameZh: null,
+      sortOrder: 5,
+    },
+  ];
 
   const categoryIdByType = new Map<AdCategoryType, string>();
 

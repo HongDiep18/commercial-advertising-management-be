@@ -48,9 +48,10 @@ export class CompaniesController {
     @Body() dto: CreateCompanyDto,
     @CurrentUser('userId') userId: string,
   ): Promise<CompanyWithAdsResponseDto> {
-    const company = await this.companiesService.createCompany(dto, userId);
+    await this.companiesService.createCompany(dto, userId);
+    const company = await this.companiesService.getCompanyDetail(dto.name);
     const name =
-      company.companyNameVi ?? company.companyNameCn ?? company.email;
+      company.companyNameVi ?? company.companyNameZh ?? company.email;
     return {
       id: company.id,
       name,
@@ -214,3 +215,4 @@ export class CompaniesController {
     return this.companiesService.getCompanyDetail(id, maskingContext);
   }
 }
+

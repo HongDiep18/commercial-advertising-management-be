@@ -22,8 +22,11 @@ export class CompanyWithAdsResponseDto {
   @ApiProperty()
   phone!: string;
 
-  @ApiProperty()
-  industry!: string;
+  @ApiProperty({
+    type: [String],
+    description: 'Company industries (multi-select)',
+  })
+  industry!: string[];
 
   @ApiPropertyOptional({
     description: 'Company country',

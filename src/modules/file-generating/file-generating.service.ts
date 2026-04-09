@@ -45,7 +45,7 @@ export class FileGeneratingService {
 
     const company = order.company;
     const companyName = unidecode(
-      company.companyNameVi ?? company.companyNameCn ?? 'N/A',
+      company.companyNameVi ?? company.companyNameZh ?? 'N/A',
     );
     doc.fontSize(12).text('Bill To:', { underline: true });
     doc.fontSize(10);
@@ -126,3 +126,4 @@ export class FileGeneratingService {
     return stream;
   }
 }
+

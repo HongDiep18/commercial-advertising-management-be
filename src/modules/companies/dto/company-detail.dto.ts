@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class CompanyContactPhonesByNameItemDto {
+  @ApiProperty()
+  contactName!: string;
+
+  @ApiProperty({ type: [String] })
+  contactPhones!: string[];
+}
+
 export class CompanyDetailResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -11,10 +19,13 @@ export class CompanyDetailResponseDto {
   companyNameVi!: string | null;
 
   @ApiPropertyOptional()
-  companyNameCn!: string | null;
+  companyNameZh!: string | null;
 
-  @ApiProperty()
-  industry!: string;
+  @ApiProperty({
+    type: [String],
+    description: 'Company industries (multi-select)',
+  })
+  industry!: string[];
 
   @ApiProperty()
   email!: string;
@@ -45,4 +56,18 @@ export class CompanyDetailResponseDto {
 
   @ApiPropertyOptional()
   contactPhone!: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description: 'All company emails as a flat list',
+    example: ['info@company.com', 'sales@company.com'],
+  })
+  emails!: string[];
+
+  @ApiProperty({
+    type: [CompanyContactPhonesByNameItemDto],
+    description: 'Contact phones grouped by contact name',
+  })
+  contactPhonesByName!: CompanyContactPhonesByNameItemDto[];
 }
+

@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AdPackageType, Prisma } from '@prisma/client';
+import {
+  AdPackageType,
+  CompanyProfileRequestStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AdEffectsRegistryService } from '../ad-effects/ad-effects-registry.service';
 import type {
@@ -35,9 +39,14 @@ import type {
   AdminUpdateCompanyDto,
 } from './dto/admin-update-company.dto';
 import type { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
+import type { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
+import { AuthService } from '../auth/auth.service';
+import type { AdminProvisionCompanyUserResponseDto } from './dto/admin-provision-company-user-response.dto';
 
 type CompanyAuditSnapshot = {
   id: string;
+  importKey: string | null;
+  isActive: boolean;
   logoUrl: string | null;
   companyNameVi: string | null;
   companyNameEn: string | null;
@@ -56,6 +65,8 @@ type CompanyAuditSnapshot = {
 
 const ADMIN_AUDIT_COMPANY_SELECT = {
   id: true,
+  importKey: true,
+  isActive: true,
   logoUrl: true,
   companyNameVi: true,
   companyNameEn: true,
@@ -110,10 +121,20 @@ export class CompaniesService {
     private readonly adEffectsRegistry: AdEffectsRegistryService,
     private readonly auditService: AuditService,
     private readonly maskingService: CompanyMaskingService,
+    private readonly authService: AuthService,
   ) {}
 
   private static normalizeCompanyEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private static extractUserNameFromEmail(email: string): string {
+    const normalizedEmail = email.trim().toLowerCase();
+    const atIndex = normalizedEmail.indexOf('@');
+    if (atIndex <= 0) {
+      return normalizedEmail;
+    }
+    return normalizedEmail.slice(0, atIndex);
   }
 
   private static getPrimaryIndustry(industry: readonly string[]): string {
@@ -266,6 +287,8 @@ export class CompaniesService {
 
   private static mapAdminCompanyDetail(company: {
     id: string;
+    importKey: string | null;
+    isActive: boolean;
     logoUrl: string | null;
     companyNameVi: string | null;
     companyNameEn: string | null;
@@ -280,12 +303,20 @@ export class CompaniesService {
       value: string;
       contactName: string | null;
     }>;
+    users: Array<{
+      email: string;
+      createdAt: Date;
+      membershipTier: string;
+    }>;
   }): AdminCompanyDetailResponseDto {
     const contactView = CompaniesService.buildCompanyContactView(
       company.companyContacts,
     );
+    const member = company.users[0] ?? null;
     return {
       id: company.id,
+      importKey: company.importKey,
+      isActive: company.isActive,
       logoUrl: company.logoUrl,
       companyNameVi: company.companyNameVi,
       companyNameEn: company.companyNameEn,
@@ -300,7 +331,6 @@ export class CompaniesService {
       region: company.region,
       website: contactView.website,
       contactName: contactView.contactName,
-      contactPhone: null,
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
       contactPhonesByName: CompaniesService.buildContactPhonesByName(
         company.companyContacts,
@@ -310,6 +340,14 @@ export class CompaniesService {
         value: contact.value,
         contactName: contact.contactName,
       })),
+      member: member
+        ? {
+            userName: CompaniesService.extractUserNameFromEmail(member.email),
+            registeredEmail: member.email,
+            memberSince: member.createdAt.toISOString(),
+            membershipTier: member.membershipTier,
+          }
+        : null,
     };
   }
 
@@ -320,6 +358,8 @@ export class CompaniesService {
       where: { id: companyId },
       select: {
         id: true,
+        importKey: true,
+        isActive: true,
         logoUrl: true,
         companyNameVi: true,
         companyNameEn: true,
@@ -336,6 +376,20 @@ export class CompaniesService {
             contactName: true,
           },
         },
+        users: {
+          where: {
+            deletedAt: null,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
+          select: {
+            email: true,
+            createdAt: true,
+            membershipTier: true,
+          },
+        },
       },
     });
     if (!company) {
@@ -346,6 +400,7 @@ export class CompaniesService {
 
   private static buildActiveUserCompanyWhere(): Prisma.CompanyWhereInput {
     return {
+      isActive: true,
       users: {
         some: {
           isActive: true,
@@ -1295,10 +1350,7 @@ export class CompaniesService {
         'contacts must not be an empty array; omit the field to leave contacts unchanged',
       );
     }
-    if (
-      replaceContacts &&
-      contactRows.length === 0
-    ) {
+    if (replaceContacts && contactRows.length === 0) {
       throw new BadRequestException(
         'Contacts payload contains no valid contact rows',
       );
@@ -1373,38 +1425,28 @@ export class CompaniesService {
     if (!companyExists) {
       throw new NotFoundException('Company not found');
     }
-    const normalizedRows: Array<{ type: string; value: string }> = [];
     const seenInRequest = new Set<string>();
-    const pushUnique = (type: string, value: string): void => {
-      const key = `${type}\0${value}`;
+    const normalizedRows: Array<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }> = [];
+    for (const row of dto.contacts) {
+      const value =
+        row.type === CONTACT_TYPE.EMAIL
+          ? row.value.trim().toLowerCase()
+          : row.value.trim();
+      const key = `${row.type}\0${value}`;
       if (seenInRequest.has(key)) {
-        return;
+        continue;
       }
       seenInRequest.add(key);
-      normalizedRows.push({ type, value });
-    };
-    for (const raw of dto.emails ?? []) {
-      const trimmed = raw.trim();
-      if (trimmed.length === 0) {
-        continue;
-      }
-      pushUnique(CONTACT_TYPE.EMAIL, trimmed.toLowerCase());
+      normalizedRows.push({
+        type: row.type,
+        value,
+        contactName: row.contactName?.trim() || null,
+      });
     }
-    for (const raw of dto.contactPhones ?? []) {
-      const trimmed = raw.trim();
-      if (trimmed.length === 0) {
-        continue;
-      }
-      pushUnique(CONTACT_TYPE.TEL, trimmed);
-    }
-    if (normalizedRows.length === 0) {
-      throw new BadRequestException(
-        'At least one valid email or contact phone is required',
-      );
-    }
-    const contactName = dto.contactName?.trim().length
-      ? dto.contactName.trim()
-      : null;
     const existing = await this.prisma.companyContact.findMany({
       where: {
         companyId,
@@ -1426,7 +1468,7 @@ export class CompaniesService {
         companyId,
         type: row.type,
         value: row.value,
-        contactName,
+        contactName: row.contactName,
       })),
     });
     await this.auditService.record({
@@ -1445,6 +1487,113 @@ export class CompaniesService {
     };
   }
 
+  async archiveCompanyWithoutLinkedUser(
+    adminUserId: string,
+    companyId: string,
+  ): Promise<AdminArchiveCompanyResponseDto> {
+    const { company, updated } = await this.prisma.$transaction(async (tx) => {
+      const company = await tx.company.findUnique({
+        where: { id: companyId },
+        select: {
+          id: true,
+          status: true,
+          users: {
+            where: { deletedAt: null },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      });
+      if (!company) {
+        throw new NotFoundException('Company not found');
+      }
+      if (company.users.length > 0) {
+        throw new BadRequestException(
+          'Company still has a linked user account; use the user deletion/disable flow instead',
+        );
+      }
+      if (company.status === CompanyProfileRequestStatus.REJECTED) {
+        return { company, updated: null };
+      }
+      const updated = await tx.company.update({
+        where: { id: companyId },
+        data: {
+          status: CompanyProfileRequestStatus.REJECTED,
+          isActive: false,
+        },
+        select: { id: true, status: true },
+      });
+      return { company, updated };
+    });
+
+    if (!updated) {
+      return { id: company.id, status: company.status };
+    }
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.PROFILE_REQUEST_STATUS_CHANGED,
+      entityType: AUDIT_ENTITY.COMPANY,
+      entityId: companyId,
+      actorId: adminUserId,
+      oldValue: company.status,
+      newValue: updated.status,
+      metadata: {
+        source: 'admin.company_archive',
+      },
+    });
+
+    return updated;
+  }
+
+  async setCompanyActive(
+    adminUserId: string,
+    companyId: string,
+    isActive: boolean,
+  ): Promise<{ id: string; isActive: boolean }> {
+    const { company, updated } = await this.prisma.$transaction(async (tx) => {
+      const company = await tx.company.findUnique({
+        where: { id: companyId },
+        select: {
+          id: true,
+          isActive: true,
+          users: {
+            where: { deletedAt: null },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      });
+      if (!company) {
+        throw new NotFoundException('Company not found');
+      }
+      if (company.users.length > 0) {
+        throw new BadRequestException(
+          'Company still has a linked user account; use the user active toggle flow instead',
+        );
+      }
+      const updated = await tx.company.update({
+        where: { id: companyId },
+        data: { isActive },
+        select: { id: true, isActive: true },
+      });
+      return { company, updated };
+    });
+
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.COMPANY,
+      action: AUDIT_ACTION.COMPANY_UPDATED_BY_ADMIN,
+      entityId: companyId,
+      actorId: adminUserId,
+      oldValue: JSON.stringify({ isActive: company.isActive }),
+      newValue: JSON.stringify({ isActive: updated.isActive }),
+      metadata: {
+        source: 'admin.company_active_changed',
+      },
+    });
+
+    return updated;
+  }
+
   private static serializeCompanyAuditPayload(
     company: CompanyAuditSnapshot | null | undefined,
   ): string {
@@ -1454,7 +1603,9 @@ export class CompaniesService {
     const companyPayload = company
       ? {
           id: company.id,
+          importKey: company.importKey,
           email: contactView?.email ?? '',
+          isActive: company.isActive,
           logoUrl: company.logoUrl,
           companyNameVi: company.companyNameVi,
           companyNameEn: company.companyNameEn,
@@ -1487,9 +1638,13 @@ export class CompaniesService {
     const companyUpdateData: Prisma.CompanyUpdateInput = {};
     const assignNullable = (
       key: keyof Prisma.CompanyUpdateInput,
-      value: string | undefined,
+      value: string | null | undefined,
     ): void => {
       if (value === undefined) {
+        return;
+      }
+      if (value === null) {
+        (companyUpdateData as Record<string, unknown>)[key] = null;
         return;
       }
       const normalized = value.trim();
@@ -1519,5 +1674,71 @@ export class CompaniesService {
       ? CompaniesService.normalizeAdminContactRows(data.contacts ?? [])
       : [];
     return { companyUpdateData, contactRows, replaceContacts };
+  }
+
+  async provisionCompanyUser(
+    adminUserId: string,
+    companyId: string,
+  ): Promise<AdminProvisionCompanyUserResponseDto> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        status: true,
+        industry: true,
+        companyContacts: {
+          select: { type: true, value: true },
+        },
+        users: {
+          where: { deletedAt: null },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    if (company.status !== CompanyProfileRequestStatus.APPROVED) {
+      throw new BadRequestException(
+        'Company must be APPROVED before a user account can be provisioned',
+      );
+    }
+    if (company.users.length > 0) {
+      throw new BadRequestException(
+        'Company already has a linked user account',
+      );
+    }
+
+    const emailContact = company.companyContacts.find(
+      (c) => c.type === CONTACT_TYPE.EMAIL,
+    );
+    if (!emailContact) {
+      throw new BadRequestException(
+        'Company has no email contact; add an email before provisioning a user',
+      );
+    }
+
+    const result = await this.authService.provisionImportedCompanyUser({
+      companyId,
+      industry: company.industry,
+      email: emailContact.value,
+      sendSetPasswordEmail: true,
+    });
+
+    await this.auditService.record({
+      entityType: AUDIT_ENTITY.COMPANY,
+      action: AUDIT_ACTION.COMPANY_USER_PROVISIONED,
+      entityId: companyId,
+      actorId: adminUserId,
+      metadata: {
+        provisionStatus: result.status,
+        email: result.email,
+        userId: result.userId,
+      },
+    });
+
+    return result as AdminProvisionCompanyUserResponseDto;
   }
 }

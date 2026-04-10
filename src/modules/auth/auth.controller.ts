@@ -334,7 +334,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Enable or disable a user account',
     description:
-      'Set isActive to true (enable) or false (disable). :id is the userId (e.g. from getAllProfileRequests item.userId). Disabled users cannot log in.',
+      'Set isActive to true (enable) or false (disable). :id is the userId (e.g. from getAllProfileRequests item.userId). Disabled users cannot log in. Also mirrors isActive to the linked company if one exists.',
   })
   @ApiBody({ type: UpdateUserActiveDto })
   @ApiResponse({ status: 200, description: 'User active status updated' })
@@ -358,7 +358,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Soft-delete user',
     description:
-      'Sets user isActive to false and deletedAt to now. Stronger than disable; use PATCH to enable (clears deletedAt).',
+      'Sets user isActive to false and deletedAt to now. Also sets isActive to false on the linked company if one exists. Stronger than disable; use PATCH to enable (clears deletedAt).',
   })
   @ApiResponse({ status: 200, description: 'User soft-deleted' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

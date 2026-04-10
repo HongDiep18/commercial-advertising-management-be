@@ -787,7 +787,7 @@ export class AuthService {
       {
         userId: string | null;
         companyId: string | null;
-        isActive: boolean | null;
+        isActive: boolean;
       } & Record<string, unknown>
     >;
     pagination: {
@@ -826,7 +826,7 @@ export class AuthService {
             ],
           } satisfies Prisma.CompanyWhereInput)
         : linkageWhere;
-    const [total, companies] = await Promise.all([
+    const [total, companies, users] = await this.prisma.$transaction([
       this.prisma.company.count({ where }),
       this.prisma.company.findMany({
         where,
@@ -840,31 +840,30 @@ export class AuthService {
           },
         },
       }),
+      this.prisma.user.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, email: true, companyId: true, isActive: true },
+      }),
     ]);
 
-    const companyIds = companies.map((company) => company.id);
+    const companyIds = new Set(companies.map((c) => c.id));
     const userByCompanyId = new Map<
       string,
       { id: string; companyId: string | null; isActive: boolean }
     >();
-    if (companyIds.length > 0) {
-      const users = await this.prisma.user.findMany({
-        where: {
-          companyId: { in: companyIds },
-          deletedAt: null,
-        },
-        select: { id: true, email: true, companyId: true, isActive: true },
-      });
-      for (const u of users) {
-        if (!u.companyId) {
-          continue;
-        }
-        userByCompanyId.set(u.companyId, {
-          id: u.id,
-          companyId: u.companyId,
-          isActive: u.isActive,
-        });
+    for (const u of users) {
+      if (!u.companyId || !companyIds.has(u.companyId)) {
+        continue;
       }
+      if (userByCompanyId.has(u.companyId)) {
+        continue;
+      }
+      userByCompanyId.set(u.companyId, {
+        id: u.id,
+        companyId: u.companyId,
+        isActive: u.isActive,
+      });
     }
 
     const totalPages = Math.ceil(total / limit);
@@ -903,7 +902,7 @@ export class AuthService {
         contactName,
         userId: user?.id ?? null,
         companyId: c.id,
-        isActive: user?.isActive ?? null,
+        isActive: user?.isActive ?? c.isActive,
       };
     });
 
@@ -944,23 +943,29 @@ export class AuthService {
     id: string,
     isActive: boolean,
   ): Promise<{ id: string; email: string; isActive: boolean }> {
-    let target = await this.prisma.user.findUnique({
-      where: { id },
-      select: { id: true, email: true, isActive: true },
-    });
-    if (!target) {
-      target = await this.prisma.user.findFirst({
-        where: { companyId: id },
+    const { target, updated } = await this.prisma.$transaction(async (tx) => {
+      const target = await tx.user.findUnique({
+        where: { id },
+        select: { id: true, email: true, isActive: true, companyId: true },
+      });
+      if (!target) {
+        throw new NotFoundException('User not found');
+      }
+      const updated = await tx.user.update({
+        where: { id: target.id },
+        data: {
+          isActive,
+          ...(isActive ? { deletedAt: null } : {}),
+        },
         select: { id: true, email: true, isActive: true },
       });
-    }
-    if (!target) {
-      throw new NotFoundException('User not found');
-    }
-    const updated = await this.prisma.user.update({
-      where: { id: target.id },
-      data: { isActive },
-      select: { id: true, email: true, isActive: true },
+      if (target.companyId) {
+        await tx.company.update({
+          where: { id: target.companyId },
+          data: { isActive },
+        });
+      }
+      return { target, updated };
     });
     await this.auditService.record({
       entityType: AUDIT_ENTITY.USER,
@@ -977,30 +982,47 @@ export class AuthService {
     adminUserId: string,
     userId: string,
   ): Promise<{ id: string; email: string; isActive: boolean }> {
-    const target = (await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, isActive: true, deletedAt: true } as {
-        id: boolean;
-        email: boolean;
+    const { target, updated } = await this.prisma.$transaction(async (tx) => {
+      const target = (await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          isActive: true,
+          deletedAt: true,
+          companyId: true,
+        } as {
+          id: boolean;
+          email: boolean;
+          isActive: boolean;
+          deletedAt: boolean;
+          companyId: boolean;
+        },
+      })) as {
+        id: string;
+        email: string;
         isActive: boolean;
-        deletedAt: boolean;
-      },
-    })) as {
-      id: string;
-      email: string;
-      isActive: boolean;
-      deletedAt: Date | null;
-    } | null;
-    if (!target) {
-      throw new NotFoundException('User not found');
-    }
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        isActive: false,
-        deletedAt: new Date(),
-      } as Prisma.UserUpdateInput,
-      select: { id: true, email: true, isActive: true },
+        deletedAt: Date | null;
+        companyId: string | null;
+      } | null;
+      if (!target) {
+        throw new NotFoundException('User not found');
+      }
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          isActive: false,
+          deletedAt: new Date(),
+        } as Prisma.UserUpdateInput,
+        select: { id: true, email: true, isActive: true },
+      });
+      if (target.companyId) {
+        await tx.company.update({
+          where: { id: target.companyId },
+          data: { isActive: false },
+        });
+      }
+      return { target, updated };
     });
     await this.auditService.record({
       entityType: AUDIT_ENTITY.USER,
@@ -1477,6 +1499,35 @@ export class AuthService {
     }
 
     const previousStatus = company.status;
+
+    if (status === CompanyProfileRequestStatus.APPROVED) {
+      // status update + user creation are atomic inside onCompanyRegistrationApproved
+      await this.onCompanyRegistrationApproved({
+        id,
+        industry: company.industry,
+        email: companyEmail,
+      });
+      await this.auditService.record({
+        action: AUDIT_ACTION.PROFILE_REQUEST_STATUS_CHANGED,
+        entityType: AUDIT_ENTITY.COMPANY,
+        entityId: id,
+        actorId: actorId ?? null,
+        oldValue: previousStatus,
+        newValue: status,
+      });
+      await this.auditService.record({
+        action: AUDIT_ACTION.PROFILE_REQUEST_APPROVED,
+        entityType: AUDIT_ENTITY.COMPANY,
+        entityId: id,
+        actorId: actorId ?? null,
+        metadata: {
+          email: companyEmail,
+          companyNameVi: company.companyNameVi ?? '',
+        },
+      });
+      return await this.prisma.company.findUniqueOrThrow({ where: { id } });
+    }
+
     const updated = await this.prisma.company.update({
       where: { id },
       data: { status },
@@ -1491,23 +1542,6 @@ export class AuthService {
       newValue: status,
     });
 
-    if (status === CompanyProfileRequestStatus.APPROVED) {
-      await this.auditService.record({
-        action: AUDIT_ACTION.PROFILE_REQUEST_APPROVED,
-        entityType: AUDIT_ENTITY.COMPANY,
-        entityId: id,
-        actorId: actorId ?? null,
-        metadata: {
-          email: companyEmail,
-          companyNameVi: company.companyNameVi ?? '',
-        },
-      });
-      await this.onCompanyRegistrationApproved({
-        id: updated.id,
-        industry: updated.industry,
-        email: companyEmail,
-      });
-    }
     if (status === CompanyProfileRequestStatus.REJECTED) {
       await this.auditService.record({
         action: AUDIT_ACTION.PROFILE_REQUEST_REJECTED,
@@ -1546,6 +1580,10 @@ export class AuthService {
     const { token, expiresAt } = this.buildSetPasswordTokenData();
     const placeholderPassword = await this.buildPlaceholderPassword();
     const createdUser = await this.prisma.$transaction(async (tx) => {
+      await tx.company.update({
+        where: { id: company.id },
+        data: { status: CompanyProfileRequestStatus.APPROVED },
+      });
       const user = await tx.user.create({
         data: {
           email: normalizedEmail,

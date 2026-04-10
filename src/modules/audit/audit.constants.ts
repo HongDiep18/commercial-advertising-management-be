@@ -61,4 +61,5 @@ export const AUDIT_ACTION = {
 
   COMPANY_UPDATED_BY_ADMIN: 'company.updated_by_admin',
   COMPANY_CONTACTS_ADDED: 'company.contacts_added',
+  COMPANY_USER_PROVISIONED: 'company.user_provisioned',
 } as const;

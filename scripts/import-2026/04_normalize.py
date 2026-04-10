@@ -14,11 +14,14 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
+from uuid import UUID, uuid5
 
 OUT    = Path(__file__).parent / "out"
 INPUT  = OUT / "03_merged.json"
 OUTPUT = OUT / "04_normalized.json"
 data = json.load(INPUT.open())
+
+COMPANY_ID_NAMESPACE = UUID("fdb6602d-1ac7-45d9-89c0-fc5365fe7d91")
 
 # ─── 1. Region → English ─────────────────────────────────────────────────────
 # All CJK/Vietnamese variants map directly to English in one pass.
@@ -204,6 +207,75 @@ for c in data:
     # Drop contacts with empty value
     c["companyContacts"] = [x for x in new_contacts if x.get("value", "").strip()]
 
+
+def normalize_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = re.sub(r"\s+", " ", value.strip()).lower()
+    return normalized or None
+
+
+def unique_sorted(values: list[str | None]) -> list[str]:
+    return sorted({value for value in values if value})
+
+
+def build_company_identity_key(company: dict) -> str:
+    names = unique_sorted([
+        normalize_text(company.get("companyNameZh")),
+        normalize_text(company.get("companyNameEn")),
+        normalize_text(company.get("companyNameVi")),
+    ])
+    tax_id = normalize_text(company.get("taxId"))
+    region = normalize_text(company.get("region"))
+    country = normalize_text(company.get("country"))
+    emails = unique_sorted([
+        normalize_text(contact.get("value"))
+        for contact in company.get("companyContacts", [])
+        if normalize_text(contact.get("type")) == "email"
+    ])
+    phones = unique_sorted([
+        normalize_text(contact.get("value"))
+        for contact in company.get("companyContacts", [])
+        if normalize_text(contact.get("type")) in {"tel", "hotline", "contact_person"}
+    ])
+    addresses = unique_sorted([
+        normalize_text(address)
+        for address in company.get("addresses", [])
+    ])
+
+    if tax_id:
+        return f"tax:{tax_id}"
+    if names and emails:
+        return "name-email:" + "|".join([*names, *emails])
+    if names and region and phones:
+        return "name-region-phone:" + "|".join([*names, region, *phones])
+    if names and region:
+        return "name-region:" + "|".join([*names, region])
+    if names and addresses:
+        return "name-address:" + "|".join([*names, *addresses])
+    if names:
+        return "name:" + "|".join(names)
+
+    fallback = {
+        "country": country,
+        "region": region,
+        "emails": emails,
+        "phones": phones,
+        "addresses": addresses,
+    }
+    return "fallback:" + json.dumps(fallback, ensure_ascii=False, sort_keys=True)
+
+
+generated_ids = 0
+identity_counts: dict[str, int] = defaultdict(int)
+for c in data:
+    identity_key = build_company_identity_key(c)
+    c["id"] = str(uuid5(COMPANY_ID_NAMESPACE, identity_key))
+    identity_counts[identity_key] += 1
+    generated_ids += 1
+
+duplicate_identity_groups = sum(1 for count in identity_counts.values() if count > 1)
+
 # ─── Output ───────────────────────────────────────────────────────────────────
 
 OUTPUT.write_text(json.dumps(data, ensure_ascii=False, indent=2))
@@ -214,6 +286,8 @@ DROP_FIELDS = {"_flags", "_raw", "industry"}  # industry superseded by industrie
 clean = [{k: v for k, v in c.items() if k not in DROP_FIELDS} for c in data]
 FINAL.write_text(json.dumps(clean, ensure_ascii=False, indent=2))
 print(f"\nFinal output : {FINAL}  ({len(clean)} companies)")
+print(f"Generated company IDs : {generated_ids}")
+print(f"Duplicate identity groups : {duplicate_identity_groups}")
 
 print(f"Canonical region fixes : {fixed_canonical}")
 print(f"Inferred regions       : {fixed_inferred}")

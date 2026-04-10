@@ -273,10 +273,12 @@ enum AdOrderStatus {
 
 model Company {
   id          String   @id @default(uuid()) @db.Uuid
+  importKey   String?  @unique @map("import_key") @db.VarChar(255)
   industry    String[] @db.VarChar(255)
   description String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  isActive    Boolean  @default(true) @map("is_active")
 
   status CompanyProfileRequestStatus @default(APPROVED) @map("registration_status")
 

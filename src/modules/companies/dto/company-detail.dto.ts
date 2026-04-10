@@ -55,7 +55,7 @@ export class CompanyDetailResponseDto {
   contactName!: string | null;
 
   @ApiPropertyOptional()
-  contactPhone!: string | null;
+  contactPhone?: string | null;
 
   @ApiProperty({
     type: [String],

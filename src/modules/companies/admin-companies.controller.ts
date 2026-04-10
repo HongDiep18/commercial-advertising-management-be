@@ -31,6 +31,10 @@ import { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
 import { AddCompanyContactsResponseDto } from './dto/add-company-contacts-response.dto';
 import { AdminCompanyStatsResponseDto } from './dto/admin-company-stats.dto';
 import { CompanyContactTypesResponseDto } from './dto/company-contact-types-response.dto';
+import { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
+import { AdminUpdateCompanyActiveDto } from './dto/admin-update-company-active.dto';
+import { AdminCompanyActiveResponseDto } from './dto/admin-company-active-response.dto';
+import { AdminProvisionCompanyUserResponseDto } from './dto/admin-provision-company-user-response.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -131,7 +135,7 @@ export class AdminCompaniesController {
   @ApiOperation({
     summary: 'Get company detail for admin management',
     description:
-      'Returns scalar company fields plus raw company_contacts rows for admin management screens.',
+      'Returns scalar company fields, raw company_contacts rows, and linked member account summary for admin management screens.',
   })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({
@@ -186,6 +190,69 @@ export class AdminCompaniesController {
     );
   }
 
+  @Patch(':companyId/archive')
+  @ApiOperation({
+    summary: 'Archive an unlinked company (admin)',
+    description:
+      'Marks a company as REJECTED for admin cleanup flows. Intended for company rows without a linked non-deleted user account.',
+  })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company archived',
+    type: AdminArchiveCompanyResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Company still has a linked user account; use the user deletion/disable flow instead',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async archiveCompany(
+    @Param('companyId') companyId: string,
+    @CurrentUser('userId') adminUserId: string,
+  ): Promise<AdminArchiveCompanyResponseDto> {
+    return this.companiesService.archiveCompanyWithoutLinkedUser(
+      adminUserId,
+      companyId,
+    );
+  }
+
+  @Patch(':companyId/active')
+  @ApiOperation({
+    summary: 'Enable or disable an unlinked company (admin)',
+    description:
+      'Sets company isActive for company rows without a linked non-deleted user account. If a linked user exists, use the user active toggle flow instead.',
+  })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiBody({ type: AdminUpdateCompanyActiveDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Company active status updated',
+    type: AdminCompanyActiveResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Company still has a linked user account; use the user active toggle flow instead',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async setCompanyActive(
+    @Param('companyId') companyId: string,
+    @Body() dto: AdminUpdateCompanyActiveDto,
+    @CurrentUser('userId') adminUserId: string,
+  ): Promise<AdminCompanyActiveResponseDto> {
+    return this.companiesService.setCompanyActive(
+      adminUserId,
+      companyId,
+      dto.isActive,
+    );
+  }
+
   @Post(':companyId/contacts')
   @ApiOperation({
     summary: 'Add company contacts (append)',
@@ -215,5 +282,30 @@ export class AdminCompaniesController {
       companyId,
       dto,
     );
+  }
+
+  @Post(':companyId/provision-user')
+  @ApiOperation({
+    summary: 'Provision a user account for an approved company (admin)',
+    description:
+      'Creates or links a user account for an APPROVED company that has no linked user. ' +
+      'Intended for import-created companies that had no email at approval time and have since had one added. ' +
+      'Sends a set-password email on success.',
+  })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({
+    status: 201,
+    description: 'User provisioned',
+    type: AdminProvisionCompanyUserResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Company not APPROVED, already has a user, or missing email contact' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async provisionCompanyUser(
+    @Param('companyId') companyId: string,
+    @CurrentUser('userId') adminUserId: string,
+  ): Promise<AdminProvisionCompanyUserResponseDto> {
+    return this.companiesService.provisionCompanyUser(adminUserId, companyId);
   }
 }

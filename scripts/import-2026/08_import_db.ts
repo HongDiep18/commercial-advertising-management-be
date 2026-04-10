@@ -5,7 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
-import { CompanyProfileRequestStatus } from '@prisma/client';
+import { CompanyProfileRequestStatus, Prisma } from '@prisma/client';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { jwtConfig, mailConfig, storageConfig } from '../../src/config';
@@ -32,6 +32,7 @@ type JsonUserContact = {
 };
 
 type JsonCompany = {
+  id?: string | null;
   companyNameVi?: string | null;
   companyNameZh?: string | null;
   companyNameEn?: string | null;
@@ -90,15 +91,13 @@ const DEFAULT_INPUT = resolve(
     AuditModule,
     MailModule,
   ],
-  providers: [
-    LoyaltyService,
-    CaptchaVerificationService,
-    AuthService,
-  ],
+  providers: [LoyaltyService, CaptchaVerificationService, AuthService],
 })
 class CompanyImportModule {}
 
-function normalizeOptionalString(value: string | null | undefined): string | null {
+function normalizeOptionalString(
+  value: string | null | undefined,
+): string | null {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
 }
@@ -110,11 +109,11 @@ const REGION_MAP: Record<string, string> = {
   'hồ chí minh': 'hcm',
   'tp hcm': 'hcm',
   'tp. hcm': 'hcm',
-  'hcm': 'hcm',
+  hcm: 'hcm',
   // Ha Noi
   'ha noi': 'hanoi',
   'hà nội': 'hanoi',
-  'hanoi': 'hanoi',
+  hanoi: 'hanoi',
   // Dong Nai
   'dong nai': 'dongnai',
   'đồng nai': 'dongnai',
@@ -128,8 +127,8 @@ const REGION_MAP: Record<string, string> = {
   'da nang': 'danang',
   'đà nẵng': 'danang',
   // Other / foreign
-  'other': 'other-region',
-  'zhejiang': 'other',
+  other: 'other-region',
+  zhejiang: 'other',
 };
 
 function normalizeRegion(region: string | null): string | null {
@@ -139,6 +138,19 @@ function normalizeRegion(region: string | null): string | null {
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function normalizeUuid(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? null;
+  if (
+    normalized &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      normalized,
+    )
+  ) {
+    return normalized;
+  }
+  return null;
 }
 
 function normalizeMatchKey(value: string | null | undefined): string | null {
@@ -208,7 +220,10 @@ function buildCompanyContactRows(company: JsonCompany): ImportContactRow[] {
 
 function getPrimaryCompanyEmail(company: JsonCompany): string | null {
   for (const contact of company.companyContacts ?? []) {
-    if (normalizeOptionalString(contact.type)?.toLowerCase() !== CONTACT_TYPE.EMAIL) {
+    if (
+      normalizeOptionalString(contact.type)?.toLowerCase() !==
+      CONTACT_TYPE.EMAIL
+    ) {
       continue;
     }
     const email = normalizeOptionalString(contact.value);
@@ -225,12 +240,221 @@ function getCompanyMatchName(company: JsonCompany): string | null {
   );
 }
 
+function getCompanyMatchNames(company: JsonCompany): string[] {
+  return Array.from(
+    new Set(
+      [
+        normalizeOptionalString(company.companyNameZh),
+        normalizeOptionalString(company.companyNameEn),
+        normalizeOptionalString(company.companyNameVi),
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  );
+}
+
+function getCompanyMatchPhones(
+  contactRows: ReadonlyArray<ImportContactRow>,
+): string[] {
+  const phoneTypes = new Set<string>([
+    CONTACT_TYPE.TEL,
+    CONTACT_TYPE.HOTLINE,
+    CONTACT_TYPE.CONTACT_PERSON,
+  ]);
+  return Array.from(
+    new Set(
+      contactRows
+        .filter((row) => phoneTypes.has(row.type))
+        .map((row) => row.value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+}
+
+function buildCompanyImportLockKey(input: {
+  company: JsonCompany;
+  companyEmail: string | null;
+  contactRows: ReadonlyArray<ImportContactRow>;
+  normalizedRegion: string | null;
+}): string {
+  const sourceId = normalizeUuid(input.company.id);
+  if (sourceId) {
+    return `id:${sourceId}`;
+  }
+
+  const taxId = normalizeOptionalString(input.company.taxId);
+  if (taxId) {
+    return `tax:${taxId.toLowerCase()}`;
+  }
+
+  if (input.companyEmail) {
+    return `email:${input.companyEmail}`;
+  }
+
+  const matchName = getCompanyMatchName(input.company);
+  if (matchName) {
+    return `name-region:${matchName}|${input.normalizedRegion ?? 'null'}`;
+  }
+
+  const phones = getCompanyMatchPhones(input.contactRows);
+  if (phones.length > 0) {
+    return `phone:${phones.join(',')}`;
+  }
+
+  return `fallback:${JSON.stringify({
+    zh: normalizeOptionalString(input.company.companyNameZh),
+    en: normalizeOptionalString(input.company.companyNameEn),
+    vi: normalizeOptionalString(input.company.companyNameVi),
+    region: input.normalizedRegion,
+  })}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+
+async function acquireCompanyImportLock(
+  tx: Prisma.TransactionClient,
+  lockKey: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const rows = await tx.$queryRaw<Array<{ locked: boolean }>>(
+      Prisma.sql`
+        SELECT pg_try_advisory_xact_lock(hashtext(${lockKey}), 0) AS locked
+      `,
+    );
+    if (rows[0]?.locked) {
+      return;
+    }
+    await sleep(200);
+  }
+  throw new Error(`Timed out waiting for import lock: ${lockKey}`);
+}
+
+async function findExistingCompanyForImport(
+  tx: Prisma.TransactionClient,
+  input: {
+    company: JsonCompany;
+    companyEmail: string | null;
+    contactRows: ReadonlyArray<ImportContactRow>;
+    normalizedRegion: string | null;
+  },
+): Promise<{ id: string } | null> {
+  const sourceId = normalizeUuid(input.company.id);
+  if (sourceId) {
+    const company = await tx.company.findFirst({
+      where: {
+        OR: [{ importKey: sourceId }, { id: sourceId }],
+      },
+      select: { id: true },
+    });
+    if (company) {
+      return company;
+    }
+  }
+
+  const taxId = normalizeOptionalString(input.company.taxId);
+  if (taxId) {
+    const company = await tx.company.findFirst({
+      where: {
+        taxId: {
+          equals: taxId,
+          mode: 'insensitive',
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (company) {
+      return company;
+    }
+  }
+
+  if (input.companyEmail) {
+    const company = await tx.company.findFirst({
+      where: {
+        companyContacts: {
+          some: {
+            type: CONTACT_TYPE.EMAIL,
+            value: input.companyEmail,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (company) {
+      return company;
+    }
+  }
+
+  const namePredicates = getCompanyMatchNames(input.company).map(
+    (name): Prisma.CompanyWhereInput => ({
+      OR: [
+        { companyNameZh: { equals: name, mode: 'insensitive' } },
+        { companyNameEn: { equals: name, mode: 'insensitive' } },
+        { companyNameVi: { equals: name, mode: 'insensitive' } },
+      ],
+    }),
+  );
+  if (namePredicates.length > 0 && input.normalizedRegion) {
+    const company = await tx.company.findFirst({
+      where: {
+        region: {
+          equals: input.normalizedRegion,
+          mode: 'insensitive',
+        },
+        OR: namePredicates,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (company) {
+      return company;
+    }
+  }
+
+  const phones = getCompanyMatchPhones(input.contactRows);
+  if (namePredicates.length > 0 && phones.length > 0) {
+    const company = await tx.company.findFirst({
+      where: {
+        OR: namePredicates,
+        companyContacts: {
+          some: {
+            type: {
+              in: [
+                CONTACT_TYPE.TEL,
+                CONTACT_TYPE.HOTLINE,
+                CONTACT_TYPE.CONTACT_PERSON,
+              ],
+            },
+            value: {
+              in: phones,
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (company) {
+      return company;
+    }
+  }
+
+  return null;
+}
+
 async function loadCompanies(inputPath: string): Promise<JsonCompany[]> {
   const raw = await readFile(inputPath, 'utf8');
   return JSON.parse(raw) as JsonCompany[];
 }
 
-function printSummary(summary: ImportSummary, companiesProcessed: number): void {
+function printSummary(
+  summary: ImportSummary,
+  companiesProcessed: number,
+): void {
   console.log('Company import completed.');
   console.log(`  Companies processed: ${companiesProcessed}`);
   console.log(`  Companies inserted: ${summary.companiesInserted}`);
@@ -298,7 +522,11 @@ async function main(): Promise<void> {
       userEmailConflictsSkipped: 0,
       setPasswordEmailsSent: 0,
     };
-    const errors: Array<{ index: number; name: string | null; error: unknown }> = [];
+    const errors: Array<{
+      index: number;
+      name: string | null;
+      error: unknown;
+    }> = [];
 
     console.log(`Importing ${companies.length} companies from ${inputPath}`);
     console.log(
@@ -310,19 +538,18 @@ async function main(): Promise<void> {
       const taxId = normalizeOptionalString(company.taxId);
       const contactRows = buildCompanyContactRows(company);
       const companyEmail = getPrimaryCompanyEmail(company);
-      const companyMatchName = getCompanyMatchName(company);
-      const companyMatchRegion = normalizeMatchKey(company.region);
+      const sourceCompanyId = normalizeUuid(company.id);
       const companyData = {
+        importKey: sourceCompanyId,
         companyNameVi: normalizeOptionalString(company.companyNameVi),
         companyNameZh: normalizeOptionalString(company.companyNameZh),
         companyNameEn: normalizeOptionalString(company.companyNameEn),
         taxId,
         country: normalizeOptionalString(company.country),
         region: normalizeRegion(normalizeOptionalString(company.region)),
-        industry:
-          (company.industries ?? [])
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0),
+        industry: (company.industries ?? [])
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
         description: normalizeOptionalString(company.description) ?? '',
         status: CompanyProfileRequestStatus.APPROVED,
       };
@@ -330,95 +557,67 @@ async function main(): Promise<void> {
       let importedCompany: { id: string };
       try {
         importedCompany = await prisma.$transaction(async (tx) => {
-        let existingCompany = taxId
-          ? await tx.company.findFirst({
-              where: { taxId },
-              select: { id: true },
-            })
-          : null;
-
-        if (!existingCompany && !taxId && companyEmail) {
-          existingCompany = await tx.company.findFirst({
-            where: {
-              companyContacts: {
-                some: {
-                  type: CONTACT_TYPE.EMAIL,
-                  value: companyEmail,
-                },
-              },
-            },
-            select: { id: true },
+          const lockKey = buildCompanyImportLockKey({
+            company,
+            companyEmail,
+            contactRows,
+            normalizedRegion: companyData.region,
           });
-        }
+          await acquireCompanyImportLock(tx, lockKey);
 
-        if (
-          !existingCompany &&
-          !taxId &&
-          companyMatchName &&
-          companyMatchRegion
-        ) {
-          existingCompany = await tx.company.findFirst({
-            where: {
-              region: companyData.region,
-              OR: [
-                { companyNameZh: company.companyNameZh ?? undefined },
-                { companyNameEn: company.companyNameEn ?? undefined },
-                { companyNameVi: company.companyNameVi ?? undefined },
-              ].filter(
-                (
-                  value,
-                ): value is
-                  | { companyNameZh: string }
-                  | { companyNameEn: string }
-                  | { companyNameVi: string } => {
-                  const raw = Object.values(value)[0];
-                  return typeof raw === 'string' && raw.trim().length > 0;
-                },
-              ),
-            },
-            select: { id: true },
+          const existingCompany = await findExistingCompanyForImport(tx, {
+            company,
+            companyEmail,
+            contactRows,
+            normalizedRegion: companyData.region,
           });
-        }
 
-        const savedCompany = existingCompany
-          ? await tx.company.update({
-              where: { id: existingCompany.id },
-              data: companyData,
-              select: { id: true },
-            })
-          : await tx.company.create({
-              data: companyData,
-              select: { id: true },
+          const savedCompany = existingCompany
+            ? await tx.company.update({
+                where: { id: existingCompany.id },
+                data: companyData,
+                select: { id: true },
+              })
+            : await tx.company.create({
+                data: companyData,
+                select: { id: true },
+              });
+
+          if (existingCompany) {
+            summary.companiesUpdated += 1;
+          } else {
+            summary.companiesInserted += 1;
+          }
+
+          await tx.companyContact.deleteMany({
+            where: { companyId: savedCompany.id },
+          });
+
+          if (contactRows.length > 0) {
+            const created = await tx.companyContact.createMany({
+              data: contactRows.map((row) => ({
+                companyId: savedCompany.id,
+                type: row.type,
+                value: row.value,
+                contactName: row.contactName,
+              })),
             });
-
-        if (existingCompany) {
-          summary.companiesUpdated += 1;
-        } else {
-          summary.companiesInserted += 1;
-        }
-
-        await tx.companyContact.deleteMany({
-          where: { companyId: savedCompany.id },
-        });
-
-        if (contactRows.length > 0) {
-          const created = await tx.companyContact.createMany({
-            data: contactRows.map((row) => ({
-              companyId: savedCompany.id,
-              type: row.type,
-              value: row.value,
-              contactName: row.contactName,
-            })),
-          });
-          summary.contactsCreated += created.count;
-        }
+            summary.contactsCreated += created.count;
+          }
 
           return savedCompany;
         });
       } catch (err) {
-        const name = company.companyNameZh ?? company.companyNameEn ?? company.companyNameVi ?? null;
+        const name =
+          company.companyNameZh ??
+          company.companyNameEn ??
+          company.companyNameVi ??
+          null;
         errors.push({ index: i, name, error: err });
-        console.error(`[${i}] Failed to import company "${name ?? 'unknown'}":`, err);
+        console.error(
+          `[${i}] Failed to import company "${name ?? 'unknown'}":`,
+          err,
+        );
         continue;
       }
 

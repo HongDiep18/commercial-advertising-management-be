@@ -413,11 +413,7 @@ export class CompaniesService {
   }
 
   async getAdminApprovedCompanyStats(): Promise<{ approvedCount: number }> {
-    const approvedCount = await this.prisma.company.count({
-      where: {
-        ...CompaniesService.buildActiveUserCompanyWhere(),
-      },
-    });
+    const approvedCount = await this.prisma.company.count();
     return { approvedCount };
   }
 
@@ -1292,19 +1288,15 @@ export class CompaniesService {
     companyId: string,
     data: AdminUpdateCompanyDto,
   ): Promise<AdminCompanyDetailResponseDto> {
-    const companyExists = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: { id: true },
-    });
-    if (!companyExists) {
-      throw new NotFoundException('Company not found');
-    }
-
     const { companyUpdateData, contactRows, replaceContacts } =
       this.toAdminCompanyUpdatePayload(data);
+    if (replaceContacts && (data.contacts?.length ?? 0) === 0) {
+      throw new BadRequestException(
+        'contacts must not be an empty array; omit the field to leave contacts unchanged',
+      );
+    }
     if (
       replaceContacts &&
-      (data.contacts?.length ?? 0) > 0 &&
       contactRows.length === 0
     ) {
       throw new BadRequestException(
@@ -1319,6 +1311,9 @@ export class CompaniesService {
       where: { id: companyId },
       select: ADMIN_AUDIT_COMPANY_SELECT,
     });
+    if (!companyBefore) {
+      throw new NotFoundException('Company not found');
+    }
     await this.prisma.$transaction(async (tx) => {
       if (Object.keys(companyUpdateData).length > 0) {
         await tx.company.update({

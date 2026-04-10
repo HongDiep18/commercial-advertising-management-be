@@ -157,6 +157,7 @@ export class AdminUpdateCompanyDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(4000)
   description?: string;
 

@@ -103,6 +103,40 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   return trimmed.length > 0 ? trimmed : null;
 }
 
+const REGION_MAP: Record<string, string> = {
+  // Ho Chi Minh
+  'ho chi minh city': 'hcm',
+  'ho chi minh': 'hcm',
+  'hồ chí minh': 'hcm',
+  'tp hcm': 'hcm',
+  'tp. hcm': 'hcm',
+  'hcm': 'hcm',
+  // Ha Noi
+  'ha noi': 'hanoi',
+  'hà nội': 'hanoi',
+  'hanoi': 'hanoi',
+  // Dong Nai
+  'dong nai': 'dongnai',
+  'đồng nai': 'dongnai',
+  // Tay Ninh
+  'tay ninh': 'tayninh',
+  'tây ninh': 'tayninh',
+  // Lam Dong
+  'lam dong': 'lamdong',
+  'lâm đồng': 'lamdong',
+  // Da Nang
+  'da nang': 'danang',
+  'đà nẵng': 'danang',
+  // Other / foreign
+  'other': 'other-region',
+  'zhejiang': 'other',
+};
+
+function normalizeRegion(region: string | null): string | null {
+  if (!region) return null;
+  return REGION_MAP[region.toLowerCase()] ?? region;
+}
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -151,7 +185,7 @@ function buildCompanyContactRows(company: JsonCompany): ImportContactRow[] {
       continue;
     }
     upsertRow({
-      type: CONTACT_TYPE.TEL,
+      type: CONTACT_TYPE.CONTACT_PERSON,
       value: phone,
       contactName: normalizeOptionalString(contact.name),
     });
@@ -264,13 +298,15 @@ async function main(): Promise<void> {
       userEmailConflictsSkipped: 0,
       setPasswordEmailsSent: 0,
     };
+    const errors: Array<{ index: number; name: string | null; error: unknown }> = [];
 
     console.log(`Importing ${companies.length} companies from ${inputPath}`);
     console.log(
       `Set-password email sending: ${sendSetPasswordEmails ? 'enabled' : 'disabled'}`,
     );
 
-    for (const company of companies) {
+    for (let i = 0; i < companies.length; i++) {
+      const company = companies[i];
       const taxId = normalizeOptionalString(company.taxId);
       const contactRows = buildCompanyContactRows(company);
       const companyEmail = getPrimaryCompanyEmail(company);
@@ -282,16 +318,18 @@ async function main(): Promise<void> {
         companyNameEn: normalizeOptionalString(company.companyNameEn),
         taxId,
         country: normalizeOptionalString(company.country),
-        region: normalizeOptionalString(company.region),
+        region: normalizeRegion(normalizeOptionalString(company.region)),
         industry:
           (company.industries ?? [])
             .map((value) => value.trim())
-            .filter((value) => value.length > 0) || [],
+            .filter((value) => value.length > 0),
         description: normalizeOptionalString(company.description) ?? '',
         status: CompanyProfileRequestStatus.APPROVED,
       };
 
-      const importedCompany = await prisma.$transaction(async (tx) => {
+      let importedCompany: { id: string };
+      try {
+        importedCompany = await prisma.$transaction(async (tx) => {
         let existingCompany = taxId
           ? await tx.company.findFirst({
               where: { taxId },
@@ -321,7 +359,7 @@ async function main(): Promise<void> {
         ) {
           existingCompany = await tx.company.findFirst({
             where: {
-              region: company.region,
+              region: companyData.region,
               OR: [
                 { companyNameZh: company.companyNameZh ?? undefined },
                 { companyNameEn: company.companyNameEn ?? undefined },
@@ -375,8 +413,14 @@ async function main(): Promise<void> {
           summary.contactsCreated += created.count;
         }
 
-        return savedCompany;
-      });
+          return savedCompany;
+        });
+      } catch (err) {
+        const name = company.companyNameZh ?? company.companyNameEn ?? company.companyNameVi ?? null;
+        errors.push({ index: i, name, error: err });
+        console.error(`[${i}] Failed to import company "${name ?? 'unknown'}":`, err);
+        continue;
+      }
 
       if (!companyEmail) {
         continue;
@@ -392,6 +436,13 @@ async function main(): Promise<void> {
     }
 
     printSummary(summary, companies.length);
+    if (errors.length > 0) {
+      console.error(`\n${errors.length} companies failed to import:`);
+      for (const { index, name, error } of errors) {
+        console.error(`  [${index}] "${name ?? 'unknown'}":`, error);
+      }
+      process.exitCode = 1;
+    }
   } finally {
     await app.close();
   }

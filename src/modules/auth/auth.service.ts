@@ -902,7 +902,7 @@ export class AuthService {
         companyEmail,
         contactName,
         userId: user?.id ?? null,
-        companyId: user?.companyId ?? null,
+        companyId: c.id,
         isActive: user?.isActive ?? null,
       };
     });

@@ -166,6 +166,7 @@ export class CompaniesService {
   ): {
     email: string;
     phone: string;
+    contactPhone: string;
     address: string;
     website: string | null;
     contactName: string | null;
@@ -175,6 +176,7 @@ export class CompaniesService {
       '';
     const phone =
       CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.TEL) ?? '';
+    const contactPhone = phone;
     const address =
       CompaniesService.getPrimaryContactValue(contacts, CONTACT_TYPE.ADDRESS) ??
       '';
@@ -183,7 +185,7 @@ export class CompaniesService {
       CONTACT_TYPE.WEBSITE,
     );
     const contactName = CompaniesService.getPrimaryContactName(contacts);
-    return { email, phone, address, website, contactName };
+    return { email, phone, contactPhone, address, website, contactName };
   }
 
   private static buildEmailsFromContacts(
@@ -522,7 +524,7 @@ export class CompaniesService {
         id: company.id,
         companyNameVi: company.companyNameVi,
         companyNameZh: company.companyNameZh,
-        taxId: contactView.taxId,
+        taxId: company.taxId,
         phone: contactView.phone,
         email: contactView.email,
         industry: primaryIndustry,

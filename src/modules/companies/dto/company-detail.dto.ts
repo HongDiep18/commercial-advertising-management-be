@@ -32,6 +32,9 @@ export class CompanyDetailResponseDto {
   @ApiPropertyOptional()
   companyNameZh!: string | null;
 
+  @ApiPropertyOptional()
+  companyNameEn!: string | null;
+
   @ApiProperty({
     type: [String],
     description: 'Company industries (multi-select)',

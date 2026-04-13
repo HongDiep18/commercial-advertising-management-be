@@ -52,7 +52,7 @@ export class AdminCompanyDetailResponseDto extends CompanyDetailResponseDto {
   isActive!: boolean;
 
   @ApiPropertyOptional()
-  companyNameEn!: string | null;
+  declare companyNameEn: string | null;
 
   @ApiProperty({
     type: [CompanyContactItemDto],

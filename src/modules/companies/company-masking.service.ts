@@ -57,17 +57,17 @@ export class CompanyMaskingService {
   /**
    * Check if user has access to a specific company based on industry
    */
-  hasIndustryAccess(
-    companyIndustry: string,
-    context: MaskingContext,
-  ): boolean {
+  hasIndustryAccess(companyIndustry: string, context: MaskingContext): boolean {
     // Guest (no tier) can see all industries but with masked data
     if (!context.userTier) {
       return true;
     }
 
     // Admin has access to all industries
-    if (context.userRole && (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')) {
+    if (
+      context.userRole &&
+      (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')
+    ) {
       return true;
     }
 
@@ -92,7 +92,10 @@ export class CompanyMaskingService {
     context: MaskingContext,
   ): 'none' | 'partial' | 'full' {
     // Admin/Super Admin - no masking regardless of tier
-    if (context.userRole && (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')) {
+    if (
+      context.userRole &&
+      (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')
+    ) {
       return 'none';
     }
 
@@ -136,6 +139,7 @@ export class CompanyMaskingService {
       id: string;
       companyNameVi: string | null;
       companyNameZh: string | null;
+      companyNameEn?: string | null;
       taxId?: string | null;
       phone: string;
       email: string;
@@ -154,6 +158,7 @@ export class CompanyMaskingService {
     id: string;
     companyNameVi: string | null;
     companyNameZh: string | null;
+    companyNameEn?: string | null;
     taxId?: string | null;
     phone: string;
     email: string;
@@ -184,6 +189,10 @@ export class CompanyMaskingService {
         id: company.id,
         companyNameVi: this.maskCompanyName(company.companyNameVi || ''),
         companyNameZh: this.maskCompanyName(company.companyNameZh || ''),
+        companyNameEn:
+          company.companyNameEn !== undefined
+            ? this.maskCompanyName(company.companyNameEn || '')
+            : undefined,
         taxId: company.taxId !== undefined ? '****' : undefined,
         phone: '****',
         email: this.maskEmail(company.email),
@@ -204,6 +213,7 @@ export class CompanyMaskingService {
       id: company.id,
       companyNameVi: company.companyNameVi, // Visible
       companyNameZh: company.companyNameZh, // Visible
+      companyNameEn: company.companyNameEn, // Visible
       taxId:
         company.taxId !== undefined ? this.maskTaxId(company.taxId) : undefined, // Masked (last 4)
       phone: this.maskPhone(company.phone), // Masked (last 4)
@@ -231,7 +241,10 @@ export class CompanyMaskingService {
     if (!context) return true; // Guest
 
     // Admin roles have all access
-    if (context.userRole && (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')) {
+    if (
+      context.userRole &&
+      (context.userRole === 'ADMIN' || context.userRole === 'SUPER_ADMIN')
+    ) {
       return true;
     }
 
@@ -290,4 +303,3 @@ export class CompanyMaskingService {
     return { industries: [], hasAllAccess: false };
   }
 }
-

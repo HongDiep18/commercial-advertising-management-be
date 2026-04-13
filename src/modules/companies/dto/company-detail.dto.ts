@@ -8,6 +8,17 @@ export class CompanyContactPhonesByNameItemDto {
   contactPhones!: string[];
 }
 
+export class CompanyContactItemDto {
+  @ApiProperty()
+  type!: string;
+
+  @ApiProperty()
+  value!: string;
+
+  @ApiPropertyOptional()
+  contactName!: string | null;
+}
+
 export class CompanyDetailResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -69,5 +80,10 @@ export class CompanyDetailResponseDto {
     description: 'Contact phones grouped by contact name',
   })
   contactPhonesByName!: CompanyContactPhonesByNameItemDto[];
-}
 
+  @ApiProperty({
+    type: [CompanyContactItemDto],
+    description: 'Raw company contact rows',
+  })
+  contacts!: CompanyContactItemDto[];
+}

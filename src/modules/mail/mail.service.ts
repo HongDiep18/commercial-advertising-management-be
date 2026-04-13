@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer from 'nodemailer';
-import { CONTACT_TYPE } from '../companies/company-contact.constants';
+import {
+  CONTACT_TYPE,
+  getPrimaryContactNameFromContactRows,
+  getPrimaryPhoneValueFromContactRows,
+} from '../companies/company-contact.constants';
 
 import { PrismaService } from '../../database/prisma.service';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
@@ -55,33 +59,6 @@ export class MailService {
   ): string | null {
     const found = contacts.find((contact) => contact.type === type);
     return found?.value ?? null;
-  }
-
-  private getContactNameFromContacts(
-    contacts: ReadonlyArray<{
-      type: string;
-      value: string;
-      contactName: string | null;
-    }>,
-  ): string {
-    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
-    for (const contactType of priorityTypes) {
-      const row = contacts.find(
-        (contact) =>
-          contact.type === contactType &&
-          contact.contactName &&
-          contact.contactName.trim().length > 0,
-      );
-      if (row?.contactName) {
-        return row.contactName.trim();
-      }
-    }
-    const anyNamed = contacts.find(
-      (contact) =>
-        contact.contactName &&
-        contact.contactName.trim().length > 0,
-    );
-    return anyNamed?.contactName?.trim() ?? '';
   }
 
   buildSetPasswordLink(token: string): string {
@@ -236,14 +213,13 @@ export class MailService {
               order.company.companyContacts,
               CONTACT_TYPE.EMAIL,
             ) ?? '',
-          contactName: this.getContactNameFromContacts(
+          contactName:
+            getPrimaryContactNameFromContactRows(
+              order.company.companyContacts,
+            ) ?? '',
+          phone: getPrimaryPhoneValueFromContactRows(
             order.company.companyContacts,
           ),
-          phone:
-            this.getCompanyContactValue(
-              order.company.companyContacts,
-              CONTACT_TYPE.TEL,
-            ) ?? '',
           address:
             this.getCompanyContactValue(
               order.company.companyContacts,

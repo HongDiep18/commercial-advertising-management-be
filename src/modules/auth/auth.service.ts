@@ -28,7 +28,11 @@ import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
 
 import { assertUserActive } from './auth.utils';
-import { CONTACT_TYPE } from '../companies/company-contact.constants';
+import {
+  CONTACT_TYPE,
+  getPrimaryContactNameFromContactRows,
+  getPrimaryPhoneValueFromContactRows,
+} from '../companies/company-contact.constants';
 import { CaptchaVerificationService } from './captcha-verification.service';
 
 import type { RegisterDto } from './dto/register.dto';
@@ -191,6 +195,17 @@ export class AuthService {
     return found?.value ?? null;
   }
 
+  private static getPhoneContactValue(
+    contacts: ReadonlyArray<{
+      type: string;
+      value: string;
+      contactName?: string | null;
+    }>,
+  ): string | null {
+    const value = getPrimaryPhoneValueFromContactRows(contacts);
+    return value.length > 0 ? value : null;
+  }
+
   private buildSetPasswordTokenData(): {
     token: string;
     expiresAt: Date;
@@ -213,22 +228,7 @@ export class AuthService {
       contactName: string | null;
     }>,
   ): string | null {
-    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
-    for (const contactType of priorityTypes) {
-      const row = contacts.find(
-        (contact) =>
-          contact.type === contactType &&
-          contact.contactName &&
-          contact.contactName.trim().length > 0,
-      );
-      if (row?.contactName) {
-        return row.contactName.trim();
-      }
-    }
-    const anyNamed = contacts.find(
-      (contact) => contact.contactName && contact.contactName.trim().length > 0,
-    );
-    return anyNamed?.contactName?.trim() ?? null;
+    return getPrimaryContactNameFromContactRows(contacts);
   }
 
   private static mapCompanyContactsToProfileFields(
@@ -239,7 +239,7 @@ export class AuthService {
     }>,
   ): Partial<Record<ProfileField, string | null>> {
     return {
-      phone: AuthService.getContactValue(contacts, CONTACT_TYPE.TEL),
+      phone: AuthService.getPhoneContactValue(contacts),
       address: AuthService.getContactValue(contacts, CONTACT_TYPE.ADDRESS),
       website: AuthService.getContactValue(contacts, CONTACT_TYPE.WEBSITE),
       fax: AuthService.getContactValue(contacts, CONTACT_TYPE.FAX),
@@ -478,44 +478,34 @@ export class AuthService {
       status: CompanyProfileRequestStatus.PENDING,
       companyContacts: {
         create: (() => {
-          const contactName = data.contact_person.trim();
+          const personLabel = data.contact_person.trim();
           return [
             {
               type: CONTACT_TYPE.EMAIL,
               value: companyEmail,
-              contactName,
+              contactName: null,
             },
             {
-              type: CONTACT_TYPE.TEL,
+              type: CONTACT_TYPE.CONTACT_PERSON,
               value: data.phone.trim(),
-              contactName,
+              contactName: personLabel,
             },
-            ...(data.contact_phone?.trim() &&
-            data.contact_phone.trim() !== data.phone.trim()
-              ? [
-                  {
-                    type: CONTACT_TYPE.TEL,
-                    value: data.contact_phone.trim(),
-                    contactName,
-                  },
-                ]
-              : []),
             {
               type: CONTACT_TYPE.ADDRESS,
               value: data.company_address.trim(),
-              contactName,
+              contactName: null,
             },
             {
               type: CONTACT_TYPE.WEBSITE,
               value: data.website.trim(),
-              contactName,
+              contactName: null,
             },
             ...(data.fax?.trim()
               ? [
                   {
                     type: CONTACT_TYPE.FAX,
                     value: data.fax.trim(),
-                    contactName,
+                    contactName: null,
                   },
                 ]
               : []),
@@ -524,7 +514,16 @@ export class AuthService {
                   {
                     type: CONTACT_TYPE.SKYPE,
                     value: data.skype.trim(),
-                    contactName,
+                    contactName: null,
+                  },
+                ]
+              : []),
+            ...(data.note?.trim()
+              ? [
+                  {
+                    type: CONTACT_TYPE.NOTE,
+                    value: data.note.trim(),
+                    contactName: null,
                   },
                 ]
               : []),
@@ -1242,6 +1241,14 @@ export class AuthService {
             ? resolvedPersonName.trim()
             : null;
         for (const [type, value] of typeValueEntries) {
+          if (type === CONTACT_TYPE.CONTACT_PERSON) {
+            await tx.companyContact.deleteMany({
+              where: {
+                companyId: input.companyId!,
+                type: { in: [CONTACT_TYPE.TEL, CONTACT_TYPE.PHONE] },
+              },
+            });
+          }
           await tx.companyContact.deleteMany({
             where: { companyId: input.companyId!, type },
           });
@@ -1315,7 +1322,7 @@ export class AuthService {
     ]);
     const contactFieldToType: Readonly<Record<string, string>> = {
       email: CONTACT_TYPE.EMAIL,
-      phone: CONTACT_TYPE.TEL,
+      phone: CONTACT_TYPE.CONTACT_PERSON,
       address: CONTACT_TYPE.ADDRESS,
       website: CONTACT_TYPE.WEBSITE,
       fax: CONTACT_TYPE.FAX,
@@ -1355,10 +1362,12 @@ export class AuthService {
     ] as const;
     const updateData = input.updateData as Record<string, unknown>;
     const contactData = input.contactData;
+    const phoneFromContactData =
+      contactData[CONTACT_TYPE.CONTACT_PERSON] ?? contactData[CONTACT_TYPE.TEL];
     const missing = requiredKeys.filter((k) => {
       const v =
         k === 'phone'
-          ? contactData[CONTACT_TYPE.TEL]
+          ? phoneFromContactData
           : k === 'address'
             ? contactData[CONTACT_TYPE.ADDRESS]
             : updateData[k];
@@ -1394,11 +1403,11 @@ export class AuthService {
             value: input.userEmail.trim().toLowerCase(),
             contactName,
           },
-          ...(contactData[CONTACT_TYPE.TEL]
+          ...(phoneFromContactData
             ? [
                 {
-                  type: CONTACT_TYPE.TEL,
-                  value: contactData[CONTACT_TYPE.TEL],
+                  type: CONTACT_TYPE.CONTACT_PERSON,
+                  value: phoneFromContactData,
                   contactName,
                 },
               ]

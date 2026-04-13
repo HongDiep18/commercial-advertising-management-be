@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { CONTACT_TYPE } from '../company-contact.constants';
@@ -160,6 +161,17 @@ export class AdminUpdateCompanyDto {
   @IsNotEmpty()
   @MaxLength(4000)
   description?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Free-form note stored as a company_contact row with type `note`. Omit to leave unchanged; send null or an empty string to remove the note.',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== undefined && value !== null)
+  @IsString()
+  @MaxLength(4000)
+  note?: string | null;
 
   @ApiPropertyOptional({
     type: [AdminCompanyContactDto],

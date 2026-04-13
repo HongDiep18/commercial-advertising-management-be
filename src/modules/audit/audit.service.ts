@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { CONTACT_TYPE } from '../companies/company-contact.constants';
+import {
+  CONTACT_TYPE,
+  getPrimaryContactNameFromContactRows,
+} from '../companies/company-contact.constants';
 import {
   AuditActivityFormatter,
   type AuditLogRow,
@@ -180,22 +183,7 @@ export class AuditService {
     if (!contacts || contacts.length === 0) {
       return null;
     }
-    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
-    for (const contactType of priorityTypes) {
-      const row = contacts.find(
-        (contact) =>
-          contact.type === contactType &&
-          contact.contactName &&
-          contact.contactName.trim().length > 0,
-      );
-      if (row?.contactName) {
-        return row.contactName.trim();
-      }
-    }
-    const anyNamed = contacts.find(
-      (contact) => contact.contactName && contact.contactName.trim().length > 0,
-    );
-    return anyNamed?.contactName?.trim() ?? null;
+    return getPrimaryContactNameFromContactRows(contacts);
   }
 
   private async buildUserLabelMap(

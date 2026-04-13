@@ -68,6 +68,13 @@ const ADMIN_UPDATE_COMPANY_SCHEMA = {
       ],
     },
     description: { type: 'string' },
+    note: {
+      type: 'string',
+      nullable: true,
+      description:
+        'Free-form note (stored as company_contact type `note`). Empty or null clears the note.',
+      maxLength: 4000,
+    },
     contacts: {
       oneOf: [
         {
@@ -105,16 +112,17 @@ export class AdminCompaniesController {
 
   @Get('stats')
   @ApiOperation({
-    summary: 'Get approved company stats (admin)',
-    description: 'Returns total company profile requests with status APPROVED.',
+    summary: 'Get active company count (admin)',
+    description:
+      'Returns how many companies have `is_active = true` on the `companies` table.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Approved company count',
+    description: '`activeCount`: companies with `is_active = true`',
     type: AdminCompanyStatsResponseDto,
   })
-  async getApprovedCompanyStats(): Promise<AdminCompanyStatsResponseDto> {
-    return this.companiesService.getAdminApprovedCompanyStats();
+  async getCompanyStats(): Promise<AdminCompanyStatsResponseDto> {
+    return this.companiesService.getAdminCompanyStats();
   }
 
   @Get('contact-types')
@@ -155,7 +163,8 @@ export class AdminCompaniesController {
   @ApiOperation({
     summary: 'Update a company (admin)',
     description:
-      'Updates scalar company fields and optionally replaces all company_contacts rows. ' +
+      'Updates scalar company fields, optional `note` (company_contact type `note`), ' +
+      'and optionally replaces all company_contacts rows. ' +
       'Supports JSON requests and multipart/form-data requests with optional `logo_url` upload.',
   })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
@@ -298,7 +307,11 @@ export class AdminCompaniesController {
     description: 'User provisioned',
     type: AdminProvisionCompanyUserResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Company not APPROVED, already has a user, or missing email contact' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Company not APPROVED, already has a user, or missing email contact',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Company not found' })

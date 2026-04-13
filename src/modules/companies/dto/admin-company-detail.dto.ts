@@ -4,20 +4,10 @@ import {
   ApiPropertyOptional,
 } from '@nestjs/swagger';
 import {
+  CompanyContactItemDto,
   CompanyContactPhonesByNameItemDto,
   CompanyDetailResponseDto,
 } from './company-detail.dto';
-
-export class AdminCompanyContactItemDto {
-  @ApiProperty()
-  type!: string;
-
-  @ApiProperty()
-  value!: string;
-
-  @ApiPropertyOptional()
-  contactName!: string | null;
-}
 
 export class AdminCompanyMemberDto {
   @ApiProperty({
@@ -65,10 +55,10 @@ export class AdminCompanyDetailResponseDto extends CompanyDetailResponseDto {
   companyNameEn!: string | null;
 
   @ApiProperty({
-    type: [AdminCompanyContactItemDto],
+    type: [CompanyContactItemDto],
     description: 'Raw company contact rows used by admin management UIs',
   })
-  contacts!: AdminCompanyContactItemDto[];
+  declare contacts: CompanyContactItemDto[];
 
   @ApiProperty({
     type: [String],
@@ -90,4 +80,11 @@ export class AdminCompanyDetailResponseDto extends CompanyDetailResponseDto {
       'Linked member account summary. Null when the company has no linked user account.',
   })
   member!: AdminCompanyMemberDto | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Free-form note from `company_contacts` row with type `note` (e.g. registration note)',
+    nullable: true,
+  })
+  note!: string | null;
 }

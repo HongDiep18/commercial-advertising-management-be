@@ -21,7 +21,11 @@ import { getPackageFormConfig, SLOT_CAPACITY } from '../ads/ads.constants';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../audit/audit.constants';
 import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
-import { CONTACT_TYPE } from '../companies/company-contact.constants';
+import {
+  CONTACT_TYPE,
+  getPrimaryContactNameFromContactRows,
+  getPrimaryPhoneValueFromContactRows,
+} from '../companies/company-contact.constants';
 import { FileGeneratingService } from '../file-generating/file-generating.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { MailService } from '../mail/mail.service';
@@ -117,33 +121,6 @@ export class AdOrdersService {
     return found?.value ?? null;
   }
 
-  private getContactNameFromContacts(
-    contacts: ReadonlyArray<{
-      type: string;
-      value: string;
-      contactName: string | null;
-    }>,
-  ): string {
-    const priorityTypes = [CONTACT_TYPE.EMAIL, CONTACT_TYPE.TEL];
-    for (const contactType of priorityTypes) {
-      const row = contacts.find(
-        (contact) =>
-          contact.type === contactType &&
-          contact.contactName &&
-          contact.contactName.trim().length > 0,
-      );
-      if (row?.contactName) {
-        return row.contactName.trim();
-      }
-    }
-    const anyNamed = contacts.find(
-      (contact) =>
-        contact.contactName &&
-        contact.contactName.trim().length > 0,
-    );
-    return anyNamed?.contactName?.trim() ?? '';
-  }
-
   private mapCompanyContactView(
     company:
       | {
@@ -165,11 +142,9 @@ export class AdOrdersService {
   } {
     const contacts = company?.companyContacts ?? [];
     return {
-      email:
-        this.getCompanyContactValue(contacts, CONTACT_TYPE.EMAIL) ?? '',
-      contactName: this.getContactNameFromContacts(contacts),
-      phone:
-        this.getCompanyContactValue(contacts, CONTACT_TYPE.TEL) ?? '',
+      email: this.getCompanyContactValue(contacts, CONTACT_TYPE.EMAIL) ?? '',
+      contactName: getPrimaryContactNameFromContactRows(contacts) ?? '',
+      phone: getPrimaryPhoneValueFromContactRows(contacts),
       address:
         this.getCompanyContactValue(contacts, CONTACT_TYPE.ADDRESS) ?? '',
       taxId: company?.taxId ?? null,

@@ -66,16 +66,6 @@ export class RegisterDto {
   @IsNotEmpty()
   @IsString()
   @MinLength(1)
-  @MaxLength(32)
-  @Matches(/^[+\d\s()-]+$/, {
-    message:
-      'Phone must contain only numbers, spaces, and phone symbols (+, -, (), spaces)',
-  })
-  contact_phone: string;
-
-  @IsNotEmpty()
-  @IsString()
-  @MinLength(1)
   @MaxLength(512)
   company_address: string;
 
@@ -128,7 +118,6 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   note?: string;
 
@@ -138,4 +127,3 @@ export class RegisterDto {
   @MaxLength(4000)
   introduction: string;
 }
-

@@ -234,7 +234,6 @@ export class CompaniesService {
     }>,
   ): Array<{ contactName: string; contactPhones: string[] }> {
     const phoneRowTypes = new Set<string>([
-      CONTACT_TYPE.TEL,
       CONTACT_TYPE.PHONE,
       CONTACT_TYPE.CONTACT_PERSON,
     ]);
@@ -335,8 +334,26 @@ export class CompaniesService {
         {
           ...baseCompany,
           email: contact.type === CONTACT_TYPE.EMAIL ? contact.value : '',
-          phone: contact.value,
-          contactPhone: contact.value,
+          phone:
+            contact.type === CONTACT_TYPE.TEL ||
+            contact.type === CONTACT_TYPE.PHONE ||
+            contact.type === CONTACT_TYPE.CONTACT_PERSON
+              ? contact.value
+              : '',
+          contactPhone:
+            contact.type === CONTACT_TYPE.TEL ||
+            contact.type === CONTACT_TYPE.PHONE ||
+            contact.type === CONTACT_TYPE.CONTACT_PERSON
+              ? contact.value
+              : '',
+          website:
+            contact.type === CONTACT_TYPE.WEBSITE
+              ? contact.value
+              : baseCompany.website,
+          address:
+            contact.type === CONTACT_TYPE.ADDRESS
+              ? contact.value
+              : baseCompany.address,
           contactName: contact.contactName,
         },
         maskingContext,

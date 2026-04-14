@@ -231,7 +231,6 @@ export class CompaniesService {
     }>,
   ): Array<{ contactName: string; contactPhones: string[] }> {
     const phoneRowTypes = new Set<string>([
-      CONTACT_TYPE.TEL,
       CONTACT_TYPE.PHONE,
       CONTACT_TYPE.CONTACT_PERSON,
     ]);

@@ -71,6 +71,10 @@ export class RegisterDto {
 
   @IsEmail()
   @MaxLength(255)
+  register_email: string;
+
+  @IsEmail()
+  @MaxLength(255)
   company_email: string;
 
   @IsNotEmpty()

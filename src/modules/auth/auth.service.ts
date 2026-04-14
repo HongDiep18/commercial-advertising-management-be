@@ -260,6 +260,7 @@ export class AuthService {
         password: true,
         role: true,
         isActive: true,
+        deletedAt: true,
         membershipTier: true,
         primaryIndustry: true,
         selectedIndustries: true,
@@ -278,10 +279,7 @@ export class AuthService {
     }
 
     // Check if user is active
-    assertUserActive({
-      isActive: user.isActive,
-      deletedAt: null,
-    });
+    assertUserActive(user);
 
     // Update last login
     await this.prisma.user.update({
@@ -397,19 +395,21 @@ export class AuthService {
       data.captcha,
     );
     const companyEmail = data.company_email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: companyEmail },
+    const registerEmail = data.register_email.trim().toLowerCase();
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: registerEmail, deletedAt: null },
     });
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
 
-    const existingCompanyEmailContact =
+    const existingRegisterContact =
       await this.prisma.companyContact.findFirst({
-        where: { type: CONTACT_TYPE.EMAIL, value: companyEmail },
+        where: { type: CONTACT_TYPE.REGISTER_EMAIL, value: registerEmail },
         select: { company: true },
       });
-    const existingCompany = existingCompanyEmailContact?.company ?? null;
+    const existingCompany = existingRegisterContact?.company ?? null;
     if (existingCompany) {
       if (existingCompany.status === CompanyProfileRequestStatus.PENDING) {
         throw new ConflictException(
@@ -419,16 +419,36 @@ export class AuthService {
       if (existingCompany.status === CompanyProfileRequestStatus.APPROVED) {
         throw new ConflictException('Email already registered');
       }
-      const company = await this.prisma.company.update({
-        where: { id: existingCompany.id },
-        data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail),
+      const contactRows = AuthService.companyContactRowsFromRegisterDto(
+        data,
+        companyEmail,
+        registerEmail,
+      );
+      const company = await this.prisma.$transaction(async (tx) => {
+        await tx.company.update({
+          where: { id: existingCompany.id },
+          data: AuthService.companyUpdateDataFromRegisterDto(data),
+          select: { id: true },
+        });
+        await tx.companyContact.deleteMany({
+          where: { companyId: existingCompany.id },
+        });
+        await tx.companyContact.createMany({
+          data: contactRows.map((row) => ({
+            companyId: existingCompany.id,
+            type: row.type,
+            value: row.value,
+            contactName: row.contactName,
+          })),
+        });
+        return { id: existingCompany.id };
       });
       await this.auditService.record({
         action: AUDIT_ACTION.PROFILE_REQUEST_CREATED,
         entityType: AUDIT_ENTITY.COMPANY,
         entityId: company.id,
         metadata: {
-          email: companyEmail,
+          email: registerEmail,
           companyNameVi: data.company_name_vi,
           industry: data.industry,
         },
@@ -440,7 +460,7 @@ export class AuthService {
     }
 
     const company = await this.prisma.company.create({
-      data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail),
+      data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail, registerEmail),
     });
 
     await this.auditService.record({
@@ -448,7 +468,7 @@ export class AuthService {
       entityType: AUDIT_ENTITY.COMPANY,
       entityId: company.id,
       metadata: {
-        email: companyEmail,
+        email: registerEmail,
         companyNameVi: data.company_name_vi,
         industry: data.industry,
       },
@@ -463,74 +483,118 @@ export class AuthService {
   private static companyCreateDataFromRegisterDto(
     data: RegisterDto,
     companyEmail: string,
+    registerEmail: string,
   ): Prisma.CompanyCreateInput {
+    return {
+      ...AuthService.companyScalarDataFromRegisterDto(data),
+      status: CompanyProfileRequestStatus.PENDING,
+      isActive: false,
+      companyContacts: {
+        create: AuthService.companyContactRowsFromRegisterDto(
+          data,
+          companyEmail,
+          registerEmail,
+        ),
+      },
+    };
+  }
+
+  private static companyUpdateDataFromRegisterDto(
+    data: RegisterDto,
+  ): Prisma.CompanyUpdateInput {
+    return {
+      ...AuthService.companyScalarDataFromRegisterDto(data),
+      status: CompanyProfileRequestStatus.PENDING,
+      isActive: false,
+    };
+  }
+
+  private static companyScalarDataFromRegisterDto(data: RegisterDto): {
+    companyNameVi: string;
+    companyNameEn: string | null;
+    companyNameZh: string;
+    taxId: string;
+    country: string;
+    region: string | null;
+    industry: string[];
+    description: string;
+  } {
     return {
       companyNameVi: data.company_name_vi.trim(),
       companyNameEn: data.company_name_en?.trim() || null,
       companyNameZh: data.company_name_zh.trim(),
       taxId: data.tax_id.trim(),
       country: data.country.trim(),
-      ...(data.region && data.region.trim()
-        ? { region: data.region.trim() }
-        : { region: null }),
+      region: data.region?.trim() || null,
       industry: data.industry.map((value) => value.trim()).filter(Boolean),
       description: data.introduction.trim(),
-      status: CompanyProfileRequestStatus.PENDING,
-      companyContacts: {
-        create: (() => {
-          const personLabel = data.contact_person.trim();
-          return [
-            {
-              type: CONTACT_TYPE.EMAIL,
-              value: companyEmail,
-              contactName: null,
-            },
-            {
-              type: CONTACT_TYPE.CONTACT_PERSON,
-              value: data.phone.trim(),
-              contactName: personLabel,
-            },
-            {
-              type: CONTACT_TYPE.ADDRESS,
-              value: data.company_address.trim(),
-              contactName: null,
-            },
-            {
-              type: CONTACT_TYPE.WEBSITE,
-              value: data.website.trim(),
-              contactName: null,
-            },
-            ...(data.fax?.trim()
-              ? [
-                  {
-                    type: CONTACT_TYPE.FAX,
-                    value: data.fax.trim(),
-                    contactName: null,
-                  },
-                ]
-              : []),
-            ...(data.skype?.trim()
-              ? [
-                  {
-                    type: CONTACT_TYPE.SKYPE,
-                    value: data.skype.trim(),
-                    contactName: null,
-                  },
-                ]
-              : []),
-            ...(data.note?.trim()
-              ? [
-                  {
-                    type: CONTACT_TYPE.NOTE,
-                    value: data.note.trim(),
-                    contactName: null,
-                  },
-                ]
-              : []),
-          ];
-        })(),
-      },
     };
+  }
+
+  private static companyContactRowsFromRegisterDto(
+    data: RegisterDto,
+    companyEmail: string,
+    registerEmail: string,
+  ): Array<{
+    type: string;
+    value: string;
+    contactName: string | null;
+  }> {
+    const personLabel = data.contact_person.trim();
+    return [
+      {
+        type: CONTACT_TYPE.REGISTER_EMAIL,
+        value: registerEmail,
+        contactName: null,
+      },
+      {
+        type: CONTACT_TYPE.EMAIL,
+        value: companyEmail,
+        contactName: null,
+      },
+      {
+        type: CONTACT_TYPE.CONTACT_PERSON,
+        value: data.phone.trim(),
+        contactName: personLabel,
+      },
+      {
+        type: CONTACT_TYPE.ADDRESS,
+        value: data.company_address.trim(),
+        contactName: null,
+      },
+      {
+        type: CONTACT_TYPE.WEBSITE,
+        value: data.website.trim(),
+        contactName: null,
+      },
+      ...(data.fax?.trim()
+        ? [
+            {
+              type: CONTACT_TYPE.FAX,
+              value: data.fax.trim(),
+              contactName: null,
+            },
+          ]
+        : []),
+      ...(data.skype?.trim()
+        ? [
+            {
+              type: CONTACT_TYPE.SKYPE,
+              value: data.skype.trim(),
+              contactName: null,
+            },
+          ]
+        : []),
+      ...(data.note?.trim()
+        ? [
+            {
+              type: CONTACT_TYPE.NOTE,
+              value: data.note.trim(),
+              contactName: null,
+            },
+          ]
+        : []),
+    ];
   }
 
   private static dtoToProfileData(
@@ -1499,10 +1563,12 @@ export class AuthService {
     if (!company) {
       throw new NotFoundException('Company registration not found');
     }
-    const companyEmail = AuthService.getContactValue(
-      company.companyContacts,
-      CONTACT_TYPE.EMAIL,
-    );
+    const companyEmail =
+      AuthService.getContactValue(
+        company.companyContacts,
+        CONTACT_TYPE.REGISTER_EMAIL,
+      ) ??
+      AuthService.getContactValue(company.companyContacts, CONTACT_TYPE.EMAIL);
     if (!companyEmail) {
       throw new BadRequestException('Company email contact is missing');
     }
@@ -1576,39 +1642,63 @@ export class AuthService {
     email: string;
   }): Promise<void> {
     const normalizedEmail = company.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const existingActiveUser = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail, deletedAt: null },
       select: { id: true },
     });
-    if (existingUser) {
+    if (existingActiveUser) {
       throw new ConflictException(
         'A user already exists for this email; cannot approve again.',
       );
     }
+
+    const softDeletedUser = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail, deletedAt: { not: null } },
+      select: { id: true },
+    });
 
     const { token, expiresAt } = this.buildSetPasswordTokenData();
     const placeholderPassword = await this.buildPlaceholderPassword();
     const createdUser = await this.prisma.$transaction(async (tx) => {
       await tx.company.update({
         where: { id: company.id },
-        data: { status: CompanyProfileRequestStatus.APPROVED },
-      });
-      const user = await tx.user.create({
         data: {
-          email: normalizedEmail,
-          password: placeholderPassword,
-          role: Role.MEMBER,
-          membershipTier: MembershipTier.BRONZE,
-          primaryIndustry: company.industry[0] ?? null,
-          setPasswordToken: token,
-          setPasswordTokenExpiresAt: expiresAt,
-        } as Prisma.UserUncheckedCreateInput,
+          status: CompanyProfileRequestStatus.APPROVED,
+          isActive: true,
+        },
       });
-      await tx.user.update({
-        where: { id: user.id },
-        data: { companyId: company.id },
-        select: { id: true },
-      });
+      const user = softDeletedUser
+        ? await tx.user.update({
+            where: { id: softDeletedUser.id },
+            data: {
+              password: placeholderPassword,
+              role: Role.MEMBER,
+              membershipTier: MembershipTier.BRONZE,
+              loyaltyPoints: 0,
+              totalSpending: 0,
+              primaryIndustry: company.industry[0] ?? null,
+              selectedIndustries: [],
+              industriesSelected: false,
+              companyId: company.id,
+              isActive: true,
+              deletedAt: null,
+              lastLoginAt: null,
+              setPasswordToken: token,
+              setPasswordTokenExpiresAt: expiresAt,
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email: normalizedEmail,
+              password: placeholderPassword,
+              role: Role.MEMBER,
+              membershipTier: MembershipTier.BRONZE,
+              primaryIndustry: company.industry[0] ?? null,
+              companyId: company.id,
+              setPasswordToken: token,
+              setPasswordTokenExpiresAt: expiresAt,
+            } as Prisma.UserUncheckedCreateInput,
+          });
       return user;
     });
 
@@ -1636,8 +1726,8 @@ export class AuthService {
     sendSetPasswordEmail: boolean;
   }): Promise<ProvisionCompanyUserResult> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail, deletedAt: null },
       select: {
         id: true,
         companyId: true,
@@ -1649,8 +1739,8 @@ export class AuthService {
         status: 'conflict_other_company',
         userId: existingUser.id,
         email: normalizedEmail,
-        companyId: existingUser.companyId,
-        conflictingCompanyId: input.companyId,
+        companyId: input.companyId,
+        conflictingCompanyId: existingUser.companyId,
         setPasswordEmailSent: false,
       };
     }
@@ -1765,6 +1855,7 @@ export class AuthService {
       where: {
         setPasswordToken: token,
         setPasswordTokenExpiresAt: { gt: new Date() },
+        deletedAt: null,
       } as Prisma.UserWhereInput,
       select: { id: true, email: true, companyId: true },
     });

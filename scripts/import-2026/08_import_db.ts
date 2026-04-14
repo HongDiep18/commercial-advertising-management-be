@@ -371,23 +371,8 @@ async function findExistingCompanyForImport(
     }
   }
 
-  if (input.companyEmail) {
-    const company = await tx.company.findFirst({
-      where: {
-        companyContacts: {
-          some: {
-            type: CONTACT_TYPE.EMAIL,
-            value: input.companyEmail,
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    });
-    if (company) {
-      return company;
-    }
-  }
+  // Email is intentionally NOT used as a dedup key — group companies legitimately
+  // share contact emails across separate legal entities with different taxIds.
 
   const namePredicates = getCompanyMatchNames(input.company).map(
     (name): Prisma.CompanyWhereInput => ({
@@ -621,17 +606,30 @@ async function main(): Promise<void> {
         continue;
       }
 
-      if (!companyEmail) {
-        continue;
-      }
+      const allEmails = contactRows
+        .filter((row) => row.type === CONTACT_TYPE.EMAIL)
+        .map((row) => row.value);
 
-      const result = await authService.provisionImportedCompanyUser({
-        companyId: importedCompany.id,
-        industry: companyData.industry,
-        email: companyEmail,
-        sendSetPasswordEmail: sendSetPasswordEmails,
-      });
-      updateUserSummary(summary, result);
+      for (const email of allEmails) {
+        const result = await authService.provisionImportedCompanyUser({
+          companyId: importedCompany.id,
+          industry: companyData.industry,
+          email,
+          sendSetPasswordEmail: sendSetPasswordEmails,
+        });
+        updateUserSummary(summary, result);
+        if (result.status !== 'conflict_other_company') {
+          await prisma.companyContact.create({
+            data: {
+              companyId: importedCompany.id,
+              type: CONTACT_TYPE.REGISTER_EMAIL,
+              value: email,
+              contactName: null,
+            },
+          });
+          break;
+        }
+      }
     }
 
     printSummary(summary, companies.length);

@@ -9000,14 +9000,14 @@
   },
   {
     "companyNameZh": "鼎鉅電子股份有限公司",
-    "companyNameVi": null,
+    "companyNameVi": "CONG TY TNHH DICH VU BAN HANG TU DONG V RICH",
     "companyNameEn": "TOP VENDING MACHINE ELECTRONICS CO.,LTD",
     "country": null,
     "region": "Other",
     "addresses": [
       "33868 桃園市蘆竹區安中街11號"
     ],
-    "taxId": null,
+    "taxId": "0315896502",
     "companyContacts": [
       {
         "type": "tel",
@@ -70529,34 +70529,6 @@
       "machinery"
     ],
     "id": "9ecb58b5-aec8-5034-9bb6-8eb2ec7a967b"
-  },
-  {
-    "companyNameZh": "鼎鉅電子股份有限公司",
-    "companyNameVi": "CONG TY TNHH DICH VU BAN HANG TU DONG V RICH",
-    "companyNameEn": null,
-    "country": "TW",
-    "region": "Ho Chi Minh City",
-    "addresses": [
-      "507 An Duong Vuong, Phuong An Lac, TP.HCM"
-    ],
-    "taxId": "0315896502",
-    "companyContacts": [
-      {
-        "type": "email",
-        "value": "rickchang56@yahoo.com.tw"
-      }
-    ],
-    "description": "自動販賣機銷售",
-    "userContacts": [
-      {
-        "name": "張永祥",
-        "phone": "0934-146951"
-      }
-    ],
-    "industries": [
-      "electronics"
-    ],
-    "id": "f3d165ff-80ce-57f2-b2de-07bd5dd82037"
   },
   {
     "companyNameZh": "橘子亞洲責任有限公司",

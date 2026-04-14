@@ -50,8 +50,6 @@ import type {
 } from './dto/admin-update-company.dto';
 import type { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
 import type { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
-import { AuthService } from '../auth/auth.service';
-import type { AdminProvisionCompanyUserResponseDto } from './dto/admin-provision-company-user-response.dto';
 
 type CompanyAuditSnapshot = {
   id: string;
@@ -131,7 +129,6 @@ export class CompaniesService {
     private readonly adEffectsRegistry: AdEffectsRegistryService,
     private readonly auditService: AuditService,
     private readonly maskingService: CompanyMaskingService,
-    private readonly authService: AuthService,
   ) {}
 
   private static normalizeCompanyEmail(email: string): string {
@@ -234,6 +231,7 @@ export class CompaniesService {
     }>,
   ): Array<{ contactName: string; contactPhones: string[] }> {
     const phoneRowTypes = new Set<string>([
+      CONTACT_TYPE.TEL,
       CONTACT_TYPE.PHONE,
       CONTACT_TYPE.CONTACT_PERSON,
     ]);
@@ -1785,71 +1783,5 @@ export class CompaniesService {
       : [];
     const notePatch = parseAdminUpdateNote(data.note);
     return { companyUpdateData, contactRows, replaceContacts, notePatch };
-  }
-
-  async provisionCompanyUser(
-    adminUserId: string,
-    companyId: string,
-  ): Promise<AdminProvisionCompanyUserResponseDto> {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        status: true,
-        industry: true,
-        companyContacts: {
-          select: { type: true, value: true },
-        },
-        users: {
-          where: { deletedAt: null },
-          select: { id: true },
-          take: 1,
-        },
-      },
-    });
-
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
-    if (company.status !== CompanyProfileRequestStatus.APPROVED) {
-      throw new BadRequestException(
-        'Company must be APPROVED before a user account can be provisioned',
-      );
-    }
-    if (company.users.length > 0) {
-      throw new BadRequestException(
-        'Company already has a linked user account',
-      );
-    }
-
-    const emailContact = company.companyContacts.find(
-      (c) => c.type === CONTACT_TYPE.EMAIL,
-    );
-    if (!emailContact) {
-      throw new BadRequestException(
-        'Company has no email contact; add an email before provisioning a user',
-      );
-    }
-
-    const result = await this.authService.provisionImportedCompanyUser({
-      companyId,
-      industry: company.industry,
-      email: emailContact.value,
-      sendSetPasswordEmail: true,
-    });
-
-    await this.auditService.record({
-      entityType: AUDIT_ENTITY.COMPANY,
-      action: AUDIT_ACTION.COMPANY_USER_PROVISIONED,
-      entityId: companyId,
-      actorId: adminUserId,
-      metadata: {
-        provisionStatus: result.status,
-        email: result.email,
-        userId: result.userId,
-      },
-    });
-
-    return result as AdminProvisionCompanyUserResponseDto;
   }
 }

@@ -1,5 +1,6 @@
 export const CONTACT_TYPE = {
   EMAIL: 'email',
+  REGISTER_EMAIL: 'register_email',
   TEL: 'tel',
   PHONE: 'phone',
   CONTACT_PERSON: 'contact_person',

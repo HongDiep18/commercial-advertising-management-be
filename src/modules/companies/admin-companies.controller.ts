@@ -34,7 +34,6 @@ import { CompanyContactTypesResponseDto } from './dto/company-contact-types-resp
 import { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
 import { AdminUpdateCompanyActiveDto } from './dto/admin-update-company-active.dto';
 import { AdminCompanyActiveResponseDto } from './dto/admin-company-active-response.dto';
-import { AdminProvisionCompanyUserResponseDto } from './dto/admin-provision-company-user-response.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -291,34 +290,5 @@ export class AdminCompaniesController {
       companyId,
       dto,
     );
-  }
-
-  @Post(':companyId/provision-user')
-  @ApiOperation({
-    summary: 'Provision a user account for an approved company (admin)',
-    description:
-      'Creates or links a user account for an APPROVED company that has no linked user. ' +
-      'Intended for import-created companies that had no email at approval time and have since had one added. ' +
-      'Sends a set-password email on success.',
-  })
-  @ApiParam({ name: 'companyId', description: 'Company UUID' })
-  @ApiResponse({
-    status: 201,
-    description: 'User provisioned',
-    type: AdminProvisionCompanyUserResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Company not APPROVED, already has a user, or missing email contact',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Company not found' })
-  async provisionCompanyUser(
-    @Param('companyId') companyId: string,
-    @CurrentUser('userId') adminUserId: string,
-  ): Promise<AdminProvisionCompanyUserResponseDto> {
-    return this.companiesService.provisionCompanyUser(adminUserId, companyId);
   }
 }

@@ -50,17 +50,35 @@ export class CompaniesController {
   ): Promise<CompanyWithAdsResponseDto> {
     await this.companiesService.createCompany(dto, userId);
     const company = await this.companiesService.getCompanyDetail(dto.name);
+    const primaryEmail = company.emails[0] ?? '';
+    const primaryPhone =
+      company.contacts.find(
+        (contact) =>
+          contact.type === 'contact_person' ||
+          contact.type === 'phone' ||
+          contact.type === 'tel',
+      )?.value ?? '';
+    const primaryAddress =
+      company.contacts.find((contact) => contact.type === 'address')?.value ??
+      '';
+    const contactName =
+      company.contacts.find((contact) => contact.contactName)?.contactName ??
+      '';
     const name =
-      company.companyNameVi ?? company.companyNameZh ?? company.email;
+      CompaniesService.resolveCompanyDisplayName(
+        company.companyNameVi,
+        company.companyNameEn,
+        company.companyNameZh,
+      ) ?? '';
     return {
       id: company.id,
       name,
       logoUrl: company.logoUrl ?? null,
-      email: company.email,
-      contactName: company.contactName ?? '',
-      phone: company.phone,
+      email: primaryEmail,
+      contactName,
+      phone: primaryPhone,
       industry: company.industry,
-      address: company.address,
+      address: primaryAddress,
       description: company.description,
       featuredHighlight: false,
       companyInfoHighlight: false,
@@ -215,4 +233,3 @@ export class CompaniesController {
     return this.companiesService.getCompanyDetail(id, maskingContext);
   }
 }
-

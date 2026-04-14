@@ -1,13 +1,5 @@
-import {
-  ApiHideProperty,
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
-import {
-  CompanyContactItemDto,
-  CompanyContactPhonesByNameItemDto,
-  CompanyDetailResponseDto,
-} from './company-detail.dto';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CompanyContactItemDto } from './company-detail.dto';
 
 export class AdminCompanyMemberDto {
   @ApiProperty({
@@ -35,9 +27,52 @@ export class AdminCompanyMemberDto {
   membershipTier!: string;
 }
 
-export class AdminCompanyDetailResponseDto extends CompanyDetailResponseDto {
-  @ApiHideProperty()
-  declare contactPhone?: never;
+export class AdminCompanyDetailResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiPropertyOptional()
+  logoUrl!: string | null;
+
+  @ApiPropertyOptional()
+  companyNameVi!: string | null;
+
+  @ApiPropertyOptional()
+  companyNameEn!: string | null;
+
+  @ApiPropertyOptional()
+  companyNameZh!: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Company industries (multi-select)',
+  })
+  industry!: string[];
+
+  @ApiProperty()
+  phone!: string;
+
+  @ApiProperty()
+  address!: string;
+
+  @ApiProperty()
+  description!: string;
+
+  @ApiPropertyOptional()
+  taxId!: string | null;
+
+  @ApiPropertyOptional()
+  country!: string | null;
+
+  @ApiPropertyOptional()
+  region!: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description: 'All company emails as a flat list',
+    example: ['info@company.com', 'sales@company.com'],
+  })
+  emails!: string[];
 
   @ApiPropertyOptional({
     description: 'Stable source/import natural key',
@@ -51,27 +86,11 @@ export class AdminCompanyDetailResponseDto extends CompanyDetailResponseDto {
   })
   isActive!: boolean;
 
-  @ApiPropertyOptional()
-  declare companyNameEn: string | null;
-
   @ApiProperty({
     type: [CompanyContactItemDto],
     description: 'Raw company contact rows used by admin management UIs',
   })
-  declare contacts: CompanyContactItemDto[];
-
-  @ApiProperty({
-    type: [String],
-    description: 'All company emails as a flat list',
-    example: ['info@company.com', 'sales@company.com'],
-  })
-  declare emails: string[];
-
-  @ApiProperty({
-    type: [CompanyContactPhonesByNameItemDto],
-    description: 'Contact phones grouped by contact name',
-  })
-  declare contactPhonesByName: CompanyContactPhonesByNameItemDto[];
+  contacts!: CompanyContactItemDto[];
 
   @ApiPropertyOptional({
     type: AdminCompanyMemberDto,

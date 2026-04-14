@@ -1598,6 +1598,7 @@ export class AdOrdersService {
           select: {
             id: true,
             companyNameVi: true,
+            companyNameEn: true,
             companyNameZh: true,
             taxId: true,
             logoUrl: true,

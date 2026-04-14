@@ -14,6 +14,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -34,6 +35,10 @@ import { CompanyContactTypesResponseDto } from './dto/company-contact-types-resp
 import { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
 import { AdminUpdateCompanyActiveDto } from './dto/admin-update-company-active.dto';
 import { AdminCompanyActiveResponseDto } from './dto/admin-company-active-response.dto';
+import {
+  AdminListCompaniesQueryDto,
+  AdminListCompaniesResponseDto,
+} from './dto/admin-list-companies.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -122,6 +127,24 @@ export class AdminCompaniesController {
   })
   async getCompanyStats(): Promise<AdminCompanyStatsResponseDto> {
     return this.companiesService.getAdminCompanyStats();
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Search and list companies (admin)',
+    description:
+      'Optional `search` across company names (VI/EN/ZH), tax id, industry tags, and email/phone/tel/contact_person values. ' +
+      'Does not filter by registration status or company isActive.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated company search results',
+    type: AdminListCompaniesResponseDto,
+  })
+  async listCompanies(
+    @Query() query: AdminListCompaniesQueryDto,
+  ): Promise<AdminListCompaniesResponseDto> {
+    return this.companiesService.adminListCompanies(query);
   }
 
   @Get('contact-types')

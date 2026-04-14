@@ -33,6 +33,11 @@ import type { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
 import type { AddCompanyContactsResponseDto } from './dto/add-company-contacts-response.dto';
 import type { CompanyContactTypesResponseDto } from './dto/company-contact-types-response.dto';
 import type { CreateCompanyDto } from './dto/create-company.dto';
+import type {
+  AdminCompanyListItemDto,
+  AdminListCompaniesQueryDto,
+  AdminListCompaniesResponseDto,
+} from './dto/admin-list-companies.dto';
 import {
   CONTACT_TYPE,
   getPrimaryContactNameFromContactRows,
@@ -96,6 +101,7 @@ const ADMIN_AUDIT_COMPANY_SELECT = {
 type CompanyWithActiveAdsRecord = {
   id: string;
   companyNameVi: string | null;
+  companyNameEn: string | null;
   companyNameZh: string | null;
   logoUrl: string | null;
   industry: string[];
@@ -146,6 +152,26 @@ export class CompaniesService {
 
   private static getPrimaryIndustry(industry: readonly string[]): string {
     return industry[0] ?? '';
+  }
+
+  static resolveCompanyDisplayName(
+    companyNameVi: string | null | undefined,
+    companyNameEn: string | null | undefined,
+    companyNameZh: string | null | undefined,
+  ): string | null {
+    const vi = companyNameVi?.trim();
+    if (vi) {
+      return vi;
+    }
+    const en = companyNameEn?.trim();
+    if (en) {
+      return en;
+    }
+    const zh = companyNameZh?.trim();
+    if (zh) {
+      return zh;
+    }
+    return null;
   }
 
   private static getPrimaryContactValue(
@@ -409,19 +435,13 @@ export class CompaniesService {
       companyNameEn: company.companyNameEn,
       companyNameZh: company.companyNameZh,
       industry: [...company.industry],
-      email: contactView.email,
       phone: contactView.phone,
       address: contactView.address,
       description: company.description,
       taxId: company.taxId ?? null,
       country: company.country,
       region: company.region,
-      website: contactView.website,
-      contactName: contactView.contactName,
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
-      contactPhonesByName: CompaniesService.buildContactPhonesByName(
-        company.companyContacts,
-      ),
       note: getNoteFromContactRows(company.companyContacts),
       contacts: CompaniesService.mapContactRows(company.companyContacts),
       member: member
@@ -530,6 +550,7 @@ export class CompaniesService {
 
   private static readonly DIRECTORY_SEARCH_FIELDS = [
     'companyNameVi',
+    'companyNameEn',
     'companyNameZh',
     'description',
     'region',
@@ -556,6 +577,155 @@ export class CompaniesService {
       where: { isActive: true },
     });
     return { activeCount };
+  }
+
+  private static buildAdminCompanySearchWhere(
+    search: string,
+    industryCompanyIds: readonly string[],
+  ): Prisma.CompanyWhereInput {
+    const contactSearchTypes = [
+      CONTACT_TYPE.EMAIL,
+      CONTACT_TYPE.TEL,
+      CONTACT_TYPE.PHONE,
+      CONTACT_TYPE.CONTACT_PERSON,
+    ];
+    const searchOr: Prisma.CompanyWhereInput[] = [
+      { companyNameVi: { contains: search, mode: 'insensitive' } },
+      { companyNameEn: { contains: search, mode: 'insensitive' } },
+      { companyNameZh: { contains: search, mode: 'insensitive' } },
+      { taxId: { contains: search, mode: 'insensitive' } },
+      {
+        companyContacts: {
+          some: {
+            type: { in: contactSearchTypes },
+            OR: [
+              { value: { contains: search, mode: 'insensitive' } },
+              { contactName: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      },
+    ];
+    if (industryCompanyIds.length > 0) {
+      searchOr.push({ id: { in: [...industryCompanyIds] } });
+    }
+    return { OR: searchOr };
+  }
+
+  private async findCompanyIdsByIndustrySearch(
+    search: string,
+  ): Promise<string[]> {
+    const pattern = `%${search}%`;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT c.id
+        FROM companies c
+        WHERE EXISTS (
+          SELECT 1
+          FROM unnest(c.industry) AS t(val)
+          WHERE t.val ILIKE ${pattern}
+        )
+      `,
+    );
+    return rows.map((row) => row.id);
+  }
+
+  private static buildAdminCompanyVisibilityWhere(): Prisma.CompanyWhereInput {
+    return {
+      OR: [{ users: { none: {} } }, { users: { some: { deletedAt: null } } }],
+    };
+  }
+
+  async adminListCompanies(
+    query: AdminListCompaniesQueryDto,
+  ): Promise<AdminListCompaniesResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+    const search = query.search?.trim() ?? '';
+    const visibilityWhere = CompaniesService.buildAdminCompanyVisibilityWhere();
+    let where: Prisma.CompanyWhereInput = { AND: [visibilityWhere] };
+    if (search.length > 0) {
+      const industryCompanyIds =
+        await this.findCompanyIdsByIndustrySearch(search);
+      where = {
+        AND: [
+          visibilityWhere,
+          CompaniesService.buildAdminCompanySearchWhere(
+            search,
+            industryCompanyIds,
+          ),
+        ],
+      };
+    }
+    const orderBy: Prisma.CompanyOrderByWithRelationInput =
+      sortBy === 'companyNameVi'
+        ? { companyNameVi: sortOrder }
+        : sortBy === 'updatedAt'
+          ? { updatedAt: sortOrder }
+          : { createdAt: sortOrder };
+    const skip = (page - 1) * limit;
+    const [total, rows] = await Promise.all([
+      this.prisma.company.count({ where }),
+      this.prisma.company.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        select: {
+          id: true,
+          companyNameVi: true,
+          companyNameEn: true,
+          companyNameZh: true,
+          industry: true,
+          status: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          users: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+            take: 1,
+          },
+          companyContacts: {
+            select: {
+              type: true,
+              value: true,
+              contactName: true,
+            },
+          },
+        },
+      }),
+    ]);
+    const companies: AdminCompanyListItemDto[] = rows.map((row) => ({
+      id: row.id,
+      userId: row.users[0]?.id ?? null,
+      companyNameVi: row.companyNameVi,
+      companyNameEn: row.companyNameEn,
+      companyNameZh: row.companyNameZh,
+      industry: [...row.industry],
+      status: row.status,
+      isActive: row.isActive,
+      primaryEmail:
+        CompaniesService.getPrimaryContactValue(
+          row.companyContacts,
+          CONTACT_TYPE.EMAIL,
+        ) ?? '',
+      primaryPhone: getPrimaryPhoneValueFromContactRows(row.companyContacts),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+    return {
+      companies,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   async createCompany(dto: CreateCompanyDto, userId?: string) {
@@ -652,9 +822,6 @@ export class CompaniesService {
       const rawEmails = CompaniesService.buildEmailsFromContacts(
         company.companyContacts,
       );
-      const rawContactPhonesByName = CompaniesService.buildContactPhonesByName(
-        company.companyContacts,
-      );
       const primaryIndustry = CompaniesService.getPrimaryIndustry(
         company.industry,
       );
@@ -694,37 +861,6 @@ export class CompaniesService {
           maskedEmailsBuffer.push(maskedEmail);
         }
       }
-      const maskedContactPhonesByNameMap = new Map<string, string[]>();
-      for (const group of rawContactPhonesByName) {
-        for (const phoneValue of group.contactPhones) {
-          const maskedContact = this.maskingService.maskCompanyData(
-            {
-              ...baseForMasking,
-              phone: phoneValue,
-              contactName: group.contactName,
-              contactPhone: phoneValue,
-            },
-            maskingContext,
-          );
-          const maskedName =
-            maskedContact.contactName &&
-            maskedContact.contactName.trim().length > 0
-              ? maskedContact.contactName.trim()
-              : 'Unknown';
-          const maskedPhone = maskedContact.contactPhone ?? '';
-          const existing = maskedContactPhonesByNameMap.get(maskedName) ?? [];
-          if (maskedPhone && !existing.includes(maskedPhone)) {
-            existing.push(maskedPhone);
-            maskedContactPhonesByNameMap.set(maskedName, existing);
-          }
-        }
-      }
-      const maskedContactPhonesByName = Array.from(
-        maskedContactPhonesByNameMap.entries(),
-      ).map(([contactName, contactPhones]) => ({
-        contactName,
-        contactPhones,
-      }));
 
       return {
         id: masked.id,
@@ -733,18 +869,11 @@ export class CompaniesService {
         companyNameZh: masked.companyNameZh,
         companyNameEn: masked.companyNameEn ?? null,
         industry: [...company.industry],
-        email: masked.email,
-        phone: masked.phone,
-        address: masked.address ?? '',
         description: masked.description ?? '',
         taxId: company.taxId ?? null,
         country: masked.country ?? null,
         region: masked.region ?? null,
-        website: masked.website ?? null,
-        contactName: masked.contactName ?? null,
-        contactPhone: null,
         emails: maskedEmailsBuffer,
-        contactPhonesByName: maskedContactPhonesByName,
         contacts: this.buildMaskedContactRows(
           company.companyContacts,
           {
@@ -758,9 +887,6 @@ export class CompaniesService {
       };
     }
 
-    const contactView = CompaniesService.buildCompanyContactView(
-      company.companyContacts,
-    );
     return {
       id: company.id,
       logoUrl: company.logoUrl,
@@ -768,20 +894,11 @@ export class CompaniesService {
       companyNameZh: company.companyNameZh,
       companyNameEn: company.companyNameEn,
       industry: [...company.industry],
-      email: contactView.email,
-      phone: contactView.phone,
-      address: contactView.address,
       description: company.description,
       taxId: company.taxId ?? null,
       country: company.country,
       region: company.region,
-      website: contactView.website,
-      contactName: contactView.contactName,
-      contactPhone: null,
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
-      contactPhonesByName: CompaniesService.buildContactPhonesByName(
-        company.companyContacts,
-      ),
       contacts: CompaniesService.mapContactRows(company.companyContacts),
     };
   }
@@ -795,11 +912,14 @@ export class CompaniesService {
     const contactView = CompaniesService.buildCompanyContactView(
       company.companyContacts,
     );
-    const displayName =
-      company.companyNameVi ?? company.companyNameZh ?? contactView.email;
+    const displayName = CompaniesService.resolveCompanyDisplayName(
+      company.companyNameVi,
+      company.companyNameEn,
+      company.companyNameZh,
+    );
     const companyData: CompanyData = {
       id: company.id,
-      name: displayName,
+      name: displayName ?? '',
       email: contactView.email,
       contactName: contactView.contactName ?? '',
       phone: contactView.phone,
@@ -828,6 +948,7 @@ export class CompaniesService {
     company: {
       id: string;
       companyNameVi: string | null;
+      companyNameEn: string | null;
       companyNameZh: string | null;
       logoUrl: string | null;
       companyContacts?: Array<{
@@ -864,7 +985,11 @@ export class CompaniesService {
           contactPhone: null,
         };
     const name =
-      company.companyNameVi ?? company.companyNameZh ?? contactView.email;
+      CompaniesService.resolveCompanyDisplayName(
+        company.companyNameVi,
+        company.companyNameEn,
+        company.companyNameZh,
+      ) ?? '';
     const companyData: CompanyData = {
       id: company.id,
       name,
@@ -1024,7 +1149,11 @@ export class CompaniesService {
         company.companyContacts,
       );
       const name =
-        company.companyNameVi ?? company.companyNameZh ?? contactView.email;
+        CompaniesService.resolveCompanyDisplayName(
+          company.companyNameVi,
+          company.companyNameEn,
+          company.companyNameZh,
+        ) ?? '';
       const requiredSlotTypeSet = new Set<AdPackageType>(requiredSlotTypes);
       const activeAdAssets = company.activeAds
         .filter((ad) => requiredSlotTypeSet.has(ad.packageType))
@@ -1129,7 +1258,11 @@ export class CompaniesService {
         company.companyContacts,
       );
       const name =
-        company.companyNameVi ?? company.companyNameZh ?? contactView.email;
+        CompaniesService.resolveCompanyDisplayName(
+          company.companyNameVi,
+          company.companyNameEn,
+          company.companyNameZh,
+        ) ?? '';
 
       const printPlacementAds = company.activeAds.filter(
         (ad) => ad.packageType === AdPackageType.PRINT_PLACEMENT,
@@ -1315,6 +1448,7 @@ export class CompaniesService {
             {
               id: company.id,
               companyNameVi: company.companyNameVi,
+              companyNameEn: company.companyNameEn,
               companyNameZh: company.companyNameZh,
               email: contactView.email,
               contactName: contactView.contactName,
@@ -1330,6 +1464,7 @@ export class CompaniesService {
         : {
             id: company.id,
             companyNameVi: company.companyNameVi,
+            companyNameEn: company.companyNameEn,
             companyNameZh: company.companyNameZh,
             email: contactView.email,
             contactName: contactView.contactName,
@@ -1341,10 +1476,11 @@ export class CompaniesService {
             logoUrl: company.logoUrl,
           };
 
-      const name =
-        maskedCompany.companyNameVi ??
-        maskedCompany.companyNameZh ??
-        maskedCompany.email;
+      const name = CompaniesService.resolveCompanyDisplayName(
+        maskedCompany.companyNameVi,
+        maskedCompany.companyNameEn,
+        maskedCompany.companyNameZh,
+      );
 
       return {
         id: maskedCompany.id,
@@ -1369,8 +1505,8 @@ export class CompaniesService {
         if (priorityDiff !== 0) return priorityDiff;
         // Then by name
         return sortOrder === 'asc'
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
+          ? (a.name ?? '').localeCompare(b.name ?? '')
+          : (b.name ?? '').localeCompare(a.name ?? '');
       });
     }
 

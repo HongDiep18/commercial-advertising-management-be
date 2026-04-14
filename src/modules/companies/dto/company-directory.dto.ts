@@ -23,7 +23,7 @@ function parseListQueryValue(value: unknown): string[] | undefined {
 export class CompanyDirectoryQueryDto {
   @ApiPropertyOptional({
     description:
-      'Search: whitespace-separated tokens; each token matches only at word start (start of text or after a space) in name, industry, description, or region (case-insensitive).',
+      'Search: whitespace-separated tokens, each token matches only at word start (start of text or after a space) in company names (VI/EN/ZH), description, or region (case-insensitive).',
     example: 'manufacturing north',
   })
   @IsOptional()
@@ -106,8 +106,13 @@ export class CompanyDirectoryItemDto {
   })
   id!: string;
 
-  @ApiProperty({ example: 'VN Buyer Guide Co.' })
-  name!: string;
+  @ApiProperty({
+    example: 'VN Buyer Guide Co.',
+    nullable: true,
+    description:
+      'Display name: companyNameVi, else companyNameEn, else companyNameZh; null if all missing (no email fallback).',
+  })
+  name!: string | null;
 
   @ApiPropertyOptional({
     description: 'Public logo URL for company card',

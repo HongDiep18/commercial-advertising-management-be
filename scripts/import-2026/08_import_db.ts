@@ -440,18 +440,57 @@ function printSummary(
   summary: ImportSummary,
   companiesProcessed: number,
 ): void {
-  console.log('Company import completed.');
-  console.log(`  Companies processed: ${companiesProcessed}`);
-  console.log(`  Companies inserted: ${summary.companiesInserted}`);
-  console.log(`  Companies updated: ${summary.companiesUpdated}`);
-  console.log(`  Contacts created: ${summary.contactsCreated}`);
-  console.log(`  Users created: ${summary.usersCreated}`);
-  console.log(`  Existing users linked: ${summary.existingUsersLinked}`);
-  console.log(`  Existing users reused: ${summary.existingUsersReused}`);
-  console.log(
-    `  User-email conflicts skipped: ${summary.userEmailConflictsSkipped}`,
+  const companiesImported =
+    summary.companiesInserted + summary.companiesUpdated;
+  const userOutcomesTotal =
+    summary.usersCreated +
+    summary.existingUsersLinked +
+    summary.existingUsersReused +
+    summary.userEmailConflictsSkipped;
+  const companiesWithoutProvisionedUser = Math.max(
+    companiesImported - userOutcomesTotal,
+    0,
   );
-  console.log(`  Set-password emails sent: ${summary.setPasswordEmailsSent}`);
+  const formatNumber = (value: number): string => value.toLocaleString('en-US');
+
+  console.log('Company import completed.');
+  console.log('');
+  console.log('Company summary');
+  console.log(`  Total companies processed: ${formatNumber(companiesProcessed)}`);
+  console.log(
+    `  New companies inserted: ${formatNumber(summary.companiesInserted)}`,
+  );
+  console.log(
+    `  Existing companies updated: ${formatNumber(summary.companiesUpdated)}`,
+  );
+  console.log(
+    `  Total companies imported: ${formatNumber(companiesImported)}`,
+  );
+  console.log('');
+  console.log('Contact summary');
+  console.log(
+    `  Total contact records created: ${formatNumber(summary.contactsCreated)}`,
+  );
+  console.log('');
+  console.log('User account summary');
+  console.log(
+    `  New user accounts created: ${formatNumber(summary.usersCreated)}`,
+  );
+  console.log(
+    `  Existing user accounts linked: ${formatNumber(summary.existingUsersLinked)}`,
+  );
+  console.log(
+    `  Existing linked accounts already reused: ${formatNumber(summary.existingUsersReused)}`,
+  );
+  console.log(
+    `  User provisioning skipped due to email conflict: ${formatNumber(summary.userEmailConflictsSkipped)}`,
+  );
+  console.log(
+    `  Companies imported without a provisioned user: ${formatNumber(companiesWithoutProvisionedUser)}`,
+  );
+  console.log(
+    `  Set-password emails sent: ${formatNumber(summary.setPasswordEmailsSent)}`,
+  );
 }
 
 function updateUserSummary(

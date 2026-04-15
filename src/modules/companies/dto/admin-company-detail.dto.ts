@@ -50,12 +50,6 @@ export class AdminCompanyDetailResponseDto {
   industry!: string[];
 
   @ApiProperty()
-  phone!: string;
-
-  @ApiProperty()
-  address!: string;
-
-  @ApiProperty()
   description!: string;
 
   @ApiPropertyOptional()

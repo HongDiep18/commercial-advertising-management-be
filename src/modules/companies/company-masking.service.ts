@@ -131,6 +131,47 @@ export class CompanyMaskingService {
     }
   }
 
+  maskPublicCompanyMember(
+    member: {
+      email: string;
+      createdAt: Date;
+      membershipTier: string;
+    },
+    companyId: string,
+    companyIndustry: string,
+    context: MaskingContext,
+  ): {
+    userName: string;
+    registeredEmail: string;
+    memberSince: string;
+    membershipTier: string;
+  } {
+    const maskingLevel = this.getMaskingLevel(
+      companyIndustry,
+      companyId,
+      context,
+    );
+    const memberSince = member.createdAt.toISOString();
+    const localPartFromEmail = (email: string): string => {
+      const atIndex = email.indexOf('@');
+      return atIndex <= 0 ? email : email.slice(0, atIndex);
+    };
+    if (maskingLevel === 'none') {
+      return {
+        userName: localPartFromEmail(member.email),
+        registeredEmail: member.email,
+        memberSince,
+        membershipTier: member.membershipTier,
+      };
+    }
+    return {
+      userName: '****',
+      registeredEmail: this.maskEmail(member.email),
+      memberSince,
+      membershipTier: member.membershipTier,
+    };
+  }
+
   /**
    * Apply masking to company data based on user tier and industry access
    */

@@ -398,6 +398,26 @@ export class CompaniesService {
     });
   }
 
+  private static mapCompanyMemberFromUser(
+    user:
+      | {
+          email: string;
+          createdAt: Date;
+          membershipTier: string;
+        }
+      | undefined,
+  ): CompanyDetailResponseDto['member'] {
+    if (!user) {
+      return null;
+    }
+    return {
+      userName: CompaniesService.extractUserNameFromEmail(user.email),
+      registeredEmail: user.email,
+      memberSince: user.createdAt.toISOString(),
+      membershipTier: user.membershipTier,
+    };
+  }
+
   private static mapAdminCompanyDetail(company: {
     id: string;
     importKey: string | null;
@@ -422,10 +442,6 @@ export class CompaniesService {
       membershipTier: string;
     }>;
   }): AdminCompanyDetailResponseDto {
-    const contactView = CompaniesService.buildCompanyContactView(
-      company.companyContacts,
-    );
-    const member = company.users[0] ?? null;
     return {
       id: company.id,
       importKey: company.importKey,
@@ -435,8 +451,6 @@ export class CompaniesService {
       companyNameEn: company.companyNameEn,
       companyNameZh: company.companyNameZh,
       industry: [...company.industry],
-      phone: contactView.phone,
-      address: contactView.address,
       description: company.description,
       taxId: company.taxId ?? null,
       country: company.country,
@@ -444,14 +458,7 @@ export class CompaniesService {
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
       note: getNoteFromContactRows(company.companyContacts),
       contacts: CompaniesService.mapContactRows(company.companyContacts),
-      member: member
-        ? {
-            userName: CompaniesService.extractUserNameFromEmail(member.email),
-            registeredEmail: member.email,
-            memberSince: member.createdAt.toISOString(),
-            membershipTier: member.membershipTier,
-          }
-        : null,
+      member: CompaniesService.mapCompanyMemberFromUser(company.users[0]),
     };
   }
 
@@ -794,6 +801,16 @@ export class CompaniesService {
             contactName: true,
           },
         },
+        users: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: {
+            email: true,
+            createdAt: true,
+            membershipTier: true,
+          },
+        },
       },
     });
     if (!company) {
@@ -884,6 +901,14 @@ export class CompaniesService {
           },
           maskingContext,
         ),
+        member: company.users[0]
+          ? this.maskingService.maskPublicCompanyMember(
+              company.users[0],
+              company.id,
+              primaryIndustry,
+              maskingContext,
+            )
+          : null,
       };
     }
 
@@ -900,6 +925,7 @@ export class CompaniesService {
       region: company.region,
       emails: CompaniesService.buildEmailsFromContacts(company.companyContacts),
       contacts: CompaniesService.mapContactRows(company.companyContacts),
+      member: CompaniesService.mapCompanyMemberFromUser(company.users[0]),
     };
   }
 

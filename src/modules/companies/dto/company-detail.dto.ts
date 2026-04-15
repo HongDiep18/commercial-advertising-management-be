@@ -1,5 +1,31 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class CompanyMemberDto {
+  @ApiProperty({
+    description: 'Local-part extracted from the linked user email',
+    example: 'john.doe',
+  })
+  userName!: string;
+
+  @ApiProperty({
+    description: 'Registered email of the linked user account',
+    example: 'john.doe@company.com',
+  })
+  registeredEmail!: string;
+
+  @ApiProperty({
+    description: 'Linked user account creation timestamp (ISO 8601)',
+    example: '2026-04-10T03:12:45.000Z',
+  })
+  memberSince!: string;
+
+  @ApiProperty({
+    description: 'Linked user membership tier',
+    example: 'BRONZE',
+  })
+  membershipTier!: string;
+}
+
 export class CompanyContactItemDto {
   @ApiProperty()
   type!: string;
@@ -57,4 +83,12 @@ export class CompanyDetailResponseDto {
     description: 'Raw company contact rows',
   })
   contacts!: CompanyContactItemDto[];
+
+  @ApiPropertyOptional({
+    type: CompanyMemberDto,
+    nullable: true,
+    description:
+      'Linked member account summary. Null when the company has no linked user account.',
+  })
+  member!: CompanyMemberDto | null;
 }

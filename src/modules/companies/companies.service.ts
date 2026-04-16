@@ -1465,7 +1465,7 @@ export class CompaniesService {
     const now = new Date();
 
     const andConditions: Prisma.CompanyWhereInput[] = [];
-    andConditions.push(CompaniesService.buildActiveUserCompanyWhere());
+    andConditions.push({ isActive: true });
     const industryFilters = Array.isArray(industry)
       ? industry.filter((value): value is string => typeof value === 'string')
       : [];

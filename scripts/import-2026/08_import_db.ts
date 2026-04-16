@@ -383,7 +383,7 @@ async function findExistingCompanyForImport(
       ],
     }),
   );
-  if (namePredicates.length > 0 && input.normalizedRegion) {
+  if (namePredicates.length > 0 && input.normalizedRegion && !taxId) {
     const company = await tx.company.findFirst({
       where: {
         region: {

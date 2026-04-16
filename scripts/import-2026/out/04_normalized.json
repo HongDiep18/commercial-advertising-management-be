@@ -131,10 +131,6 @@
       {
         "type": "email",
         "value": "steve@cphvn.com"
-      },
-      {
-        "type": "tel",
-        "value": "028-5411 7096"
       }
     ],
     "_flags": [],
@@ -27573,8 +27569,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "DATACOLOR VIETNAM CO.,LTD",
+    "companyNameVi": "DATACOLOR VIETNAM CO.,LTD",
     "country": "VN",
     "industry": "textile",
     "region": "Ho Chi Minh City",
@@ -28384,8 +28379,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "NAVITEX INTERNATIONAL CO.,LTD",
+    "companyNameVi": "NAVITEX INTERNATIONAL CO.,LTD",
     "country": "VN",
     "industry": "textile",
     "region": "Ha Noi",
@@ -28660,8 +28654,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "BCB VIET NAM TRADING PRODUCTION COMPANY LIMITED",
+    "companyNameVi": "BCB VIET NAM TRADING PRODUCTION COMPANY LIMITED",
     "country": "VN",
     "industry": "shoes",
     "region": "Ho Chi Minh City",
@@ -28776,8 +28769,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "KIM HOA IMPORT - EXPORT COMPANY LIMITED",
+    "companyNameVi": "KIM HOA IMPORT - EXPORT COMPANY LIMITED",
     "country": "VN",
     "industry": "shoes",
     "region": "Ha Noi",
@@ -28824,8 +28816,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "TRITEXCO VIET NAM JOINT STOCK COMPANY",
+    "companyNameVi": "TRITEXCO VIET NAM JOINT STOCK COMPANY",
     "country": "VN",
     "industry": "shoes",
     "region": "Ha Noi",
@@ -29299,8 +29290,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "WOODSLAND JOINT STOCK COMPANY",
+    "companyNameVi": "WOODSLAND JOINT STOCK COMPANY",
     "country": "VN",
     "industry": "furniture",
     "region": "Ha Noi",
@@ -29482,8 +29472,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "VIET DUC CONSTRUCTION CONCRETE CO.,LTD",
+    "companyNameVi": "VIET DUC CONSTRUCTION CONCRETE CO.,LTD",
     "country": "VN",
     "industry": "construction",
     "region": "Ho Chi Minh City",
@@ -34178,8 +34167,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "HIEN LONG TECHNOLOGY CORP.",
+    "companyNameVi": "HIEN LONG TECHNOLOGY CORP.",
     "country": "VN",
     "industry": "education",
     "region": "Ho Chi Minh City",
@@ -34736,8 +34724,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "LM CAPITAL CO.,LTD",
+    "companyNameVi": "LM CAPITAL CO.,LTD",
     "country": "VN",
     "industry": "legal",
     "region": "Ho Chi Minh City",
@@ -35034,8 +35021,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "DANG VIET TRADING CO.,LTD",
+    "companyNameVi": "DANG VIET TRADING CO.,LTD",
     "country": "VN",
     "industry": "other",
     "region": "Ho Chi Minh City",
@@ -35659,8 +35645,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "VESA COMPANY LIMITED",
+    "companyNameVi": "VESA COMPANY LIMITED",
     "country": "VN",
     "industry": "other",
     "region": "Ho Chi Minh City",
@@ -36020,8 +36005,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "SONADEZI LONG THANH SHAREHOLDING COMPANY",
+    "companyNameVi": "SONADEZI LONG THANH SHAREHOLDING COMPANY",
     "country": "VN",
     "industry": "other",
     "region": "Dong Nai",
@@ -36059,8 +36043,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "DONA MEDIA CO.,LTD",
+    "companyNameVi": "DONA MEDIA CO.,LTD",
     "country": "VN",
     "industry": "other",
     "region": "Dong Nai",
@@ -36489,7 +36472,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
+    "companyNameVi": "HIEP HOI DET MAY VIET NAM",
     "companyNameEn": "VIETNAM TEXTILE & APPAREL ASSOCIATION",
     "country": "VN",
     "industry": "textile",
@@ -36533,7 +36516,7 @@
     "industries": [
       "textile"
     ],
-    "id": "a7a39a0c-c558-593a-973b-4a1a14521634"
+    "id": "1558d58b-983f-5adc-9150-6b576fbeaec0"
   },
   {
     "companyNameZh": null,
@@ -37118,8 +37101,8 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "HIEP HOI DOANH NGHIEP MALAYSIA TAI VIET NAM",
+    "companyNameVi": "HIEP HOI DOANH NGHIEP MALAYSIA TAI VIET NAM",
+    "companyNameEn": "MALAYSIA BUSINESS CHAMBER VIETNAM",
     "country": "MY",
     "industry": "other",
     "region": "Ho Chi Minh City",
@@ -37162,7 +37145,7 @@
     "industries": [
       "other"
     ],
-    "id": "bfab033d-d50d-5d15-b4e1-29e4ab81322c"
+    "id": "4fe7afba-22b8-5548-8a4e-875b5c82a32e"
   },
   {
     "companyNameZh": null,
@@ -80424,15 +80407,15 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0272 3751928"
+        "value": "02723751928"
       },
       {
         "type": "tel",
-        "value": "0272 3751929"
+        "value": "02723751929"
       },
       {
         "type": "fax",
-        "value": "0272 3751927"
+        "value": "02723751927"
       },
       {
         "type": "email",
@@ -100862,7 +100845,7 @@
       },
       {
         "type": "fax",
-        "value": "0274-246 1498"
+        "value": "0274-2461498"
       },
       {
         "type": "email",
@@ -105312,7 +105295,7 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0274 3772385"
+        "value": "02743772385"
       },
       {
         "type": "email",
@@ -119592,11 +119575,11 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0251-3 984316"
+        "value": "0251-3984316"
       },
       {
         "type": "tel",
-        "value": "0251-3 984317"
+        "value": "0251-3984317"
       },
       {
         "type": "tel",
@@ -141134,7 +141117,7 @@
       },
       {
         "type": "hotline",
-        "value": "0908 398 199"
+        "value": "0908398199"
       }
     ],
     "_flags": [],
@@ -146091,6 +146074,10 @@
       {
         "type": "website",
         "value": "https://thuanphuonggroup.com"
+      },
+      {
+        "type": "hotline",
+        "value": "1900-558842"
       }
     ],
     "_flags": [],
@@ -146099,10 +146086,6 @@
       {
         "name": "梅德順",
         "phone": "0903-809119"
-      },
-      {
-        "name": "Hotline:1900-558842",
-        "phone": null
       }
     ],
     "_raw": {
@@ -147209,8 +147192,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "VINATIRE TRADING CO.,LTD",
+    "companyNameVi": "VINATIRE TRADING CO.,LTD",
     "country": "VN",
     "industry": "vehicle",
     "region": "Ha Noi",
@@ -147365,8 +147347,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "TIMBERLINK VN COMPANY LIMITED",
+    "companyNameVi": "TIMBERLINK VN COMPANY LIMITED",
     "country": "VN",
     "industry": "furniture",
     "region": "Ho Chi Minh City",
@@ -150234,8 +150215,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "NGOC LONG PRINTING TRADING & SERVICE CO.,LTD",
+    "companyNameVi": "NGOC LONG PRINTING TRADING & SERVICE CO.,LTD",
     "country": "VN",
     "industry": "paper",
     "region": "Ho Chi Minh City",
@@ -150558,8 +150538,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "HANOPRO (VIET NAM) CO.,LTD",
+    "companyNameVi": "HANOPRO (VIET NAM) CO.,LTD",
     "country": "VN",
     "industry": "paper",
     "region": "Ha Noi",
@@ -151512,7 +151491,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
+    "companyNameVi": "HIEP HOI BONG SOI VIET NAM",
     "companyNameEn": "VIET NAM COTTON AND SPINNING ASSOCIATION",
     "country": "VN",
     "industry": "textile",
@@ -151549,7 +151528,7 @@
     "industries": [
       "textile"
     ],
-    "id": "16dd7be9-fde4-5e3c-80ba-5a83d209777a"
+    "id": "ce028d14-3e91-5153-8244-438cd71d1b6c"
   },
   {
     "companyNameZh": null,

@@ -28,19 +28,35 @@ print(f"Input: {len(data)} companies")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+PHONE_TYPES = {"tel", "fax", "hotline"}
+
+
+def normalize_phone(value: str) -> str:
+    """Strip internal spaces from a phone number, keep dashes and structure."""
+    return re.sub(r"(?<=\d) (?=\d)", "", value)
+
+
 def merge_contacts(lists: list[list[dict]]) -> list[dict]:
     """Combine companyContacts lists, deduplicate by (type, normalized-value).
     Emails are lowercased so Ken-chang@... and ken-chang@... collapse to one.
+    Phone/fax/hotline values are space-normalized so "028-5411 7096" and
+    "028-54117096" deduplicate to the same entry.
     """
     seen = set()
     result = []
     for lst in lists:
         for item in lst:
-            val = item["value"].lower() if item["type"] == "email" else item["value"]
-            key = (item["type"], val)
+            ctype = item["type"]
+            if ctype == "email":
+                val = item["value"].lower()
+            elif ctype in PHONE_TYPES:
+                val = normalize_phone(item["value"])
+            else:
+                val = item["value"]
+            key = (ctype, val)
             if key not in seen:
                 seen.add(key)
-                result.append({**item, "value": val} if item["type"] == "email" else item)
+                result.append({**item, "value": val})
     return result
 
 

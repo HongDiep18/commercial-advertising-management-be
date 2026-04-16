@@ -214,7 +214,7 @@ def parse_names_cell(paras: list[str]) -> dict:
             r"^(CONG TY|TONG CONG TY|TAP DOAN|NGAN HANG|TRUNG TAM|PHONG KHAM|"
             r"BENH VIEN|NHA HANG|KHACH SAN|LAP XUONG|CHI NHANH|VAN PHONG|"
             r"HOP TAC XA|QUY|TRUONG|HOI |LIEN DOAN|BAN QUAN LY|"
-            r"VPDD|DNTN|HTX|CTCP)",  # Vietnamese abbreviations
+            r"VPDD|DNTN|HTX|CTCP|HIEP HOI|LIEN HIEP)",  # Vietnamese abbreviations
             # Strip diacritics before matching so "CÔNG TY" matches "CONG TY"
             unicodedata.normalize("NFD", line).encode("ascii", "ignore").decode(),
             re.IGNORECASE,
@@ -329,7 +329,15 @@ def parse_contacts_cell(paras: list[str]) -> tuple[list[dict], list[dict]]:
                         pending_name = None
                         i += 1
                     else:  # "name"
-                        if i + 1 < len(segments) and segments[i + 1][0] == "phone":
+                        # Hotline label concatenated after a phone (e.g. "0903-809119Hotline:1900-558842")
+                        if HOTLINE_LABEL_RE.match(seg_val):
+                            remainder = HOTLINE_LABEL_RE.sub("", seg_val).strip()
+                            if remainder and looks_like_phone(remainder):
+                                hotlines.append({"type": "hotline", "value": remainder})
+                            else:
+                                pending_hotline = True
+                            i += 1
+                        elif i + 1 < len(segments) and segments[i + 1][0] == "phone":
                             contacts.append({"name": seg_val, "phone": segments[i + 1][1]})
                             i += 2
                         else:
@@ -341,7 +349,14 @@ def parse_contacts_cell(paras: list[str]) -> tuple[list[dict], list[dict]]:
                 pending_name = line
 
     if pending_name:
-        contacts.append({"name": pending_name, "phone": None})
+        # Hotline label left as pending name (e.g. no following phone line)
+        if HOTLINE_LABEL_RE.match(pending_name):
+            remainder = HOTLINE_LABEL_RE.sub("", pending_name).strip()
+            if remainder and looks_like_phone(remainder):
+                hotlines.append({"type": "hotline", "value": remainder})
+            # else: drop — bare "Hotline:" label with no number is noise
+        else:
+            contacts.append({"name": pending_name, "phone": None})
 
     return contacts, hotlines
 

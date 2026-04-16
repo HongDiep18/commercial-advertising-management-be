@@ -129,10 +129,6 @@
       {
         "type": "email",
         "value": "steve@cphvn.com"
-      },
-      {
-        "type": "tel",
-        "value": "028-5411 7096"
       }
     ],
     "_flags": [],
@@ -35770,7 +35766,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
+    "companyNameVi": "HIEP HOI DET MAY VIET NAM",
     "companyNameEn": "VIETNAM TEXTILE & APPAREL ASSOCIATION",
     "country": "越南",
     "industry": "textile",
@@ -36386,8 +36382,8 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
-    "companyNameEn": "HIEP HOI DOANH NGHIEP MALAYSIA TAI VIET NAM",
+    "companyNameVi": "HIEP HOI DOANH NGHIEP MALAYSIA TAI VIET NAM",
+    "companyNameEn": "MALAYSIA BUSINESS CHAMBER VIETNAM",
     "country": "馬來西亞",
     "industry": "other",
     "region": "胡志明市 – TP.HCM",
@@ -78822,15 +78818,15 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0272 3751928"
+        "value": "02723751928"
       },
       {
         "type": "tel",
-        "value": "0272 3751929"
+        "value": "02723751929"
       },
       {
         "type": "fax",
-        "value": "0272 3751927"
+        "value": "02723751927"
       },
       {
         "type": "email",
@@ -98839,7 +98835,7 @@
       },
       {
         "type": "fax",
-        "value": "0274-246 1498"
+        "value": "0274-2461498"
       },
       {
         "type": "email",
@@ -103197,7 +103193,7 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0274 3772385"
+        "value": "02743772385"
       },
       {
         "type": "email",
@@ -117180,11 +117176,11 @@
     "companyContacts": [
       {
         "type": "tel",
-        "value": "0251-3 984316"
+        "value": "0251-3984316"
       },
       {
         "type": "tel",
-        "value": "0251-3 984317"
+        "value": "0251-3984317"
       },
       {
         "type": "tel",
@@ -138273,7 +138269,7 @@
       },
       {
         "type": "hotline",
-        "value": "0908 398 199"
+        "value": "0908398199"
       }
     ],
     "_flags": [],
@@ -148396,7 +148392,7 @@
   },
   {
     "companyNameZh": null,
-    "companyNameVi": null,
+    "companyNameVi": "HIEP HOI BONG SOI VIET NAM",
     "companyNameEn": "VIET NAM COTTON AND SPINNING ASSOCIATION",
     "country": "越南",
     "industry": "textile",

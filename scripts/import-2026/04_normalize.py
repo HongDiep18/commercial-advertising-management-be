@@ -115,6 +115,34 @@ for c in data:
     else:
         unknown_countries[raw] += 1
 
+# ─── 3b. Promote companyNameEn → companyNameVi for VN-only companies ──────────
+# When a VN-country company has no CJK name and no Vi name, its Latin-script name
+# is its registered Vietnamese name — BUT only when it contains a Vietnamese legal
+# entity suffix (CO.,LTD, JOINT STOCK, CORP, etc.).
+# Names ending in ASSOCIATION / COMMITTEE / UNION etc. are English translations of
+# organizations that have separate proper Vietnamese names → leave in companyNameEn.
+
+VN_ENTITY_SUFFIX_RE = re.compile(
+    r"\b(CO\.?,?\s*LTD\.?|COMPANY\s+LIMITED|JOINT[\s-]+STOCK|CORPORATION|CORP\.?|"
+    r"INCORPORATED|INC\.?|JSC|LLC|SHAREHOLDING|ONE\s+MEMBER|TRADING|"
+    r"MANUFACTURING|PRODUCTION|IMPORT[\s-]+EXPORT|TECHNOLOGY|TECHNOLOGIES|"
+    r"INVESTMENT|CONSTRUCTION|SERVICES?|SOLUTIONS?|LOGISTICS|INTERNATIONAL)\b",
+    re.IGNORECASE,
+)
+
+fixed_en_to_vi = 0
+for c in data:
+    en = c.get("companyNameEn") or ""
+    if (
+        c.get("country") == "VN"
+        and not c.get("companyNameZh")
+        and not c.get("companyNameVi")
+        and en
+        and VN_ENTITY_SUFFIX_RE.search(en)
+    ):
+        c["companyNameVi"] = c.pop("companyNameEn")
+        fixed_en_to_vi += 1
+
 # ─── 4. Fix taxId parsing artifacts (taxId + email concatenated) ─────────────
 # e.g. "3603757691Email: superman@..." → taxId="3603757691", rescue the email
 
@@ -252,6 +280,33 @@ for c in data:
     c["companyContacts"] = [x for x in new_contacts if x.get("value", "").strip()]
 
 
+# ─── 9. Rescue hotline labels stranded in userContacts ───────────────────────
+# Catches any remaining cases where a hotline label+number ended up as a person
+# name (e.g. "Hotline:1900-558842" with phone=null).
+
+HOTLINE_RESCUE_RE = re.compile(
+    r"(?i)^hotline\s*[:\：]\s*(.+)$"
+    r"|^[\u4e00-\u9fff]*熱[線綫]\s*[:\：]\s*(.+)$"
+)
+
+PHONE_DIGITS_RE = re.compile(r"^[\d\s\-\+\(\)\.]{7,}$")
+
+fixed_hotline_rescue = 0
+for c in data:
+    keep = []
+    for uc in c.get("userContacts", []):
+        name = (uc.get("name") or "").strip()
+        m = HOTLINE_RESCUE_RE.match(name)
+        if m and uc.get("phone") is None:
+            phone_val = (m.group(1) or m.group(2) or "").strip()
+            if phone_val and PHONE_DIGITS_RE.match(phone_val):
+                c.setdefault("companyContacts", []).append({"type": "hotline", "value": phone_val})
+                fixed_hotline_rescue += 1
+                continue  # drop from userContacts
+        keep.append(uc)
+    c["userContacts"] = keep
+
+
 def normalize_text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -336,10 +391,12 @@ print(f"Duplicate identity groups : {duplicate_identity_groups}")
 print(f"Canonical region fixes : {fixed_canonical}")
 print(f"Inferred regions       : {fixed_inferred}")
 print(f"Country → ISO fixes    : {fixed_country}")
+print(f"En→Vi name promotions  : {fixed_en_to_vi}")
 print(f"TaxId artifact fixes   : {fixed_taxid}")
 print(f"Office suffix strips   : {fixed_office_suffix}")
 print(f"Split address merges   : {fixed_split_addr}")
 print(f"Contact type fixes     : {fixed_contact_types}")
+print(f"Hotline rescue (name→contact): {fixed_hotline_rescue}")
 
 if unknown_countries:
     print("\nUnrecognized country values (not mapped):")

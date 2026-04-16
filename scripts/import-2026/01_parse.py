@@ -52,6 +52,19 @@ SECTION_TO_INDUSTRY = {
 COUNTRY_RE    = re.compile(r"（(.+?)[）)]")
 HAS_CJK_RE    = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 LATIN_CO_RE   = re.compile(r"\b(CO\.?,?\s*LTD|CONG TY|CORPORATION|INC\.|JSC|COMPANY)\b", re.IGNORECASE)
+# Detect CJK name with embedded Vietnamese company name on same line, e.g.
+# "工業及民用設計諮詢股份公司CONG TY CP TU VAN..." → split at last CJK char
+SPLIT_ZH_VI_RE = re.compile(
+    r"^(.+[\u4e00-\u9fff\u3400-\u4dbf])((?:CONG\s+TY|TONG\s+CONG\s+TY|TAP\s+DOAN)\b.+)$",
+    re.IGNORECASE,
+)
+# Detect CJK name with embedded English company name on same line, e.g.
+# "中國檢驗認證集團越南有限公司CCIC VIETNAM ... CO.,LTD" → split at last CJK char
+# Anchor: Latin part must end with a known English legal suffix
+SPLIT_ZH_EN_RE = re.compile(
+    r"^(.+[\u4e00-\u9fff\u3400-\u4dbf])\s*(\S.+?(?:CO\.?,?\s*LTD\.?|COMPANY\s+LIMITED|CORPORATION|INCORPORATED|INC\.|JSC))$",
+    re.IGNORECASE,
+)
 EMAIL_RE      = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 PHONE_RE      = re.compile(r"[\d]{3,}[\d\s\-]{3,}")
 LABELED_RE    = re.compile(
@@ -78,6 +91,8 @@ def cell_paragraphs(cell_xml: str) -> list[str]:
     paras = re.findall(r"<w:p[ >].*?</w:p>", cell_xml, re.DOTALL)
     result = []
     for p in paras:
+        # Strip field instruction content (e.g. HYPERLINK "url") before removing tags
+        p = re.sub(r"<w:instrText[^>]*>.*?</w:instrText>", "", p, flags=re.DOTALL)
         text = re.sub(r"<[^>]+>", "", p).strip()
         text = re.sub(r"\s+", " ", text)
         text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
@@ -182,7 +197,19 @@ def parse_names_cell(paras: list[str]) -> dict:
             continue
 
         if HAS_CJK_RE.search(line) and not company_name_cn:
-            company_name_cn = line
+            m = SPLIT_ZH_VI_RE.match(line)
+            if m:
+                company_name_cn = m.group(1).strip()
+                if not company_name_vi:
+                    company_name_vi = m.group(2).strip()
+            else:
+                m = SPLIT_ZH_EN_RE.match(line)
+                if m:
+                    company_name_cn = m.group(1).strip()
+                    if not company_name_en:
+                        company_name_en = m.group(2).strip()
+                else:
+                    company_name_cn = line
         elif re.match(
             r"^(CONG TY|TONG CONG TY|TAP DOAN|NGAN HANG|TRUNG TAM|PHONG KHAM|"
             r"BENH VIEN|NHA HANG|KHACH SAN|LAP XUONG|CHI NHANH|VAN PHONG|"
@@ -325,7 +352,6 @@ def parse_details_cell(paras: list[str]) -> dict:
     addresses = []
     tax_id = None
     flags = []
-    last_contact_type = None  # track for continuation lines
 
     # First non-labeled, non-phone line(s) before any labeled line = address
     hit_labeled = False

@@ -3033,8 +3033,6 @@
     "addresses": [
       "Duong so 7, KCN Song May, Xa Binh Minh, Tinh Dong Nai",
       "43642 台中市清水區中山路396號",
-      "396 Zhongshan Rd, Qingshui Dist,",
-      "Taichung City, 43642 Taiwan R.O.C.",
       "396 Zhongshan Rd, Qingshui Dist, Taichung City, 43642 Taiwan R.O.C."
     ],
     "taxId": "3602800464",
@@ -3504,6 +3502,54 @@
       "shoes"
     ],
     "id": "cf09f8c9-46e6-5174-bc00-5d080c37464c"
+  },
+  {
+    "companyNameZh": "群展責任有限公司",
+    "companyNameVi": null,
+    "companyNameEn": "CHYUN JAAN ENTERPRISE CO.,LTD",
+    "country": "TW",
+    "industry": "shoes",
+    "region": "Other",
+    "addresses": [
+      "Lo L3+4, KCN Nam Sach, Phuong Ai Quoc, TP.Hai Phong"
+    ],
+    "taxId": "0800282603",
+    "companyContacts": [
+      {
+        "type": "tel",
+        "value": "0220-3753026"
+      },
+      {
+        "type": "tel",
+        "value": "0220-3753034"
+      },
+      {
+        "type": "email",
+        "value": "chyunjann2004@yahoo.com.tw"
+      }
+    ],
+    "_flags": [],
+    "description": "鞋材",
+    "userContacts": [
+      {
+        "name": "高光隆",
+        "phone": null
+      },
+      {
+        "name": "賴坤捷",
+        "phone": "0904-182500"
+      }
+    ],
+    "_raw": {
+      "names": "群展責任有限公司CHYUN JAAN ENTERPRISE CO.,LTD\n（台灣）",
+      "contacts": "高光隆\n賴坤捷\n0904-182500",
+      "details": "Lo L3+4, KCN Nam Sach, Phuong Ai Quoc, TP.Hai Phong\nTel: 0220-3753026~3034\nMST: 0800282603\nEmail: chyunjann2004@yahoo.com.tw",
+      "description": "鞋材"
+    },
+    "industries": [
+      "shoes"
+    ],
+    "id": "5b75263f-9402-5398-8241-1250ce063d6a"
   },
   {
     "companyNameZh": "裕得越南責任有限公司",
@@ -9457,7 +9503,7 @@
   {
     "companyNameZh": "廣電運通國際有限公司胡志明市辦事處",
     "companyNameVi": null,
-    "companyNameEn": "GRG BANKING EQUIPMENT (HK) CO.,LTD - VPDD TAI TP.HCM",
+    "companyNameEn": "GRG BANKING EQUIPMENT (HK) CO.,LTD",
     "country": "CN",
     "industry": "electronics",
     "region": "Ho Chi Minh City",
@@ -10608,7 +10654,7 @@
   },
   {
     "companyNameZh": "鼎鉅電子股份有限公司",
-    "companyNameVi": "CONG TY TNHH DICH VU BAN HANG TU DONG V RICH",
+    "companyNameVi": null,
     "companyNameEn": "TOP VENDING MACHINE ELECTRONICS CO.,LTD",
     "country": null,
     "industry": "electronics",
@@ -10616,7 +10662,7 @@
     "addresses": [
       "33868 桃園市蘆竹區安中街11號"
     ],
-    "taxId": "0315896502",
+    "taxId": null,
     "companyContacts": [
       {
         "type": "tel",
@@ -10705,7 +10751,7 @@
   {
     "companyNameZh": "弘達儀器越南分公司",
     "companyNameVi": null,
-    "companyNameEn": "HUNG TA INSTRUMENT CO.,LTD- VPDD TAI VIETNAM",
+    "companyNameEn": "HUNG TA INSTRUMENT CO.,LTD",
     "country": "TW",
     "industry": null,
     "region": "Ho Chi Minh City",
@@ -11401,8 +11447,7 @@
     "industry": "machinery",
     "region": "Dong Nai",
     "addresses": [
-      "So 6, Duong 3A, KCN Bien Hoa II,",
-      "Phuong Long Hung, Tinh Dong Nai",
+      "So 6, Duong 3A, KCN Bien Hoa II, Phuong Long Hung, Tinh Dong Nai",
       "VPDD HCM: So 1738, Vo Van Kiet, Phuong An Lac, TP.HCM",
       "BAC NINH: KCN Que Vo Mo Rong, Phuong Phuong Lieu, Tinh Bac Ninh"
     ],
@@ -12255,7 +12300,7 @@
   {
     "companyNameZh": "中石化化工銷售（香港）有限公司越南辦事處",
     "companyNameVi": null,
-    "companyNameEn": "SINOPEC CHEMICAL COMMERCIAL HOLDING (HONGKONG) CO.,LTD - VPDD TAI HCM",
+    "companyNameEn": "SINOPEC CHEMICAL COMMERCIAL HOLDING (HONGKONG) CO.,LTD",
     "country": "HK",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -12307,7 +12352,7 @@
   {
     "companyNameZh": "中國石油國際事業公司越南辦事處",
     "companyNameVi": null,
-    "companyNameEn": "PETROCHINA INTERNATIONAL CO.,LTD - VPDD TAI HCM",
+    "companyNameEn": "PETROCHINA INTERNATIONAL CO.,LTD",
     "country": "CN",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -12363,7 +12408,7 @@
   {
     "companyNameZh": "台灣塑膠工業股份有限公司越南辦事處",
     "companyNameVi": null,
-    "companyNameEn": "FORMOSA PLASTICS CORPORATION VPDD TAI HCM",
+    "companyNameEn": "FORMOSA PLASTICS CORPORATION",
     "country": "TW",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -12755,7 +12800,7 @@
   {
     "companyNameZh": "首華公司",
     "companyNameVi": null,
-    "companyNameEn": "CHIYOWA TSUSHO CORPORATION LIMITED - VPDD TP.HCM",
+    "companyNameEn": "CHIYOWA TSUSHO CORPORATION LIMITED",
     "country": "TW",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -13807,6 +13852,63 @@
     "id": "2c3a81c1-62c2-5e73-bd36-724d70f72056"
   },
   {
+    "companyNameZh": "籌春（越南）實業有限公司",
+    "companyNameVi": "CONG TY TNHH THO XUAN (VIET NAM)",
+    "companyNameEn": "CHOU CHUN INDUSTRIAL CO.,LTD",
+    "country": "TW",
+    "industry": null,
+    "region": "Tay Ninh",
+    "addresses": [
+      "Duong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh"
+    ],
+    "taxId": "3900357921",
+    "companyContacts": [
+      {
+        "type": "tel",
+        "value": "0276-3896918"
+      },
+      {
+        "type": "fax",
+        "value": "0276-3896920"
+      },
+      {
+        "type": "email",
+        "value": "alex.chen@chouchunasia.com"
+      },
+      {
+        "type": "email",
+        "value": "alexnvivian@chouchunasia.com"
+      },
+      {
+        "type": "website",
+        "value": "https://www.chouchunasia.com"
+      }
+    ],
+    "_flags": [],
+    "description": "各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發",
+    "userContacts": [
+      {
+        "name": "陳軒字",
+        "phone": "0908-782158"
+      },
+      {
+        "name": "王葦芩",
+        "phone": "0908-613076"
+      }
+    ],
+    "_raw": {
+      "names": "籌春（越南）實業有限公司CHOU CHUN INDUSTRIAL CO.,LTD\nCONG TY TNHH THO XUAN (VIET NAM)\n（台灣）\n---\n籌春（越南）實業有限公司CHOU CHUN INDUSTRIAL CO.,LTD\nCONG TY TNHH THO XUAN (VIET NAM)\n（台灣）",
+      "contacts": "陳軒字\n0908-782158\n王葦芩\n0908-613076\n---\n陳軒字\n0908-782158\n王葦芩\n0908-613076",
+      "details": "Duong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh\nTel: 0276-3896918\nFax: 0276-3896920\nMST: 3900357921\nEmail: alex.chen@chouchunasia.com\nalexnvivian@chouchunasia.com\nWebsite: www.chouchunasia.com\n---\nDuong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh\nTel: 0276-3896918\nFax: 0276-3896920\nMST: 3900357921\nEmail: alex.chen@chouchunasia.com\nalexnvivian@chouchunasia.com\nWebsite: www.chouchunasia.com",
+      "description": "各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發\n---\n各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發"
+    },
+    "industries": [
+      "plastic",
+      "metal"
+    ],
+    "id": "0797737d-1cb1-5871-88ea-19e84392b60b"
+  },
+  {
     "companyNameZh": "新億責任有限公司",
     "companyNameVi": "CONG TY TNHH MTV TAN TY",
     "companyNameEn": "NEW YIH CO.,LTD",
@@ -14203,54 +14305,6 @@
       "other"
     ],
     "id": "7eca9d53-0564-5f35-8165-6ae0815b0c64"
-  },
-  {
-    "companyNameZh": "新南北茶葉責任有限公司CONG TY TNHH",
-    "companyNameVi": null,
-    "companyNameEn": "CHE BIEN TRA TAN NAM BAC",
-    "country": "TW",
-    "industry": "agriculture",
-    "region": "Ho Chi Minh City",
-    "addresses": [
-      "So 861, Quoc lo 1A, Phuong Thoi An, TP.HCM"
-    ],
-    "taxId": "0303640150",
-    "companyContacts": [
-      {
-        "type": "hotline",
-        "value": "0919-667768"
-      },
-      {
-        "type": "tel",
-        "value": "028-37169081"
-      },
-      {
-        "type": "email",
-        "value": "info@nnst.vn"
-      },
-      {
-        "type": "website",
-        "value": "https://nnst.vn"
-      }
-    ],
-    "_flags": [],
-    "description": "收購,生産製造各種茶葉,種植茉莉花造花香料,食品,茶葉罐,包裝罐",
-    "userContacts": [
-      {
-        "name": "吳活明",
-        "phone": "0913-865515"
-      }
-    ],
-    "_raw": {
-      "names": "新南北茶葉責任有限公司CONG TY TNHH\nCHE BIEN TRA TAN NAM BAC\n（台灣）",
-      "contacts": "吳活明\n0913-865515\nHotline:\n0919-667768",
-      "details": "So 861, Quoc lo 1A, Phuong Thoi An, TP.HCM\nTel: 028-37169081\nMST: 0303640150\nEmail: info@nnst.vn\nWeb: nnst.vn",
-      "description": "收購,生産製造各種茶葉,種植茉莉花造花香料,食品,茶葉罐,包裝罐"
-    },
-    "industries": [
-      "agriculture"
-    ],
-    "id": "5fee3b33-d16d-5bb6-8691-0b9082f12ac4"
   },
   {
     "companyNameZh": "金泰（越南）責任有限公司",
@@ -15005,7 +15059,7 @@
     "_raw": {
       "names": "PEB預制鋼結構建築公司\nPEB STEEL CO.,LTD\nCONG TY TNHH THEP PEB\n（台灣）",
       "contacts": "林寓輝\n0909-891218\n張瑋強\n0908-808211",
-      "details": "Unit 701, Lau 7, Menas Mall Saigon Airport, 60A Truong Son, Phuong Tan Son Hoa, TP.HCM\nTel: 028-38475475\nFax: 028-38476476\nMST: 3500684522\nEmail: HYPERLINK \"mailto:lim@pebsteel.com.vn\nTVC@PEBSteel.com.vn\"lim@pebsteel.com.vn\ntvc@pebsteel.com.vn\nWeb: www.pebsteel.com",
+      "details": "Unit 701, Lau 7, Menas Mall Saigon Airport, 60A Truong Son, Phuong Tan Son Hoa, TP.HCM\nTel: 028-38475475\nFax: 028-38476476\nMST: 3500684522\nEmail:\nlim@pebsteel.com.vn\ntvc@pebsteel.com.vn\nWeb: www.pebsteel.com",
       "description": "預製輕鋼架結構、安裝、供應、生產、設計"
     },
     "industries": [
@@ -15261,7 +15315,7 @@
   {
     "companyNameZh": "寳鋼新加坡有限公司越南代表處",
     "companyNameVi": null,
-    "companyNameEn": "BAOSTEEL SINGAPORE PTE LTD -VPDD TAI TP.HCM",
+    "companyNameEn": "BAOSTEEL SINGAPORE PTE LTD",
     "country": "SG",
     "industry": "metal",
     "region": "Ho Chi Minh City",
@@ -15895,6 +15949,50 @@
     "id": "f172c8a1-d4f4-5a46-9418-e35499a225b3"
   },
   {
+    "companyNameZh": "A-PLUS責任有限公司",
+    "companyNameVi": null,
+    "companyNameEn": "A-PLUS CO.,LTD",
+    "country": "TW",
+    "industry": "metal",
+    "region": "Dong Nai",
+    "addresses": [
+      "Khu 2, Ap Binh Thach, Phuong Tan Trieu, Tinh Dong Nai"
+    ],
+    "taxId": "3601716273",
+    "companyContacts": [
+      {
+        "type": "tel",
+        "value": "0837-556111"
+      },
+      {
+        "type": "email",
+        "value": "shipping@a-pluscoltd.com.vn"
+      }
+    ],
+    "_flags": [],
+    "description": "加工生產螺絲、釘子、模具、各類五金產品",
+    "userContacts": [
+      {
+        "name": "郭志誠",
+        "phone": null
+      },
+      {
+        "name": "黃燕美",
+        "phone": "0946-550348"
+      }
+    ],
+    "_raw": {
+      "names": "A-PLUS責任有限公司A-PLUS CO.,LTD\n（台灣）",
+      "contacts": "郭志誠\n黃燕美\n0946-550348",
+      "details": "Khu 2, Ap Binh Thach, Phuong Tan Trieu, Tinh Dong Nai\nTel: 0837-556111\nMST: 3601716273\nEmail:\nshipping@a-pluscoltd.com.vn",
+      "description": "加工生產螺絲、釘子、模具、各類五金產品"
+    },
+    "industries": [
+      "metal"
+    ],
+    "id": "3ba4809e-667a-5a39-8ed3-e2461866cdf1"
+  },
+  {
     "companyNameZh": "正大責任有限公司",
     "companyNameVi": "CONG TY TNHH CHANH DAI",
     "companyNameEn": "JENDA CO.,LTD",
@@ -16204,7 +16302,7 @@
       }
     ],
     "_raw": {
-      "names": "越南紮米爾鋼結構公司\nZAMIL STEEL BUILDINGS VIETNAM CO.,LTD\n（ HYPERLINK \"https://zh.wikipedia.org/zh-hant/%E6%B2%99%E7%89%B9%E9%98%BF%E6%8B%89%E4%BC%AF\" 沙烏地阿拉伯）",
+      "names": "越南紮米爾鋼結構公司\nZAMIL STEEL BUILDINGS VIETNAM CO.,LTD\n（沙烏地阿拉伯）",
       "contacts": "Mr. Hung\n0906-208008",
       "details": "Khu cong nghiep Noi Bai, Xa Soc Son, TP.Ha Noi\nTel: 024-38378522\nMST: 0100680623\nEmail: zsv.marketing@zamilsteel.com\nWebsite: www.zamilsteel.com.vn",
       "description": "鋼架結構"
@@ -16715,7 +16813,7 @@
   {
     "companyNameZh": "上海CMIC機電產品有限公司",
     "companyNameVi": null,
-    "companyNameEn": "SHANGHAI CMIC MACHINERY AND ELICTRICAL PRODUCTS CO.,LTD-VPDD TAI HCM",
+    "companyNameEn": "SHANGHAI CMIC MACHINERY AND ELICTRICAL PRODUCTS CO.,LTD",
     "country": "CN",
     "industry": "paper",
     "region": "Ho Chi Minh City",
@@ -21521,6 +21619,59 @@
     "id": "74d9836b-e476-5abc-ae79-4ef5812fdcd1"
   },
   {
+    "companyNameZh": "三井住友海上保險集團越南子公司",
+    "companyNameVi": null,
+    "companyNameEn": "MSIG INSURANCE (VIETNAM) COMPANY LIMITED",
+    "country": "JP",
+    "industry": "finance",
+    "region": "Ho Chi Minh City",
+    "addresses": [
+      "HCM: Tang 15, toa nha The Hallark, 15 Tran Bach Dang, Phuong An Khanh, TP.HCM",
+      "Tang 10, Toa nha CornerStone, 16 Phan Chu Trinh, Phuong Cua Nam, TP.Ha Noi"
+    ],
+    "taxId": null,
+    "companyContacts": [
+      {
+        "type": "tel",
+        "value": "028-38219030"
+      },
+      {
+        "type": "email",
+        "value": "delphi_chiang@vn.msig-asia.com"
+      },
+      {
+        "type": "tel",
+        "value": "024-39369188"
+      },
+      {
+        "type": "tel",
+        "value": "024-39369200"
+      },
+      {
+        "type": "website",
+        "value": "https://www.msig.com.vn"
+      }
+    ],
+    "_flags": [],
+    "description": "產物保險服務",
+    "userContacts": [
+      {
+        "name": "江明憲",
+        "phone": "0913-903557"
+      }
+    ],
+    "_raw": {
+      "names": "三井住友海上保險集團越南子公司MSIG INSURANCE (VIETNAM) COMPANY LIMITED\n（日本）",
+      "contacts": "江明憲\n0913-903557",
+      "details": "HCM: Tang 15, toa nha The Hallark, 15 Tran Bach Dang, Phuong An Khanh, TP.HCM\nTel: 028-38219030\nEmail:\ndelphi_chiang@vn.msig-asia.com\nTang 10, Toa nha CornerStone, 16 Phan Chu Trinh, Phuong Cua Nam, TP.Ha Noi\nTel: 024-39369188~200\nWebsite: www.msig.com.vn",
+      "description": "產物保險服務"
+    },
+    "industries": [
+      "finance"
+    ],
+    "id": "3e53b3e1-2656-53e6-be3e-81d3d7ba75de"
+  },
+  {
     "companyNameZh": "越南航海商業股份銀行",
     "companyNameVi": null,
     "companyNameEn": "VIETNAM MARITIME COMMERCIAL JOINT STOCK BANK",
@@ -25990,7 +26141,7 @@
   {
     "companyNameZh": "滙益管理顧問有限公司胡志明市代表處",
     "companyNameVi": null,
-    "companyNameEn": "HUI YI MANAGEMENT CONSULTANT LTD-VPDD HCM",
+    "companyNameEn": "HUI YI MANAGEMENT CONSULTANT LTD",
     "country": "TW",
     "industry": "other",
     "region": "Ho Chi Minh City",
@@ -26940,6 +27091,55 @@
       "other"
     ],
     "id": "68d769e7-e93d-5015-9b2f-311b7eaac588"
+  },
+  {
+    "companyNameZh": "中國檢驗認證集團越南有限公司",
+    "companyNameVi": null,
+    "companyNameEn": "CCIC VIETNAM CERTIFICATION AND INSPECTION CO.,LTD",
+    "country": "CN",
+    "industry": "other",
+    "region": "Ho Chi Minh City",
+    "addresses": [
+      "Tang 16, Toa nha Mapletree, 1060 Nguyen Van Linh, Phuong Tan Hung, TP.HCM",
+      "Tang 3, Toa nha Phu Tai, So 278 Nguyen Thi Dinh, Phuong Quy Nhon Nam, Tinh Gia Lai"
+    ],
+    "taxId": "4101399525-001",
+    "companyContacts": [
+      {
+        "type": "tel",
+        "value": "028-73030468"
+      },
+      {
+        "type": "email",
+        "value": "liang.derong@ccicsg.com"
+      },
+      {
+        "type": "email",
+        "value": "ccicvn@ccicsg.com"
+      },
+      {
+        "type": "website",
+        "value": "https://www.cichk.com.hk"
+      }
+    ],
+    "_flags": [],
+    "description": "各類貿易貨物檢驗",
+    "userContacts": [
+      {
+        "name": "梁德榮",
+        "phone": "0918-776199"
+      }
+    ],
+    "_raw": {
+      "names": "中國檢驗認證集團越南有限公司CCIC VIETNAM CERTIFICATION AND INSPECTION CO.,LTD\n（中國）",
+      "contacts": "梁德榮\n0918-776199",
+      "details": "Tang 16, Toa nha Mapletree, 1060 Nguyen Van Linh, Phuong Tan Hung, TP.HCM\nTel: 028-73030468\nMST: 4101399525-001\nEmail: liang.derong@ccicsg.com\nccicvn@ccicsg.com\nTang 3, Toa nha Phu Tai, So 278 Nguyen Thi Dinh, Phuong Quy Nhon Nam, Tinh Gia Lai\nWeb: www.cichk.com.hk",
+      "description": "各類貿易貨物檢驗"
+    },
+    "industries": [
+      "other"
+    ],
+    "id": "50e91514-31d5-554f-8a30-7ea1597edf11"
   },
   {
     "companyNameZh": "怡安風險顧問集團越南怡安公司",
@@ -29918,7 +30118,7 @@
   {
     "companyNameZh": null,
     "companyNameVi": null,
-    "companyNameEn": "STARKWELL TECHNOLOGY PTE.LTD - VPDD TAI HA NOI",
+    "companyNameEn": "STARKWELL TECHNOLOGY PTE.LTD",
     "country": "SG",
     "industry": "machinery",
     "region": "Ha Noi",
@@ -30495,7 +30695,7 @@
   {
     "companyNameZh": null,
     "companyNameVi": null,
-    "companyNameEn": "VINMAR INTERNATIONAL LTD-VPDD HCM",
+    "companyNameEn": "VINMAR INTERNATIONAL LTD",
     "country": "US",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -38437,8 +38637,8 @@
     "id": "7540f3a2-7260-5cd1-be2a-0237338f8080"
   },
   {
-    "companyNameZh": "祥發針織染整印花製衣貿易有限公司CONG TY TNHH MTV DET NHUOM IN BONG VA MAY MAC TUONG PHAT",
-    "companyNameVi": null,
+    "companyNameZh": "祥發針織染整印花製衣貿易有限公司",
+    "companyNameVi": "CONG TY TNHH MTV DET NHUOM IN BONG VA MAY MAC TUONG PHAT",
     "companyNameEn": null,
     "country": "VN",
     "industry": "textile",
@@ -43457,8 +43657,7 @@
     "industry": "textile",
     "region": "Dong Nai",
     "addresses": [
-      "So 30A, Duong 3B, KCN AMATA,",
-      "Phuong Long Binh, Tinh Dong Nai"
+      "So 30A, Duong 3B, KCN AMATA, Phuong Long Binh, Tinh Dong Nai"
     ],
     "taxId": "3600938918",
     "companyContacts": [
@@ -53745,54 +53944,6 @@
     "id": "f51881b9-adca-5438-850c-c1b8004b90d7"
   },
   {
-    "companyNameZh": "群展責任有限公司CHYUN JAAN ENTERPRISE CO.,LTD",
-    "companyNameVi": null,
-    "companyNameEn": null,
-    "country": "TW",
-    "industry": "shoes",
-    "region": "Other",
-    "addresses": [
-      "Lo L3+4, KCN Nam Sach, Phuong Ai Quoc, TP.Hai Phong"
-    ],
-    "taxId": "0800282603",
-    "companyContacts": [
-      {
-        "type": "tel",
-        "value": "0220-3753026"
-      },
-      {
-        "type": "tel",
-        "value": "0220-3753034"
-      },
-      {
-        "type": "email",
-        "value": "chyunjann2004@yahoo.com.tw"
-      }
-    ],
-    "_flags": [],
-    "description": "鞋材",
-    "userContacts": [
-      {
-        "name": "高光隆",
-        "phone": null
-      },
-      {
-        "name": "賴坤捷",
-        "phone": "0904-182500"
-      }
-    ],
-    "_raw": {
-      "names": "群展責任有限公司CHYUN JAAN ENTERPRISE CO.,LTD\n（台灣）",
-      "contacts": "高光隆\n賴坤捷\n0904-182500",
-      "details": "Lo L3+4, KCN Nam Sach, Phuong Ai Quoc, TP.Hai Phong\nTel: 0220-3753026~3034\nMST: 0800282603\nEmail: chyunjann2004@yahoo.com.tw",
-      "description": "鞋材"
-    },
-    "industries": [
-      "shoes"
-    ],
-    "id": "5b75263f-9402-5398-8241-1250ce063d6a"
-  },
-  {
     "companyNameZh": "萬邦（越南）鞋業有限公司",
     "companyNameVi": "CONG TY TNHH GIAY APACHE VIET NAM",
     "companyNameEn": null,
@@ -58963,8 +59114,8 @@
     "id": "b3054e38-fe7c-5b3b-b259-cc1d15165cf2"
   },
   {
-    "companyNameZh": "禾達（越南）腳輪工業有限公司CONG TY TNHH CONG NGHIEP BANH XE DAY HERDAR (VIET NAM)",
-    "companyNameVi": null,
+    "companyNameZh": "禾達（越南）腳輪工業有限公司",
+    "companyNameVi": "CONG TY TNHH CONG NGHIEP BANH XE DAY HERDAR (VIET NAM)",
     "companyNameEn": null,
     "country": "TW",
     "industry": "vehicle",
@@ -64137,8 +64288,8 @@
     "id": "ff4503ed-7157-5d8b-9dc4-5683ace985f6"
   },
   {
-    "companyNameZh": "黃通木業有限公司CONG TY TNHH MTV GO HOANG THONG",
-    "companyNameVi": null,
+    "companyNameZh": "黃通木業有限公司",
+    "companyNameVi": "CONG TY TNHH MTV GO HOANG THONG",
     "companyNameEn": null,
     "country": "CN",
     "industry": "furniture",
@@ -64183,7 +64334,7 @@
     "industries": [
       "furniture"
     ],
-    "id": "79cf6159-e9bf-5ccb-aa1b-0991b0f8ac1f"
+    "id": "0c1c9577-a590-50c1-9602-564895543014"
   },
   {
     "companyNameZh": "盈德實業股份有限公司",
@@ -70123,8 +70274,8 @@
     "id": "189aaf94-20ff-578e-8a22-e42ca47ea604"
   },
   {
-    "companyNameZh": "工業及民用設計諮詢股份公司CONG TY CP TU VAN THIET KE CONG NGHIEP VA DAN DUNG – IDCO",
-    "companyNameVi": null,
+    "companyNameZh": "工業及民用設計諮詢股份公司",
+    "companyNameVi": "CONG TY CP TU VAN THIET KE CONG NGHIEP VA DAN DUNG – IDCO",
     "companyNameEn": null,
     "country": "VN",
     "industry": "construction",
@@ -71972,8 +72123,8 @@
     "id": "f96d31fe-e2d4-5b18-a04b-564219c16b3f"
   },
   {
-    "companyNameZh": "唐城越南建築有限公司CONG TY TNHH XD DUONG THANH (VN)",
-    "companyNameVi": null,
+    "companyNameZh": "唐城越南建築有限公司",
+    "companyNameVi": "CONG TY TNHH XD DUONG THANH (VN)",
     "companyNameEn": null,
     "country": "TW",
     "industry": "construction",
@@ -72897,8 +73048,8 @@
     "id": "1488eec4-141b-5294-9b0a-30dc731f85be"
   },
   {
-    "companyNameZh": "越南建築諮詢總公司南越分公司TONG CONG TY TU VAN XAY DUNG VIET NAM-CTCP",
-    "companyNameVi": null,
+    "companyNameZh": "越南建築諮詢總公司南越分公司",
+    "companyNameVi": "TONG CONG TY TU VAN XAY DUNG VIET NAM-CTCP",
     "companyNameEn": null,
     "country": "TW",
     "industry": "construction",
@@ -80784,8 +80935,8 @@
     "id": "9846bb42-ab55-540e-bcff-41d32099e83f"
   },
   {
-    "companyNameZh": "和泰興業股份公司CONG TY CO PHAN HUNG NGHIEP HOA THAI",
-    "companyNameVi": null,
+    "companyNameZh": "和泰興業股份公司",
+    "companyNameVi": "CONG TY CO PHAN HUNG NGHIEP HOA THAI",
     "companyNameEn": null,
     "country": "TW",
     "industry": "construction",
@@ -83811,6 +83962,42 @@
     "id": "9ecb58b5-aec8-5034-9bb6-8eb2ec7a967b"
   },
   {
+    "companyNameZh": "鼎鉅電子股份有限公司",
+    "companyNameVi": "CONG TY TNHH DICH VU BAN HANG TU DONG V RICH",
+    "companyNameEn": null,
+    "country": "TW",
+    "industry": "electronics",
+    "region": "Ho Chi Minh City",
+    "addresses": [
+      "507 An Duong Vuong, Phuong An Lac, TP.HCM"
+    ],
+    "taxId": "0315896502",
+    "companyContacts": [
+      {
+        "type": "email",
+        "value": "rickchang56@yahoo.com.tw"
+      }
+    ],
+    "_flags": [],
+    "description": "自動販賣機銷售",
+    "userContacts": [
+      {
+        "name": "張永祥",
+        "phone": "0934-146951"
+      }
+    ],
+    "_raw": {
+      "names": "鼎鉅電子股份有限公司\nCONG TY TNHH DICH VU BAN HANG TU DONG V RICH\n（台灣）",
+      "contacts": "張永祥\n0934-146951",
+      "details": "507 An Duong Vuong, Phuong An Lac, TP.HCM\nMST: 0315896502\nEmail: rickchang56@yahoo.com.tw",
+      "description": "自動販賣機銷售"
+    },
+    "industries": [
+      "electronics"
+    ],
+    "id": "f3d165ff-80ce-57f2-b2de-07bd5dd82037"
+  },
+  {
     "companyNameZh": "橘子亞洲責任有限公司",
     "companyNameVi": "CONG TY TNHH CLOCK WORK ORANGE ASIA",
     "companyNameEn": null,
@@ -84260,7 +84447,7 @@
     "id": "9ffafd48-d8c1-55ce-8ea6-4e5d2b1d6257"
   },
   {
-    "companyNameZh": "安普新國際責任有限公司 XE \"墾青拉鍊責任有限公司\"",
+    "companyNameZh": "安普新國際責任有限公司",
     "companyNameVi": "CONG TY TNHH AMPACS INTERNATIONAL",
     "companyNameEn": null,
     "country": "TW",
@@ -84305,7 +84492,7 @@
       }
     ],
     "_raw": {
-      "names": "安普新國際責任有限公司 XE \"墾青拉鍊責任有限公司\"\nCONG TY TNHH AMPACS INTERNATIONAL\n（台灣）",
+      "names": "安普新國際責任有限公司\nCONG TY TNHH AMPACS INTERNATIONAL\n（台灣）",
       "contacts": "黃偉文\n0865-303580\nHotline:\n0936-035336",
       "details": "Lo B7 H_CN, KCN Bau Bang, Xa Bau Bang, TP.HCM\nTel: 0274-3803700\nFax: 0274-3803701\nMST: 3702768704\nEmail: kevin.huang@ampasscorp.com.vn\nTranmynhien@ampacs.com.vn\nWebsite: www.ampacs.com.vn",
       "description": "耳機，遊戲耳機，辦公室耳機"
@@ -86437,8 +86624,8 @@
     "id": "256cb71c-2df3-5628-a60a-179631433f9b"
   },
   {
-    "companyNameZh": "中望（越南）軟件有限公司CONG TY TNHH ZWSOFT VIET NAM",
-    "companyNameVi": null,
+    "companyNameZh": "中望（越南）軟件有限公司",
+    "companyNameVi": "CONG TY TNHH ZWSOFT VIET NAM",
     "companyNameEn": null,
     "country": "TW",
     "industry": "electronics",
@@ -94810,8 +94997,8 @@
     "id": "10ab1816-6602-5787-a904-629a74c6c886"
   },
   {
-    "companyNameZh": "合風責任有限公司CONG TY TNHH THUONG MAI DICH VU HOP PHONG",
-    "companyNameVi": null,
+    "companyNameZh": "合風責任有限公司",
+    "companyNameVi": "CONG TY TNHH THUONG MAI DICH VU HOP PHONG",
     "companyNameEn": null,
     "country": "TW",
     "industry": "machinery",
@@ -95168,8 +95355,8 @@
     "id": "226aa21f-693b-587f-977f-591a77587722"
   },
   {
-    "companyNameZh": "林武工業責任有限公司CONG TY TNHH CONG NGHIEP LAM VU",
-    "companyNameVi": null,
+    "companyNameZh": "林武工業責任有限公司",
+    "companyNameVi": "CONG TY TNHH CONG NGHIEP LAM VU",
     "companyNameEn": null,
     "country": "TW",
     "industry": "machinery",
@@ -95473,8 +95660,8 @@
     "id": "0effaa4d-6e1b-5b3e-bcc5-5f158a3ecc6a"
   },
   {
-    "companyNameZh": "高登電機有限公司CONG TY TNHH DIEN GORDON",
-    "companyNameVi": null,
+    "companyNameZh": "高登電機有限公司",
+    "companyNameVi": "CONG TY TNHH DIEN GORDON",
     "companyNameEn": null,
     "country": "TW",
     "industry": "machinery",
@@ -95952,8 +96139,8 @@
     "id": "9e0d9bed-4b84-5e3a-ba34-3f5ab94d795a"
   },
   {
-    "companyNameZh": "廣興責任有限公司CONG TY TNHH CONG HUNG",
-    "companyNameVi": null,
+    "companyNameZh": "廣興責任有限公司",
+    "companyNameVi": "CONG TY TNHH CONG HUNG",
     "companyNameEn": null,
     "country": null,
     "industry": "machinery",
@@ -100856,7 +101043,7 @@
   {
     "companyNameZh": "浙江傳化股份有限公司",
     "companyNameVi": null,
-    "companyNameEn": "TRANSFAR INTERNATIONAL GROUP (HONGKONG) LIMITED-VPDD TP.HCM",
+    "companyNameEn": "TRANSFAR INTERNATIONAL GROUP (HONGKONG) LIMITED",
     "country": "HK",
     "industry": "plastic",
     "region": "Ho Chi Minh City",
@@ -101416,14 +101603,6 @@
       },
       {
         "type": "email",
-        "value": "thanhliem@messer.com.vn"
-      },
-      {
-        "type": "website",
-        "value": "https://www.messer.com.vn"
-      },
-      {
-        "type": "email",
         "value": "giakiet@messer.com.vn"
       }
     ],
@@ -101442,7 +101621,7 @@
     "_raw": {
       "names": "梅塞爾（越南）工業氣體有限公司\nCONG TY TNHH KHI CONG NGHIEP MESSER VIET NAM\n（新加坡）",
       "contacts": "林衛國\n0338-558888\n何家傑\n0903-542726",
-      "details": "So 21, duong so 3, KCN Viet Nam – Singapore, Phuong Binh Hoa, TP.HCM\nTel: 0274-3756700\nMST: 3700262207\nEmail: HYPERLINK \"mailto:victor.lim@messer.com.vn\nthanhliem@messer.com.vn\nWeb: www.messer.com.vn \" victor.lim@messer.com.vn\ngiakiet@messer.com.vn",
+      "details": "So 21, duong so 3, KCN Viet Nam – Singapore, Phuong Binh Hoa, TP.HCM\nTel: 0274-3756700\nMST: 3700262207\nEmail:\nvictor.lim@messer.com.vn\ngiakiet@messer.com.vn",
       "description": "Argon、O2、CO2等工業氣體及特殊氣體、設備買賣"
     },
     "industries": [
@@ -106846,63 +107025,6 @@
     "id": "abe579a7-3668-52ee-805a-105cff97148e"
   },
   {
-    "companyNameZh": "籌春（越南）實業有限公司CHOU CHUN INDUSTRIAL CO.,LTD",
-    "companyNameVi": "CONG TY TNHH THO XUAN (VIET NAM)",
-    "companyNameEn": null,
-    "country": "TW",
-    "industry": null,
-    "region": "Tay Ninh",
-    "addresses": [
-      "Duong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh"
-    ],
-    "taxId": "3900357921",
-    "companyContacts": [
-      {
-        "type": "tel",
-        "value": "0276-3896918"
-      },
-      {
-        "type": "fax",
-        "value": "0276-3896920"
-      },
-      {
-        "type": "email",
-        "value": "alex.chen@chouchunasia.com"
-      },
-      {
-        "type": "email",
-        "value": "alexnvivian@chouchunasia.com"
-      },
-      {
-        "type": "website",
-        "value": "https://www.chouchunasia.com"
-      }
-    ],
-    "_flags": [],
-    "description": "各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發",
-    "userContacts": [
-      {
-        "name": "陳軒字",
-        "phone": "0908-782158"
-      },
-      {
-        "name": "王葦芩",
-        "phone": "0908-613076"
-      }
-    ],
-    "_raw": {
-      "names": "籌春（越南）實業有限公司CHOU CHUN INDUSTRIAL CO.,LTD\nCONG TY TNHH THO XUAN (VIET NAM)\n（台灣）\n---\n籌春（越南）實業有限公司CHOU CHUN INDUSTRIAL CO.,LTD\nCONG TY TNHH THO XUAN (VIET NAM)\n（台灣）",
-      "contacts": "陳軒字\n0908-782158\n王葦芩\n0908-613076\n---\n陳軒字\n0908-782158\n王葦芩\n0908-613076",
-      "details": "Duong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh\nTel: 0276-3896918\nFax: 0276-3896920\nMST: 3900357921\nEmail: alex.chen@chouchunasia.com\nalexnvivian@chouchunasia.com\nWebsite: www.chouchunasia.com\n---\nDuong so 7, KCN Trang Bang, Phuong An Tinh, Tinh Tay Ninh\nTel: 0276-3896918\nFax: 0276-3896920\nMST: 3900357921\nEmail: alex.chen@chouchunasia.com\nalexnvivian@chouchunasia.com\nWebsite: www.chouchunasia.com",
-      "description": "各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發\n---\n各種金屬表面前處理藥劑/特殊電鍍及專業諮詢服務和研發"
-    },
-    "industries": [
-      "plastic",
-      "metal"
-    ],
-    "id": "0797737d-1cb1-5871-88ea-19e84392b60b"
-  },
-  {
     "companyNameZh": "順安環保科技有限公司",
     "companyNameVi": "CONG TY TNHH SHUN AN ENVIRONMENT TECHNOLOGY",
     "companyNameEn": null,
@@ -109497,6 +109619,54 @@
       "agriculture"
     ],
     "id": "57774165-77ae-5e96-8ffa-d9ed642ce028"
+  },
+  {
+    "companyNameZh": "新南北茶葉責任有限公司",
+    "companyNameVi": "CONG TY TNHH CHE BIEN TRA TAN NAM BAC",
+    "companyNameEn": null,
+    "country": "TW",
+    "industry": "agriculture",
+    "region": "Ho Chi Minh City",
+    "addresses": [
+      "So 861, Quoc lo 1A, Phuong Thoi An, TP.HCM"
+    ],
+    "taxId": "0303640150",
+    "companyContacts": [
+      {
+        "type": "hotline",
+        "value": "0919-667768"
+      },
+      {
+        "type": "tel",
+        "value": "028-37169081"
+      },
+      {
+        "type": "email",
+        "value": "info@nnst.vn"
+      },
+      {
+        "type": "website",
+        "value": "https://nnst.vn"
+      }
+    ],
+    "_flags": [],
+    "description": "收購,生産製造各種茶葉,種植茉莉花造花香料,食品,茶葉罐,包裝罐",
+    "userContacts": [
+      {
+        "name": "吳活明",
+        "phone": "0913-865515"
+      }
+    ],
+    "_raw": {
+      "names": "新南北茶葉責任有限公司CONG TY TNHH\nCHE BIEN TRA TAN NAM BAC\n（台灣）",
+      "contacts": "吳活明\n0913-865515\nHotline:\n0919-667768",
+      "details": "So 861, Quoc lo 1A, Phuong Thoi An, TP.HCM\nTel: 028-37169081\nMST: 0303640150\nEmail: info@nnst.vn\nWeb: nnst.vn",
+      "description": "收購,生産製造各種茶葉,種植茉莉花造花香料,食品,茶葉罐,包裝罐"
+    },
+    "industries": [
+      "agriculture"
+    ],
+    "id": "5fee3b33-d16d-5bb6-8691-0b9082f12ac4"
   },
   {
     "companyNameZh": "億兆興企業有限公司",
@@ -112277,8 +112447,8 @@
     "id": "b110c764-d082-5a14-9a8d-762d88dd21a8"
   },
   {
-    "companyNameZh": "瑞徠富股份有限公司CONG TY TNHH PETLIFE",
-    "companyNameVi": null,
+    "companyNameZh": "瑞徠富股份有限公司",
+    "companyNameVi": "CONG TY TNHH PETLIFE",
     "companyNameEn": null,
     "country": "TW",
     "industry": "agriculture",
@@ -116482,8 +116652,8 @@
     "id": "86cb0080-3335-54c8-a465-979c77d63a88"
   },
   {
-    "companyNameZh": "越南自奧有限公司CONG TY TNHH ZHIAO VIET NAM",
-    "companyNameVi": null,
+    "companyNameZh": "越南自奧有限公司",
+    "companyNameVi": "CONG TY TNHH ZHIAO VIET NAM",
     "companyNameEn": null,
     "country": "CN",
     "industry": "metal",
@@ -118592,50 +118762,6 @@
       "metal"
     ],
     "id": "16662fde-1dd7-594f-ac1f-8af5bc48d5dd"
-  },
-  {
-    "companyNameZh": "A-PLUS責任有限公司A-PLUS CO.,LTD",
-    "companyNameVi": null,
-    "companyNameEn": null,
-    "country": "TW",
-    "industry": "metal",
-    "region": "Dong Nai",
-    "addresses": [
-      "Khu 2, Ap Binh Thach, Phuong Tan Trieu, Tinh Dong Nai"
-    ],
-    "taxId": "3601716273",
-    "companyContacts": [
-      {
-        "type": "tel",
-        "value": "0837-556111"
-      },
-      {
-        "type": "email",
-        "value": "shipping@a-pluscoltd.com.vn"
-      }
-    ],
-    "_flags": [],
-    "description": "加工生產螺絲、釘子、模具、各類五金產品",
-    "userContacts": [
-      {
-        "name": "郭志誠",
-        "phone": null
-      },
-      {
-        "name": "黃燕美",
-        "phone": "0946-550348"
-      }
-    ],
-    "_raw": {
-      "names": "A-PLUS責任有限公司A-PLUS CO.,LTD\n（台灣）",
-      "contacts": "郭志誠\n黃燕美\n0946-550348",
-      "details": "Khu 2, Ap Binh Thach, Phuong Tan Trieu, Tinh Dong Nai\nTel: 0837-556111\nMST: 3601716273\nEmail:\nshipping@a-pluscoltd.com.vn",
-      "description": "加工生產螺絲、釘子、模具、各類五金產品"
-    },
-    "industries": [
-      "metal"
-    ],
-    "id": "3ba4809e-667a-5a39-8ed3-e2461866cdf1"
   },
   {
     "companyNameZh": "三賢企業有限公司",
@@ -131777,7 +131903,7 @@
   },
   {
     "companyNameZh": "中國建設銀行胡志明分行",
-    "companyNameVi": "NGAN HANG CHINA CONSTRUCTION BANK CORPORATION - CHI NHANH TPHCM",
+    "companyNameVi": "NGAN HANG CHINA CONSTRUCTION BANK CORPORATION",
     "companyNameEn": null,
     "country": "CN",
     "industry": "finance",
@@ -132529,59 +132655,6 @@
       "finance"
     ],
     "id": "12e2fef5-66fa-57b0-b3fb-0dfe4dbd5804"
-  },
-  {
-    "companyNameZh": "三井住友海上保險集團越南子公司MSIG INSURANCE (VIETNAM) COMPANY LIMITED",
-    "companyNameVi": null,
-    "companyNameEn": null,
-    "country": "JP",
-    "industry": "finance",
-    "region": "Ho Chi Minh City",
-    "addresses": [
-      "HCM: Tang 15, toa nha The Hallark, 15 Tran Bach Dang, Phuong An Khanh, TP.HCM",
-      "Tang 10, Toa nha CornerStone, 16 Phan Chu Trinh, Phuong Cua Nam, TP.Ha Noi"
-    ],
-    "taxId": null,
-    "companyContacts": [
-      {
-        "type": "tel",
-        "value": "028-38219030"
-      },
-      {
-        "type": "email",
-        "value": "delphi_chiang@vn.msig-asia.com"
-      },
-      {
-        "type": "tel",
-        "value": "024-39369188"
-      },
-      {
-        "type": "tel",
-        "value": "024-39369200"
-      },
-      {
-        "type": "website",
-        "value": "https://www.msig.com.vn"
-      }
-    ],
-    "_flags": [],
-    "description": "產物保險服務",
-    "userContacts": [
-      {
-        "name": "江明憲",
-        "phone": "0913-903557"
-      }
-    ],
-    "_raw": {
-      "names": "三井住友海上保險集團越南子公司MSIG INSURANCE (VIETNAM) COMPANY LIMITED\n（日本）",
-      "contacts": "江明憲\n0913-903557",
-      "details": "HCM: Tang 15, toa nha The Hallark, 15 Tran Bach Dang, Phuong An Khanh, TP.HCM\nTel: 028-38219030\nEmail:\ndelphi_chiang@vn.msig-asia.com\nTang 10, Toa nha CornerStone, 16 Phan Chu Trinh, Phuong Cua Nam, TP.Ha Noi\nTel: 024-39369188~200\nWebsite: www.msig.com.vn",
-      "description": "產物保險服務"
-    },
-    "industries": [
-      "finance"
-    ],
-    "id": "08da6fc2-9173-5e34-916e-1057ee034f94"
   },
   {
     "companyNameZh": "越南投資發展銀行",
@@ -136010,8 +136083,7 @@
     "industry": "tourism",
     "region": "Ho Chi Minh City",
     "addresses": [
-      "So 105F Ngo Quyen, Phuong Cho Lon,",
-      "TP.HCM"
+      "So 105F Ngo Quyen, Phuong Cho Lon, TP.HCM"
     ],
     "taxId": "0303824334",
     "companyContacts": [
@@ -136270,8 +136342,8 @@
     "id": "b5e90b1d-89e6-5ed9-ae7b-605c884e9ab5"
   },
   {
-    "companyNameZh": "黎鋒旅遊貿易公司CONG TY TNHH DU LICH - THUONG MAI LE PHONG",
-    "companyNameVi": null,
+    "companyNameZh": "黎鋒旅遊貿易公司",
+    "companyNameVi": "CONG TY TNHH DU LICH - THUONG MAI LE PHONG",
     "companyNameEn": null,
     "country": "VN",
     "industry": "tourism",
@@ -137015,7 +137087,7 @@
     "id": "87fd3f47-27f1-5661-adb8-4644009d4b86"
   },
   {
-    "companyNameZh": "HYPERLINK \"https://www.liontravel.com/category/zh-tw/index\" 雄獅集團",
+    "companyNameZh": "雄獅集團",
     "companyNameVi": null,
     "companyNameEn": "LION GROUP",
     "country": "TW",
@@ -137048,7 +137120,7 @@
       }
     ],
     "_raw": {
-      "names": "HYPERLINK \"https://www.liontravel.com/category/zh-tw/index\" 雄獅集團\nLION GROUP\n（台灣）",
+      "names": "雄獅集團\nLION GROUP\n（台灣）",
       "contacts": "袁子閔\n+84-931310111\n+886-919321770",
       "details": "No.151, Shitan Rd., Neihu Dist., Taipei City, Taiwan\nEmail: jimmyyuan@liontravel.com\nWeb: www.liontravel.com",
       "description": "旅遊業，提供旅遊服務，團體遊、機票、飯店、交通、等服務"
@@ -137056,7 +137128,7 @@
     "industries": [
       "tourism"
     ],
-    "id": "3f2887c1-12e2-54ab-960c-159e512c072d"
+    "id": "a4c74605-33c9-5d7c-a31a-0ad02959f5bb"
   },
   {
     "companyNameZh": "建豪責任有限公司",
@@ -138581,8 +138653,8 @@
     "id": "93a0b586-5ff9-581b-a7a2-8fb3093add88"
   },
   {
-    "companyNameZh": "忠誠責任有限公司CONG TY TNHH MTV TM DV XNK XD TRUNG THANH BINH DUONG",
-    "companyNameVi": null,
+    "companyNameZh": "忠誠責任有限公司",
+    "companyNameVi": "CONG TY TNHH MTV TM DV XNK XD TRUNG THANH BINH DUONG",
     "companyNameEn": null,
     "country": "TW",
     "industry": "food",
@@ -145017,55 +145089,6 @@
       "other"
     ],
     "id": "bc1b88b5-55db-5f72-ae64-0a469d85c3bc"
-  },
-  {
-    "companyNameZh": "中國檢驗認證集團越南有限公司CCIC VIETNAM CERTIFICATION AND INSPECTION CO.,LTD",
-    "companyNameVi": null,
-    "companyNameEn": null,
-    "country": "CN",
-    "industry": "other",
-    "region": "Ho Chi Minh City",
-    "addresses": [
-      "Tang 16, Toa nha Mapletree, 1060 Nguyen Van Linh, Phuong Tan Hung, TP.HCM",
-      "Tang 3, Toa nha Phu Tai, So 278 Nguyen Thi Dinh, Phuong Quy Nhon Nam, Tinh Gia Lai"
-    ],
-    "taxId": "4101399525-001",
-    "companyContacts": [
-      {
-        "type": "tel",
-        "value": "028-73030468"
-      },
-      {
-        "type": "email",
-        "value": "liang.derong@ccicsg.com"
-      },
-      {
-        "type": "email",
-        "value": "ccicvn@ccicsg.com"
-      },
-      {
-        "type": "website",
-        "value": "https://www.cichk.com.hk"
-      }
-    ],
-    "_flags": [],
-    "description": "各類貿易貨物檢驗",
-    "userContacts": [
-      {
-        "name": "梁德榮",
-        "phone": "0918-776199"
-      }
-    ],
-    "_raw": {
-      "names": "中國檢驗認證集團越南有限公司CCIC VIETNAM CERTIFICATION AND INSPECTION CO.,LTD\n（中國）",
-      "contacts": "梁德榮\n0918-776199",
-      "details": "Tang 16, Toa nha Mapletree, 1060 Nguyen Van Linh, Phuong Tan Hung, TP.HCM\nTel: 028-73030468\nMST: 4101399525-001\nEmail: liang.derong@ccicsg.com\nccicvn@ccicsg.com\nTang 3, Toa nha Phu Tai, So 278 Nguyen Thi Dinh, Phuong Quy Nhon Nam, Tinh Gia Lai\nWeb: www.cichk.com.hk",
-      "description": "各類貿易貨物檢驗"
-    },
-    "industries": [
-      "other"
-    ],
-    "id": "50e91514-31d5-554f-8a30-7ea1597edf11"
   },
   {
     "companyNameZh": "聖鋒工業有限公司",

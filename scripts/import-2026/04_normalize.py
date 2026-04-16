@@ -133,7 +133,51 @@ for c in data:
         c.setdefault("companyContacts", []).append({"type": "email", "value": email})
     fixed_taxid += 1
 
-# ─── 5. Fix values concatenated with '"' or space separator ─────────────────
+# ─── 5. Strip office-location suffixes from company name fields ──────────────
+# Source doc appends "- VPDD TAI HCM", "- CHI NHANH TPHCM" etc. to legal names.
+# VPDD = Văn Phòng Đại Diện (Representative Office) — not part of the legal name.
+
+OFFICE_SUFFIX_RE = re.compile(
+    # Dash-separated: "CO.,LTD - VPDD TAI HCM", "CO.,LTD - CHI NHANH TPHCM"
+    r"\s*[-–—]\s*(?:VPDD|VP\b|CHI\s+NHANH|VAN\s+PHONG)\b.*$"
+    # Space-only VPDD: "CORPORATION VPDD TAI HCM" — only mid-string (lookbehind guards start)
+    r"|(?<=\S)\s+VPDD\b.*$",
+    re.IGNORECASE,
+)
+
+fixed_office_suffix = 0
+for c in data:
+    for field in ("companyNameZh", "companyNameVi", "companyNameEn"):
+        val = c.get(field)
+        if val and OFFICE_SUFFIX_RE.search(val):
+            c[field] = OFFICE_SUFFIX_RE.sub("", val).strip()
+            fixed_office_suffix += 1
+
+# ─── 6. Merge split address lines (continuation: previous line ends with comma) ─
+# Source doc sometimes wraps a single address across two lines, e.g.:
+#   "396 Zhongshan Rd, Qingshui Dist,"  +  "Taichung City, 43642 Taiwan R.O.C."
+# → "396 Zhongshan Rd, Qingshui Dist, Taichung City, 43642 Taiwan R.O.C."
+
+fixed_split_addr = 0
+for c in data:
+    addrs = c.get("addresses", [])
+    if len(addrs) < 2:
+        continue
+    merged: list[str] = []
+    i = 0
+    while i < len(addrs):
+        cur = addrs[i]
+        if cur.rstrip().endswith(",") and i + 1 < len(addrs):
+            joined = cur.rstrip() + " " + addrs[i + 1].lstrip()
+            merged.append(joined)
+            fixed_split_addr += 1
+            i += 2
+        else:
+            merged.append(cur)
+            i += 1
+    c["addresses"] = merged
+
+# ─── 7. Fix values concatenated with '"' or space separator ─────────────────
 # e.g. 'tvc@pebsteel.com.vn"lim@pebsteel.com.vn'    → two email entries
 # e.g. 'https://www.messer.com.vn " victor.lim@...' → website + email
 
@@ -171,7 +215,7 @@ for c in data:
             deduped_contacts.append(x)
     c["companyContacts"] = deduped_contacts
 
-# ─── 6. Normalize compound/variant contact types ─────────────────────────────
+# ─── 8. Normalize compound/variant contact types ─────────────────────────────
 # Maps parser artifacts to canonical types.
 # Compound types (e.g. Line/WeChat share same ID) → expand into both.
 
@@ -293,6 +337,8 @@ print(f"Canonical region fixes : {fixed_canonical}")
 print(f"Inferred regions       : {fixed_inferred}")
 print(f"Country → ISO fixes    : {fixed_country}")
 print(f"TaxId artifact fixes   : {fixed_taxid}")
+print(f"Office suffix strips   : {fixed_office_suffix}")
+print(f"Split address merges   : {fixed_split_addr}")
 print(f"Contact type fixes     : {fixed_contact_types}")
 
 if unknown_countries:

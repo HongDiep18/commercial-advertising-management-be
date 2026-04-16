@@ -6,7 +6,7 @@ import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 export class AdminListCompaniesQueryDto {
   @ApiPropertyOptional({
     description:
-      'Search company names (VI/EN/ZH), tax id, industry tags, and email/phone contact values',
+      'Search by consecutive word-start sequence (no skipped words) or initials across company names (VI/EN/ZH), tax id, industry tags, and contact value/contact_name.',
     example: 'acme',
   })
   @IsOptional()

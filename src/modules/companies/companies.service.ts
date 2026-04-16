@@ -547,23 +547,108 @@ export class CompaniesService {
     return { OR: orGroup };
   }
 
-  private static readonly DIRECTORY_SEARCH_FIELDS = [
-    'companyNameVi',
-    'companyNameEn',
-    'companyNameZh',
-    'description',
-    'region',
-  ] as const;
+  private static splitDirectorySearchWords(search: string): string[] {
+    return search
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter((word) => word.length > 0);
+  }
 
-  private static buildDirectorySearchWhere(
-    search: string,
-  ): Prisma.CompanyWhereInput {
-    const mode = 'insensitive' as const;
-    return {
-      OR: CompaniesService.DIRECTORY_SEARCH_FIELDS.map((field) => ({
-        [field]: { contains: search, mode },
-      })),
+  private static escapePostgresRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private static buildWordStartSequenceRegex(words: readonly string[]): string {
+    const buildTokenRegex = (word: string): string => {
+      const escapedWord = CompaniesService.escapePostgresRegex(word);
+      const isAsciiWord = /^[a-z0-9]+$/i.test(word);
+      if (isAsciiWord) {
+        return `\\m${escapedWord}[[:alnum:]]*\\M`;
+      }
+      return escapedWord;
     };
+    return words
+      .map((word) => buildTokenRegex(word))
+      .join('(?:[^[:alnum:]]+)?');
+  }
+
+  private static normalizeInitialSearch(search: string): string {
+    return search.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  private static shouldApplyInitialSearch(search: string): boolean {
+    const isAsciiOnly = /^[a-z0-9\s]+$/i.test(search.trim());
+    if (!isAsciiOnly) {
+      return false;
+    }
+    const normalized = CompaniesService.normalizeInitialSearch(search);
+    return normalized.length >= 2;
+  }
+
+  private async findCompanyIdsByDirectorySearch(
+    search: string,
+  ): Promise<string[]> {
+    const words = CompaniesService.splitDirectorySearchWords(search);
+    if (words.length === 0) {
+      return [];
+    }
+    const sequenceRegex = CompaniesService.buildWordStartSequenceRegex(words);
+    const normalizedInitials = CompaniesService.normalizeInitialSearch(search);
+    const isInitialSearchEnabled =
+      CompaniesService.shouldApplyInitialSearch(search);
+    const initialsPattern = `${normalizedInitials}%`;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT c.id
+        FROM companies c
+        WHERE
+          (
+            COALESCE(c.company_name_vi, '') ~* ${sequenceRegex}
+            OR COALESCE(c.company_name_en, '') ~* ${sequenceRegex}
+            OR COALESCE(c.company_name_zh, '') ~* ${sequenceRegex}
+            OR COALESCE(c.description, '') ~* ${sequenceRegex}
+            OR COALESCE(c.region, '') ~* ${sequenceRegex}
+          )
+          OR (
+            ${isInitialSearchEnabled}
+            AND (
+              COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_vi, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+              OR COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_en, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+              OR COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_zh, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+            )
+          )
+      `,
+    );
+    return rows.map((row) => row.id);
   }
 
   async getAdminCompanyStats(): Promise<{ activeCount: number }> {
@@ -573,52 +658,83 @@ export class CompaniesService {
     return { activeCount };
   }
 
-  private static buildAdminCompanySearchWhere(
-    search: string,
-    industryCompanyIds: readonly string[],
-  ): Prisma.CompanyWhereInput {
+  private async findCompanyIdsByAdminSearch(search: string): Promise<string[]> {
+    const words = CompaniesService.splitDirectorySearchWords(search);
+    if (words.length === 0) {
+      return [];
+    }
+    const sequenceRegex = CompaniesService.buildWordStartSequenceRegex(words);
+    const normalizedInitials = CompaniesService.normalizeInitialSearch(search);
+    const isInitialSearchEnabled =
+      CompaniesService.shouldApplyInitialSearch(search);
+    const initialsPattern = `${normalizedInitials}%`;
     const contactSearchTypes = [
       CONTACT_TYPE.EMAIL,
       CONTACT_TYPE.TEL,
       CONTACT_TYPE.PHONE,
       CONTACT_TYPE.CONTACT_PERSON,
     ];
-    const searchOr: Prisma.CompanyWhereInput[] = [
-      { companyNameVi: { contains: search, mode: 'insensitive' } },
-      { companyNameEn: { contains: search, mode: 'insensitive' } },
-      { companyNameZh: { contains: search, mode: 'insensitive' } },
-      { taxId: { contains: search, mode: 'insensitive' } },
-      {
-        companyContacts: {
-          some: {
-            type: { in: contactSearchTypes },
-            OR: [
-              { value: { contains: search, mode: 'insensitive' } },
-              { contactName: { contains: search, mode: 'insensitive' } },
-            ],
-          },
-        },
-      },
-    ];
-    if (industryCompanyIds.length > 0) {
-      searchOr.push({ id: { in: [...industryCompanyIds] } });
-    }
-    return { OR: searchOr };
-  }
-
-  private async findCompanyIdsByIndustrySearch(
-    search: string,
-  ): Promise<string[]> {
-    const pattern = `%${search}%`;
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(
       Prisma.sql`
         SELECT c.id
         FROM companies c
-        WHERE EXISTS (
-          SELECT 1
-          FROM unnest(c.industry) AS t(val)
-          WHERE t.val ILIKE ${pattern}
-        )
+        WHERE
+          (
+            COALESCE(c.company_name_vi, '') ~* ${sequenceRegex}
+            OR COALESCE(c.company_name_en, '') ~* ${sequenceRegex}
+            OR COALESCE(c.company_name_zh, '') ~* ${sequenceRegex}
+            OR COALESCE(c.tax_id, '') ~* ${sequenceRegex}
+            OR EXISTS (
+              SELECT 1
+              FROM unnest(c.industry) AS t(val)
+              WHERE COALESCE(t.val, '') ~* ${sequenceRegex}
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM company_contacts cc
+              WHERE cc.company_id = c.id
+                AND cc.type IN (${Prisma.join(contactSearchTypes)})
+                AND (
+                  COALESCE(cc.value, '') ~* ${sequenceRegex}
+                  OR COALESCE(cc.contact_name, '') ~* ${sequenceRegex}
+                )
+            )
+          )
+          OR (
+            ${isInitialSearchEnabled}
+            AND (
+              COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_vi, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+              OR COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_en, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+              OR COALESCE((
+                SELECT string_agg(left(token, 1), '')
+                FROM unnest(
+                  regexp_split_to_array(
+                    lower(regexp_replace(COALESCE(c.company_name_zh, ''), '[^[:alnum:]]+', ' ', 'g')),
+                    '\\s+'
+                  )
+                ) AS token
+                WHERE token <> ''
+              ), '') LIKE ${initialsPattern}
+            )
+          )
       `,
     );
     return rows.map((row) => row.id);
@@ -641,16 +757,20 @@ export class CompaniesService {
     const visibilityWhere = CompaniesService.buildAdminCompanyVisibilityWhere();
     let where: Prisma.CompanyWhereInput = { AND: [visibilityWhere] };
     if (search.length > 0) {
-      const industryCompanyIds =
-        await this.findCompanyIdsByIndustrySearch(search);
+      const companyIdsBySearch = await this.findCompanyIdsByAdminSearch(search);
+      if (companyIdsBySearch.length === 0) {
+        return {
+          companies: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
       where = {
-        AND: [
-          visibilityWhere,
-          CompaniesService.buildAdminCompanySearchWhere(
-            search,
-            industryCompanyIds,
-          ),
-        ],
+        AND: [visibilityWhere, { id: { in: companyIdsBySearch } }],
       };
     }
     const orderBy: Prisma.CompanyOrderByWithRelationInput =
@@ -1355,9 +1475,20 @@ export class CompaniesService {
 
     const normalizedSearch = search?.trim() ?? '';
     if (normalizedSearch.length > 0) {
-      andConditions.push(
-        CompaniesService.buildDirectorySearchWhere(normalizedSearch),
-      );
+      const companyIdsBySearch =
+        await this.findCompanyIdsByDirectorySearch(normalizedSearch);
+      if (companyIdsBySearch.length === 0) {
+        return {
+          companies: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+      andConditions.push({ id: { in: companyIdsBySearch } });
     }
 
     // Industry group OR-values, AND-ed with region group.

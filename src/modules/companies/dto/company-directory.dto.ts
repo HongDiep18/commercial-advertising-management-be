@@ -23,8 +23,8 @@ function parseListQueryValue(value: unknown): string[] | undefined {
 export class CompanyDirectoryQueryDto {
   @ApiPropertyOptional({
     description:
-      'Search phrase (case-insensitive) matched in sequence with contains() across company names (VI/EN/ZH), description, or region.',
-    example: 'cong nghiep v',
+      'Search by consecutive word-start sequence (no skipped words) or by initials across company names (VI/EN/ZH), description, and region (case-insensitive). Example: "epv" matches "Eternal Prowess VN".',
+    example: 'e p v',
   })
   @IsOptional()
   @IsString()

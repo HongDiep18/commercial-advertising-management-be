@@ -580,7 +580,7 @@ async function main(): Promise<void> {
 
       let importedCompany: { id: string };
       try {
-        importedCompany = await prisma.$transaction(async (tx) => {
+        importedCompany = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
           const lockKey = buildCompanyImportLockKey({
             company,
             companyEmail,

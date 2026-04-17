@@ -28,12 +28,16 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { UserPayload } from '../../common/interfaces/user-payload.interface';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { ActiveAdsErrors } from './active-ads.errors';
-import { ActiveAdsService } from './active-ads.service';
+import {
+  ActiveAdsService,
+  type TrackedAdSlotStatus,
+} from './active-ads.service';
 import type { ActiveAdDto } from './dto/active-ads.dto';
 import {
   AdminAddActiveAdAssetsDto,
   AdminAddActiveAdAssetsResponseDto,
 } from './dto/admin-add-active-ad-assets.dto';
+import { TrackedAdSlotStatusResponseDto } from './dto/tracked-slot-status-response.dto';
 import { AdminCreateCompanyPopupAddonDto } from './dto/admin-create-company-popup-addon.dto';
 import {
   AdminManualActivateAdDto,
@@ -52,6 +56,22 @@ export class ActiveAdsAdminController {
     private readonly activeAdsService: ActiveAdsService,
     private readonly fileUploadService: FileUploadService,
   ) {}
+
+  @Get('slot-status')
+  @ApiOperation({
+    summary: 'Get tracked slot statuses',
+    description:
+      'Returns status summary for popup and featured slot package types, including active, expired, and waiting ads.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tracked slot statuses retrieved successfully',
+    type: TrackedAdSlotStatusResponseDto,
+    isArray: true,
+  })
+  async getTrackedSlotStatuses(): Promise<TrackedAdSlotStatus[]> {
+    return this.activeAdsService.getTrackedSlotStatuses();
+  }
 
   @Post(':activeAdId/assets')
   @UseInterceptors(FilesInterceptor('files', 10))

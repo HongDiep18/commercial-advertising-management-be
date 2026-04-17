@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AdOrderStatus,
   AdPackageType,
   DurationUnit,
   PricingModel,
@@ -58,6 +59,86 @@ export interface ActiveAdResponse {
   endDate?: Date;
   isActive: boolean;
 }
+
+const TRACKED_SLOT_PACKAGE_TYPES: readonly AdPackageType[] = [
+  AdPackageType.POPUP_PRIORITY_SLOT,
+  AdPackageType.POPUP_ROTATION_SLOT,
+  AdPackageType.FEATURED_HIGHLIGHT_BOOST,
+  AdPackageType.FEATURED_HOMEPAGE_DISPLAY,
+];
+
+type TrackedSlotAdSource = 'active_ad' | 'pending_order';
+
+type TrackedCompanyNameRecord = {
+  companyNameVi: string | null;
+  companyNameEn: string | null;
+  companyNameZh: string | null;
+};
+
+type TrackedSlotPackageRecord = {
+  type: AdPackageType;
+  name: string;
+  nameZh: string | null;
+  sortOrder: number;
+  createdAt: Date;
+};
+
+type TrackedSlotActiveAdRecord = {
+  id: string;
+  packageType: AdPackageType;
+  companyId: string;
+  orderId: string | null;
+  orderItemId: string | null;
+  adLinkUrl: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  isActive: boolean;
+  company: TrackedCompanyNameRecord | null;
+};
+
+type TrackedSlotPendingOrderItemRecord = {
+  id: string;
+  startDate: Date;
+  adLinkUrl: string;
+  durationValue: number | null;
+  durationUnit: DurationUnit | null;
+  pricing: {
+    pricingModel: PricingModel;
+    durationValue: number | null;
+    durationUnit: DurationUnit | null;
+    package: {
+      type: AdPackageType;
+    };
+  };
+  order: {
+    id: string;
+    companyId: string | null;
+    company: TrackedCompanyNameRecord | null;
+  };
+};
+
+export type TrackedSlotAdItem = {
+  source: TrackedSlotAdSource;
+  activeAdId: string | null;
+  orderId: string | null;
+  orderItemId: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  adLinkUrl: string | null;
+};
+
+export type TrackedAdSlotStatus = {
+  packageType: AdPackageType;
+  packageName: string;
+  packageNameZh: string | null;
+  hasActiveAds: boolean;
+  expiresAt: Date | null;
+  activeAds: TrackedSlotAdItem[];
+  expiredAds: TrackedSlotAdItem[];
+  waitingAds: TrackedSlotAdItem[];
+};
 
 @Injectable()
 export class ActiveAdsService {
@@ -289,6 +370,220 @@ export class ActiveAdsService {
       company_id: companyId,
       items,
     };
+  }
+
+  async getTrackedSlotStatuses(): Promise<TrackedAdSlotStatus[]> {
+    const now = new Date();
+    const trackedTypes: AdPackageType[] = [...TRACKED_SLOT_PACKAGE_TYPES];
+    const [slotPackages, slotActiveAds, slotPendingOrderItems] =
+      await Promise.all([
+        this.prisma.adPackage.findMany({
+          where: {
+            type: { in: trackedTypes },
+            isActive: true,
+          },
+          select: {
+            type: true,
+            name: true,
+            nameZh: true,
+            sortOrder: true,
+            createdAt: true,
+          },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        }) as unknown as Promise<TrackedSlotPackageRecord[]>,
+        this.prisma.activeAd.findMany({
+          where: {
+            packageType: { in: trackedTypes },
+          },
+          select: {
+            id: true,
+            packageType: true,
+            companyId: true,
+            orderId: true,
+            orderItemId: true,
+            adLinkUrl: true,
+            startDate: true,
+            endDate: true,
+            isActive: true,
+            company: {
+              select: {
+                companyNameVi: true,
+                companyNameEn: true,
+                companyNameZh: true,
+              },
+            },
+          },
+        }) as unknown as Promise<TrackedSlotActiveAdRecord[]>,
+        this.prisma.adOrderItem.findMany({
+          where: {
+            order: { status: AdOrderStatus.PENDING },
+            pricing: {
+              package: {
+                type: { in: trackedTypes },
+              },
+            },
+          },
+          select: {
+            id: true,
+            startDate: true,
+            adLinkUrl: true,
+            durationValue: true,
+            durationUnit: true,
+            pricing: {
+              select: {
+                pricingModel: true,
+                durationValue: true,
+                durationUnit: true,
+                package: {
+                  select: {
+                    type: true,
+                  },
+                },
+              },
+            },
+            order: {
+              select: {
+                id: true,
+                companyId: true,
+                company: {
+                  select: {
+                    companyNameVi: true,
+                    companyNameEn: true,
+                    companyNameZh: true,
+                  },
+                },
+              },
+            },
+          },
+        }) as unknown as Promise<TrackedSlotPendingOrderItemRecord[]>,
+      ]);
+
+    const packageByType = new Map<
+      AdPackageType,
+      { name: string; nameZh: string | null }
+    >();
+    for (const slotPackage of slotPackages) {
+      if (packageByType.has(slotPackage.type)) continue;
+      packageByType.set(slotPackage.type, {
+        name: slotPackage.name,
+        nameZh: slotPackage.nameZh,
+      });
+    }
+
+    const slotStatusByType = new Map<AdPackageType, TrackedAdSlotStatus>(
+      trackedTypes.map((trackedType) => {
+        const packageInfo = packageByType.get(trackedType);
+        return [
+          trackedType,
+          {
+            packageType: trackedType,
+            packageName: packageInfo?.name ?? trackedType,
+            packageNameZh: packageInfo?.nameZh ?? null,
+            hasActiveAds: false,
+            expiresAt: null,
+            activeAds: [],
+            expiredAds: [],
+            waitingAds: [],
+          },
+        ];
+      }),
+    );
+
+    for (const slotActiveAd of slotActiveAds) {
+      const slotStatus = slotStatusByType.get(slotActiveAd.packageType);
+      if (!slotStatus) continue;
+      const item: TrackedSlotAdItem = {
+        source: 'active_ad',
+        activeAdId: slotActiveAd.id,
+        orderId: slotActiveAd.orderId,
+        orderItemId: slotActiveAd.orderItemId,
+        companyId: slotActiveAd.companyId,
+        companyName: this.resolveCompanyDisplayName(slotActiveAd.company),
+        startDate: slotActiveAd.startDate,
+        endDate: slotActiveAd.endDate,
+        adLinkUrl: slotActiveAd.adLinkUrl,
+      };
+      const isScheduled = slotActiveAd.isActive && slotActiveAd.startDate > now;
+      const isCurrentActive =
+        slotActiveAd.isActive &&
+        slotActiveAd.startDate <= now &&
+        (!slotActiveAd.endDate || slotActiveAd.endDate > now);
+      const isExpired =
+        slotActiveAd.endDate !== null && slotActiveAd.endDate <= now;
+      if (isCurrentActive) {
+        slotStatus.activeAds.push(item);
+        continue;
+      }
+      if (isScheduled) {
+        slotStatus.waitingAds.push(item);
+        continue;
+      }
+      if (isExpired) {
+        slotStatus.expiredAds.push(item);
+      }
+    }
+
+    for (const slotPendingOrderItem of slotPendingOrderItems) {
+      const packageType = slotPendingOrderItem.pricing.package.type;
+      const slotStatus = slotStatusByType.get(packageType);
+      if (!slotStatus) continue;
+      const endDate = this.computeProjectedEndDate({
+        startDate: slotPendingOrderItem.startDate,
+        pricingModel: slotPendingOrderItem.pricing.pricingModel,
+        durationValue:
+          slotPendingOrderItem.durationValue ??
+          slotPendingOrderItem.pricing.durationValue,
+        durationUnit:
+          slotPendingOrderItem.durationUnit ??
+          slotPendingOrderItem.pricing.durationUnit,
+      });
+      slotStatus.waitingAds.push({
+        source: 'pending_order',
+        activeAdId: null,
+        orderId: slotPendingOrderItem.order.id,
+        orderItemId: slotPendingOrderItem.id,
+        companyId: slotPendingOrderItem.order.companyId,
+        companyName: this.resolveCompanyDisplayName(
+          slotPendingOrderItem.order.company,
+        ),
+        startDate: slotPendingOrderItem.startDate,
+        endDate,
+        adLinkUrl: slotPendingOrderItem.adLinkUrl,
+      });
+    }
+
+    for (const packageType of trackedTypes) {
+      const slotStatus = slotStatusByType.get(packageType);
+      if (!slotStatus) continue;
+      slotStatus.activeAds.sort(
+        (left, right) => left.startDate.getTime() - right.startDate.getTime(),
+      );
+      slotStatus.expiredAds.sort(
+        (left, right) =>
+          (right.endDate?.getTime() ?? 0) - (left.endDate?.getTime() ?? 0),
+      );
+      slotStatus.waitingAds.sort(
+        (left, right) => left.startDate.getTime() - right.startDate.getTime(),
+      );
+      slotStatus.hasActiveAds = slotStatus.activeAds.length > 0;
+      const endingDates: Date[] = slotStatus.activeAds
+        .map((item) => item.endDate)
+        .filter((dateValue): dateValue is Date => dateValue instanceof Date);
+      if (endingDates.length === 0) {
+        slotStatus.expiresAt = null;
+        continue;
+      }
+      const nearestEndTimestamp = Math.min(
+        ...endingDates.map((dateValue) => dateValue.getTime()),
+      );
+      slotStatus.expiresAt = new Date(nearestEndTimestamp);
+    }
+
+    return trackedTypes
+      .map((packageType) => slotStatusByType.get(packageType))
+      .filter((slotStatus): slotStatus is TrackedAdSlotStatus =>
+        Boolean(slotStatus),
+      );
   }
 
   async updateActiveAd(
@@ -613,5 +908,38 @@ export class ActiveAdsService {
     }
 
     return end;
+  }
+
+  private computeProjectedEndDate(input: {
+    startDate: Date;
+    pricingModel: PricingModel;
+    durationValue: number | null;
+    durationUnit: DurationUnit | null;
+  }): Date | null {
+    if (input.pricingModel !== PricingModel.DURATION || !input.durationUnit) {
+      return null;
+    }
+    return this.calculateEndDate(
+      input.startDate,
+      input.durationValue ?? 0,
+      input.durationUnit,
+    );
+  }
+
+  private resolveCompanyDisplayName(
+    company: TrackedCompanyNameRecord | null | undefined,
+  ): string | null {
+    if (!company) {
+      return null;
+    }
+    const names: Array<string | null> = [
+      company.companyNameVi,
+      company.companyNameEn,
+      company.companyNameZh,
+    ];
+    const foundName = names.find(
+      (name) => typeof name === 'string' && name.trim().length > 0,
+    );
+    return foundName ?? null;
   }
 }

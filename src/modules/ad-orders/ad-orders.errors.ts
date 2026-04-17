@@ -80,8 +80,7 @@ export const AdOrdersErrors = {
   },
   ADDON_REQUIRES_BASE_PACKAGE: {
     code: 'AD_ORDER_ADDON_REQUIRES_BASE',
-    message:
-      'Order must contain a Homepage Popup base package to add add-ons',
+    message: 'Order must contain a Homepage Popup base package to add add-ons',
   },
   EDIT_ITEM_NOT_IN_ORDER: {
     code: 'AD_ORDER_EDIT_ITEM_NOT_FOUND',

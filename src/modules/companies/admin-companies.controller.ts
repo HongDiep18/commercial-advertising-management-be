@@ -134,7 +134,7 @@ export class AdminCompaniesController {
     summary: 'Search and list companies (admin)',
     description:
       'Optional `search` across company names (VI/EN/ZH), tax id, industry tags, and email/phone/tel/contact_person values. ' +
-      'Does not filter by registration status or company isActive.',
+      'Supports optional registration `status` and company `isActive` filters.',
   })
   @ApiResponse({
     status: 200,

@@ -751,11 +751,20 @@ export class CompaniesService {
   ): Promise<AdminListCompaniesResponseDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const status = query.status;
+    const isActiveFilter = query.isActive;
     const sortBy = query.sortBy ?? 'createdAt';
     const sortOrder = query.sortOrder ?? 'desc';
     const search = query.search?.trim() ?? '';
     const visibilityWhere = CompaniesService.buildAdminCompanyVisibilityWhere();
-    let where: Prisma.CompanyWhereInput = { AND: [visibilityWhere] };
+    const baseAndConditions: Prisma.CompanyWhereInput[] = [visibilityWhere];
+    if (status) {
+      baseAndConditions.push({ status });
+    }
+    if (isActiveFilter !== undefined) {
+      baseAndConditions.push({ isActive: isActiveFilter });
+    }
+    let where: Prisma.CompanyWhereInput = { AND: baseAndConditions };
     if (search.length > 0) {
       const companyIdsBySearch = await this.findCompanyIdsByAdminSearch(search);
       if (companyIdsBySearch.length === 0) {
@@ -770,7 +779,7 @@ export class CompaniesService {
         };
       }
       where = {
-        AND: [visibilityWhere, { id: { in: companyIdsBySearch } }],
+        AND: [...baseAndConditions, { id: { in: companyIdsBySearch } }],
       };
     }
     const orderBy: Prisma.CompanyOrderByWithRelationInput =
@@ -1673,7 +1682,7 @@ export class CompaniesService {
     maskingContext?: MaskingContext,
   ): Promise<CompanyCategoriesResponseDto> {
     const grouped = await this.prisma.company.findMany({
-      where: CompaniesService.buildActiveUserCompanyWhere(),
+      where: { isActive: true },
       select: { industry: true },
     });
     const categoryCountMap = new Map<string, number>();

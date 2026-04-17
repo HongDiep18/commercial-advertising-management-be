@@ -1,7 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CompanyProfileRequestStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class AdminListCompaniesQueryDto {
   @ApiPropertyOptional({
@@ -12,6 +20,45 @@ export class AdminListCompaniesQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by company registration status',
+    enum: CompanyProfileRequestStatus,
+    example: CompanyProfileRequestStatus.REJECTED,
+  })
+  @IsOptional()
+  @IsIn([
+    CompanyProfileRequestStatus.PENDING,
+    CompanyProfileRequestStatus.APPROVED,
+    CompanyProfileRequestStatus.REJECTED,
+  ])
+  status?: CompanyProfileRequestStatus;
+
+  @ApiPropertyOptional({
+    description: 'Filter by company `isActive`. Omit for all companies.',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const v = value.toLowerCase();
+      if (v === 'true') {
+        return true;
+      }
+      if (v === 'false') {
+        return false;
+      }
+    }
+    return undefined;
+  })
+  @IsBoolean()
+  isActive?: boolean;
 
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()

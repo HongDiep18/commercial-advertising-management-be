@@ -832,14 +832,15 @@ export class CompaniesService {
       status: row.status,
       isActive: row.isActive,
       primaryEmail:
-        (CompaniesService.getPrimaryContactValue(
+        CompaniesService.getPrimaryContactValue(
           row.companyContacts,
           CONTACT_TYPE.REGISTER_EMAIL,
         ) ??
-          CompaniesService.getPrimaryContactValue(
-            row.companyContacts,
-            CONTACT_TYPE.EMAIL,
-          )) ?? '',
+        CompaniesService.getPrimaryContactValue(
+          row.companyContacts,
+          CONTACT_TYPE.EMAIL,
+        ) ??
+        '',
       primaryPhone: getPrimaryPhoneValueFromContactRows(row.companyContacts),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -1678,6 +1679,21 @@ export class CompaniesService {
     };
   }
 
+  private static sortCategoriesWithOtherLast<
+    T extends { industry: string; count: number },
+  >(categories: readonly T[]): T[] {
+    const otherItems: T[] = [];
+    const rest: T[] = [];
+    for (const item of categories) {
+      if (item.industry.toLowerCase() === 'other') {
+        otherItems.push(item);
+      } else {
+        rest.push(item);
+      }
+    }
+    return [...rest, ...otherItems];
+  }
+
   async getCompanyCategories(
     maskingContext?: MaskingContext,
   ): Promise<CompanyCategoriesResponseDto> {
@@ -1693,10 +1709,12 @@ export class CompaniesService {
       });
     });
     const allCategories: CompanyCategoriesResponseDto['categories'] =
-      Array.from(categoryCountMap.entries()).map(([industry, count]) => ({
-        industry,
-        count,
-      }));
+      CompaniesService.sortCategoriesWithOtherLast(
+        Array.from(categoryCountMap.entries()).map(([industry, count]) => ({
+          industry,
+          count,
+        })),
+      );
 
     // If no masking context (guest), return all with hasAllAccess: true
     if (!maskingContext) {
@@ -1720,9 +1738,11 @@ export class CompaniesService {
 
     // Filter categories based on user's accessible industries
     const accessibleIndustries = maskingContext.userIndustries;
-    const filteredCategories = allCategories.filter((cat) =>
-      accessibleIndustries.some((ind) =>
-        cat.industry.toLowerCase().includes(ind.toLowerCase()),
+    const filteredCategories = CompaniesService.sortCategoriesWithOtherLast(
+      allCategories.filter((cat) =>
+        accessibleIndustries.some((ind) =>
+          cat.industry.toLowerCase().includes(ind.toLowerCase()),
+        ),
       ),
     );
 

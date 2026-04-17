@@ -1081,7 +1081,10 @@ export class AuthService {
       if (target.companyId) {
         await tx.company.update({
           where: { id: target.companyId },
-          data: { isActive: false },
+          data: {
+            isActive: false,
+            status: CompanyProfileRequestStatus.REJECTED,
+          },
         });
       }
       return { target, updated };

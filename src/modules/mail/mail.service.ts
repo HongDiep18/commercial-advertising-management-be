@@ -187,9 +187,15 @@ export class MailService {
         );
         return;
       }
-      const companyEmail = this.getCompanyContactValue(
-        order.company.companyContacts,
-        CONTACT_TYPE.EMAIL,
+      const companyEmail = (
+        this.getCompanyContactValue(
+          order.company.companyContacts,
+          CONTACT_TYPE.REGISTER_EMAIL,
+        ) ??
+        this.getCompanyContactValue(
+          order.company.companyContacts,
+          CONTACT_TYPE.EMAIL,
+        )
       )?.trim();
       if (!companyEmail) {
         console.log(
@@ -209,10 +215,14 @@ export class MailService {
           companyNameVi: order.company.companyNameVi,
           companyNameZh: order.company.companyNameZh,
           email:
-            this.getCompanyContactValue(
+            (this.getCompanyContactValue(
               order.company.companyContacts,
-              CONTACT_TYPE.EMAIL,
-            ) ?? '',
+              CONTACT_TYPE.REGISTER_EMAIL,
+            ) ??
+              this.getCompanyContactValue(
+                order.company.companyContacts,
+                CONTACT_TYPE.EMAIL,
+              )) ?? '',
           contactName:
             getPrimaryContactNameFromContactRows(
               order.company.companyContacts,

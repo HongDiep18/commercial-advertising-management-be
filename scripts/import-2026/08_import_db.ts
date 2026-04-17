@@ -18,6 +18,7 @@ import {
 } from '../../src/modules/auth/auth.service';
 import { CaptchaVerificationService } from '../../src/modules/auth/captcha-verification.service';
 import { CONTACT_TYPE } from '../../src/modules/companies/company-contact.constants';
+import { POINTS_VALUES, PointsSource } from '../../src/common/enums/points-source.enum';
 import { LoyaltyService } from '../../src/modules/loyalty/loyalty.service';
 import { MailModule } from '../../src/modules/mail/mail.module';
 
@@ -61,6 +62,7 @@ type ImportSummary = {
   existingUsersReused: number;
   userEmailConflictsSkipped: number;
   setPasswordEmailsSent: number;
+  pointsAwarded: number;
 };
 
 const DEFAULT_INPUT = resolve(
@@ -491,6 +493,9 @@ function printSummary(
   console.log(
     `  Set-password emails sent: ${formatNumber(summary.setPasswordEmailsSent)}`,
   );
+  console.log(
+    `  Registration bonus (50,000 pts) awarded: ${formatNumber(summary.pointsAwarded)}`,
+  );
 }
 
 function updateUserSummary(
@@ -533,6 +538,7 @@ async function main(): Promise<void> {
   try {
     const prisma = app.get(PrismaService);
     const authService = app.get(AuthService);
+    const loyaltyService = app.get(LoyaltyService);
     const companies = await loadCompanies(inputPath);
     const sendSetPasswordEmails =
       process.env.IMPORT_SEND_SET_PASSWORD_EMAILS === 'true';
@@ -545,6 +551,7 @@ async function main(): Promise<void> {
       existingUsersReused: 0,
       userEmailConflictsSkipped: 0,
       setPasswordEmailsSent: 0,
+      pointsAwarded: 0,
     };
     const errors: Array<{
       index: number;
@@ -657,14 +664,33 @@ async function main(): Promise<void> {
           sendSetPasswordEmail: sendSetPasswordEmails,
         });
         updateUserSummary(summary, result);
+        if (result.status === 'created') {
+          try {
+            const registrationPoints = POINTS_VALUES[PointsSource.REGISTRATION];
+            if (typeof registrationPoints === 'number') {
+              await loyaltyService.awardPoints({
+                userId: result.userId,
+                points: registrationPoints,
+                source: PointsSource.REGISTRATION,
+                description: 'Registration bonus - Welcome to VN Buyer',
+              });
+              summary.pointsAwarded += 1;
+            }
+          } catch (err) {
+            console.error(
+              `Failed to award registration bonus for userId=${result.userId}:`,
+              err,
+            );
+          }
+        }
         if (result.status !== 'conflict_other_company') {
-          await prisma.companyContact.create({
-            data: {
+          await prisma.companyContact.updateMany({
+            where: {
               companyId: importedCompany.id,
-              type: CONTACT_TYPE.REGISTER_EMAIL,
+              type: CONTACT_TYPE.EMAIL,
               value: email,
-              contactName: null,
             },
+            data: { type: CONTACT_TYPE.REGISTER_EMAIL },
           });
           break;
         }

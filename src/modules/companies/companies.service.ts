@@ -823,10 +823,14 @@ export class CompaniesService {
       status: row.status,
       isActive: row.isActive,
       primaryEmail:
-        CompaniesService.getPrimaryContactValue(
+        (CompaniesService.getPrimaryContactValue(
           row.companyContacts,
-          CONTACT_TYPE.EMAIL,
-        ) ?? '',
+          CONTACT_TYPE.REGISTER_EMAIL,
+        ) ??
+          CompaniesService.getPrimaryContactValue(
+            row.companyContacts,
+            CONTACT_TYPE.EMAIL,
+          )) ?? '',
       primaryPhone: getPrimaryPhoneValueFromContactRows(row.companyContacts),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

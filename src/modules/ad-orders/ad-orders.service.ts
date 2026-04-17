@@ -142,7 +142,10 @@ export class AdOrdersService {
   } {
     const contacts = company?.companyContacts ?? [];
     return {
-      email: this.getCompanyContactValue(contacts, CONTACT_TYPE.EMAIL) ?? '',
+      email:
+        (this.getCompanyContactValue(contacts, CONTACT_TYPE.REGISTER_EMAIL) ??
+          this.getCompanyContactValue(contacts, CONTACT_TYPE.EMAIL)) ??
+        '',
       contactName: getPrimaryContactNameFromContactRows(contacts) ?? '',
       phone: getPrimaryPhoneValueFromContactRows(contacts),
       address:

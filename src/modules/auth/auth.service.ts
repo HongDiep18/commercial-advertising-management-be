@@ -898,7 +898,7 @@ export class AuthService {
         take: limit,
         include: {
           companyContacts: {
-            where: { type: CONTACT_TYPE.EMAIL },
+            where: { type: { in: [CONTACT_TYPE.REGISTER_EMAIL, CONTACT_TYPE.EMAIL] } },
             select: { type: true, value: true, contactName: true },
           },
         },
@@ -950,10 +950,9 @@ export class AuthService {
     const requests = companies.map((c) => {
       const user = userByCompanyId.get(c.id);
       const typedCompany = c as unknown as CompanyWithContacts;
-      const companyEmail = getCompanyContactValue(
-        typedCompany,
-        CONTACT_TYPE.EMAIL,
-      );
+      const companyEmail =
+        getCompanyContactValue(typedCompany, CONTACT_TYPE.REGISTER_EMAIL) ??
+        getCompanyContactValue(typedCompany, CONTACT_TYPE.EMAIL);
       const contactName = AuthService.getContactNameFromContacts(
         typedCompany.companyContacts ?? [],
       );
@@ -1815,14 +1814,22 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
-    const user = (await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
-      select: { id: true, isActive: true, deletedAt: true } as {
-        id: boolean;
-        isActive: boolean;
-        deletedAt: boolean;
+      select: {
+        id: true,
+        isActive: true,
+        deletedAt: true,
+        companyId: true,
+        company: {
+          select: {
+            companyContacts: {
+              select: { type: true, value: true },
+            },
+          },
+        },
       },
-    })) as { id: string; isActive: boolean; deletedAt: Date | null } | null;
+    });
     if (!user || !user.isActive || user.deletedAt != null) {
       return {
         message:
@@ -1840,7 +1847,12 @@ export class AuthService {
         setPasswordTokenExpiresAt: expiresAt,
       } as Prisma.UserUncheckedUpdateInput,
     });
-    await this.mailService.sendForgotPasswordEmail(normalizedEmail, token);
+    const contacts = user.company?.companyContacts ?? [];
+    const sendTo =
+      AuthService.getContactValue(contacts, CONTACT_TYPE.REGISTER_EMAIL) ??
+      AuthService.getContactValue(contacts, CONTACT_TYPE.EMAIL) ??
+      normalizedEmail;
+    await this.mailService.sendForgotPasswordEmail(sendTo, token);
     return {
       message:
         'If an account exists with this email, you will receive a password reset link.',

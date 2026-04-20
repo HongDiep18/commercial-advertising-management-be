@@ -742,7 +742,12 @@ export class CompaniesService {
 
   private static buildAdminCompanyVisibilityWhere(): Prisma.CompanyWhereInput {
     return {
-      OR: [{ users: { none: {} } }, { users: { some: { deletedAt: null } } }],
+      OR: [
+        { status: CompanyProfileRequestStatus.PENDING },
+        { status: CompanyProfileRequestStatus.REJECTED },
+        { users: { none: {} } },
+        { users: { some: { deletedAt: null } } },
+      ],
     };
   }
 
@@ -1931,13 +1936,13 @@ export class CompaniesService {
           'Company still has a linked user account; use the user deletion/disable flow instead',
         );
       }
-      if (company.status === CompanyProfileRequestStatus.REJECTED) {
+      if (company.status === CompanyProfileRequestStatus.DELETED) {
         return { company, updated: null };
       }
       const updated = await tx.company.update({
         where: { id: companyId },
         data: {
-          status: CompanyProfileRequestStatus.REJECTED,
+          status: CompanyProfileRequestStatus.DELETED,
           isActive: false,
         },
         select: { id: true, status: true },

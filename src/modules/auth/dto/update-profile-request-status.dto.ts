@@ -1,8 +1,12 @@
 import { CompanyProfileRequestStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty } from 'class-validator';
+import { IsIn, IsNotEmpty } from 'class-validator';
 
 export class UpdateProfileRequestStatusDto {
   @IsNotEmpty()
-  @IsEnum(CompanyProfileRequestStatus)
+  @IsIn([
+    CompanyProfileRequestStatus.PENDING,
+    CompanyProfileRequestStatus.APPROVED,
+    CompanyProfileRequestStatus.REJECTED,
+  ])
   status: CompanyProfileRequestStatus;
 }

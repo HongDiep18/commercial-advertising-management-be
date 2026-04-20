@@ -101,9 +101,10 @@ enum CompanyProfileRequestStatus {
   PENDING
   APPROVED
   REJECTED
+  DELETED
 }
 
-enum MembershipTier {
+enum MembershipTier {  
   NONE
   BRONZE
   SILVER

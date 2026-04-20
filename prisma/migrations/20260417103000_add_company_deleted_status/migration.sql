@@ -1,0 +1,1 @@
+ALTER TYPE "CompanyProfileRequestStatus" ADD VALUE IF NOT EXISTS 'DELETED';

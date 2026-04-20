@@ -1083,7 +1083,7 @@ export class AuthService {
           where: { id: target.companyId },
           data: {
             isActive: false,
-            status: CompanyProfileRequestStatus.REJECTED,
+            status: CompanyProfileRequestStatus.DELETED,
           },
         });
       }

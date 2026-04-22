@@ -765,6 +765,12 @@ export class CompaniesService {
     const baseAndConditions: Prisma.CompanyWhereInput[] = [visibilityWhere];
     if (status) {
       baseAndConditions.push({ status });
+    } else {
+      baseAndConditions.push({
+        status: {
+          not: CompanyProfileRequestStatus.DELETED,
+        },
+      });
     }
     if (isActiveFilter !== undefined) {
       baseAndConditions.push({ isActive: isActiveFilter });

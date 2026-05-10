@@ -22,7 +22,7 @@ import { vectorStoreProvider } from './vectorstore.provider';
     {
       provide: CHATBOT_PG_POOL,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => createChatbotPgPool(config),
+      useFactory: async (config: ConfigService) => createChatbotPgPool(config),
     },
     vectorStoreProvider,
     checkpointProvider,

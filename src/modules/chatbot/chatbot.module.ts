@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { DatabaseModule } from '../../database/database.module';
+import { CHATBOT_PG_POOL } from '../../database/chatbot-pg-pool.token';
+import { createChatbotPgPool } from '../../database/create-chatbot-pg-pool';
 import { ChatThrottlerGuard } from '../../common/guards/chat-throttler.guard';
 import { checkpointProvider } from './checkpoint.provider';
 import { ChatbotController } from './chatbot.controller';
@@ -16,6 +19,11 @@ import { vectorStoreProvider } from './vectorstore.provider';
   imports: [DatabaseModule, ScheduleModule.forRoot()],
   controllers: [ChatbotController],
   providers: [
+    {
+      provide: CHATBOT_PG_POOL,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createChatbotPgPool(config),
+    },
     vectorStoreProvider,
     checkpointProvider,
     ChatThrottlerGuard,

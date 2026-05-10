@@ -1,4 +1,3 @@
-import * as dns from 'node:dns';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -7,9 +6,6 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
-
-// Prefer IPv4 when resolving DB hosts (e.g. Supabase). Many PaaS have no outbound IPv6 → ENETUNREACH.
-dns.setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

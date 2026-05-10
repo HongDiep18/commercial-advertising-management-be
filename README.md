@@ -2,6 +2,12 @@
 
 B2B directory platform connecting Chinese-speaking businesses with Vietnam.
 
+## Architecture Overview
+
+Sketch-style overview of how the backend fits together (API, auth, data, news pipeline, and Docker).
+
+![Architecture Overview](docs/architecture-overview.png)
+
 ## Tech Stack
 
 - NestJS 11 / TypeScript

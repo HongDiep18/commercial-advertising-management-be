@@ -28,3 +28,7 @@ npm-debug.log*
 
 # Test
 coverage
+.env*
+.flaskenv*
+!.env.project
+!.env.vault

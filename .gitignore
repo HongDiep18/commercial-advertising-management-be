@@ -33,3 +33,7 @@ tasks/
 
 /generated/prisma
 .claude
+.env*
+.flaskenv*
+!.env.project
+!.env.vault

@@ -1,4 +1,4 @@
-# VN Buyer's Guide — Backend
+# Commercial advertising — Backend
 
 B2B directory platform connecting Chinese-speaking businesses with Vietnam.
 

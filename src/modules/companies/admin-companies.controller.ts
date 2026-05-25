@@ -15,6 +15,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -39,6 +40,7 @@ import {
   AdminListCompaniesQueryDto,
   AdminListCompaniesResponseDto,
 } from './dto/admin-list-companies.dto';
+import { AdminExportCompaniesQueryDto } from './dto/admin-export-companies.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -145,6 +147,47 @@ export class AdminCompaniesController {
     @Query() query: AdminListCompaniesQueryDto,
   ): Promise<AdminListCompaniesResponseDto> {
     return this.companiesService.adminListCompanies(query);
+  }
+
+  @Get('export')
+  @ApiOperation({
+    summary: 'Export companies to Excel or CSV (admin)',
+    description:
+      'Downloads a file. Requires `type` (`excel` or `csv`) and `locale` (`vi`, `en`, or `zh`). ' +
+      'Column headers and name column order follow `locale`. ' +
+      'Optional `search`, `status`, and `isActive` match the admin company list filters.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Companies Excel export',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Companies CSV export',
+    content: {
+      'text/csv': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid query or export too large',
+  })
+  async exportCompanies(
+    @Query() query: AdminExportCompaniesQueryDto,
+  ): Promise<StreamableFile> {
+    const { buffer, filename, mimeType } =
+      await this.companiesService.exportAdminCompanies(query);
+    return new StreamableFile(buffer, {
+      type: mimeType,
+      disposition: `attachment; filename="${filename}"`,
+    });
   }
 
   @Get('contact-types')

@@ -55,6 +55,26 @@ import type {
 } from './dto/admin-update-company.dto';
 import type { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
 import type { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
+import type { AdminExportCompaniesQueryDto } from './dto/admin-export-companies.dto';
+import {
+  buildCompanyExportFilename,
+  COMPANY_EXPORT_CSV_TYPE,
+  COMPANY_EXPORT_MIME_BY_TYPE,
+  getCompanyExportColumnOrder,
+  getCompanyExportHeaders,
+  type CompanyExportLocale,
+} from './company-export.locale';
+import {
+  buildAllEmailsFromContacts,
+  buildAllPhonesFromContacts,
+  formatExportActiveLabel,
+  formatExportIndustry,
+  formatExportUpdatedAt,
+  getFirstContactValueByType,
+  translateRegionForExport,
+} from './company-export.utils';
+import { FileGeneratingService } from '../file-generating/file-generating.service';
+import type { CompanyExportRow } from './types/company-export-row.types';
 
 type CompanyAuditSnapshot = {
   id: string;
@@ -98,6 +118,29 @@ const ADMIN_AUDIT_COMPANY_SELECT = {
   },
 } as const;
 
+const COMPANY_EXPORT_BATCH_SIZE = 500;
+const COMPANY_EXPORT_MAX_ROWS = 10_000;
+const COMPANY_EXPORT_SHEET_NAME = 'Companies';
+
+const COMPANY_EXPORT_SELECT = {
+  id: true,
+  companyNameVi: true,
+  companyNameEn: true,
+  companyNameZh: true,
+  industry: true,
+  isActive: true,
+  taxId: true,
+  country: true,
+  region: true,
+  updatedAt: true,
+  companyContacts: {
+    select: {
+      type: true,
+      value: true,
+    },
+  },
+} as const;
+
 type CompanyWithActiveAdsRecord = {
   id: string;
   companyNameVi: string | null;
@@ -135,6 +178,7 @@ export class CompaniesService {
     private readonly adEffectsRegistry: AdEffectsRegistryService,
     private readonly auditService: AuditService,
     private readonly maskingService: CompanyMaskingService,
+    private readonly fileGeneratingService: FileGeneratingService,
   ) {}
 
   private static normalizeCompanyEmail(email: string): string {
@@ -751,20 +795,19 @@ export class CompaniesService {
     };
   }
 
-  async adminListCompanies(
-    query: AdminListCompaniesQueryDto,
-  ): Promise<AdminListCompaniesResponseDto> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const status = query.status;
-    const isActiveFilter = query.isActive;
-    const sortBy = query.sortBy ?? 'createdAt';
-    const sortOrder = query.sortOrder ?? 'desc';
-    const search = query.search?.trim() ?? '';
+  private async buildAdminCompanyListWhere(input: {
+    search?: string;
+    status?: CompanyProfileRequestStatus;
+    isActive?: boolean;
+  }): Promise<{
+    where: Prisma.CompanyWhereInput | null;
+    isEmptyFromSearch: boolean;
+  }> {
+    const search = input.search?.trim() ?? '';
     const visibilityWhere = CompaniesService.buildAdminCompanyVisibilityWhere();
     const baseAndConditions: Prisma.CompanyWhereInput[] = [visibilityWhere];
-    if (status) {
-      baseAndConditions.push({ status });
+    if (input.status) {
+      baseAndConditions.push({ status: input.status });
     } else {
       baseAndConditions.push({
         status: {
@@ -772,27 +815,153 @@ export class CompaniesService {
         },
       });
     }
-    if (isActiveFilter !== undefined) {
-      baseAndConditions.push({ isActive: isActiveFilter });
+    if (input.isActive !== undefined) {
+      baseAndConditions.push({ isActive: input.isActive });
     }
-    let where: Prisma.CompanyWhereInput = { AND: baseAndConditions };
-    if (search.length > 0) {
-      const companyIdsBySearch = await this.findCompanyIdsByAdminSearch(search);
-      if (companyIdsBySearch.length === 0) {
-        return {
-          companies: [],
-          pagination: {
-            page,
-            limit,
-            total: 0,
-            totalPages: 0,
-          },
-        };
-      }
-      where = {
+    if (search.length === 0) {
+      return { where: { AND: baseAndConditions }, isEmptyFromSearch: false };
+    }
+    const companyIdsBySearch = await this.findCompanyIdsByAdminSearch(search);
+    if (companyIdsBySearch.length === 0) {
+      return { where: null, isEmptyFromSearch: true };
+    }
+    return {
+      where: {
         AND: [...baseAndConditions, { id: { in: companyIdsBySearch } }],
+      },
+      isEmptyFromSearch: false,
+    };
+  }
+
+  async exportAdminCompanies(
+    query: AdminExportCompaniesQueryDto,
+  ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
+    const locale = query.locale;
+    const exportType = query.type;
+    const exportRows = await this.collectAdminCompanyExportRows(query);
+    const headers = getCompanyExportHeaders(locale);
+    const columnOrder = getCompanyExportColumnOrder(locale);
+    const sheetRows = exportRows.map((row) =>
+      columnOrder.map((key) => row[key]),
+    );
+    const sheetInput = {
+      sheetName: COMPANY_EXPORT_SHEET_NAME,
+      headers,
+      rows: sheetRows,
+    };
+    const buffer =
+      exportType === COMPANY_EXPORT_CSV_TYPE
+        ? this.fileGeneratingService.generateCompaniesCsvBuffer(sheetInput)
+        : await this.fileGeneratingService.generateCompaniesExcelBuffer(
+            sheetInput,
+          );
+    return {
+      buffer,
+      filename: buildCompanyExportFilename(locale, exportType),
+      mimeType: COMPANY_EXPORT_MIME_BY_TYPE[exportType],
+    };
+  }
+
+  private async collectAdminCompanyExportRows(
+    query: AdminExportCompaniesQueryDto,
+  ): Promise<CompanyExportRow[]> {
+    const locale = query.locale;
+    const listWhere = await this.buildAdminCompanyListWhere({
+      search: query.search,
+      status: query.status,
+      isActive: query.isActive,
+    });
+    const rows: CompanyExportRow[] = [];
+    if (listWhere.isEmptyFromSearch || !listWhere.where) {
+      return rows;
+    }
+    const total = await this.prisma.company.count({ where: listWhere.where });
+    if (total > COMPANY_EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `Export exceeds maximum of ${COMPANY_EXPORT_MAX_ROWS} companies. Narrow filters and try again.`,
+      );
+    }
+    let skip = 0;
+    while (skip < total) {
+      const batch = await this.prisma.company.findMany({
+        where: listWhere.where,
+        skip,
+        take: COMPANY_EXPORT_BATCH_SIZE,
+        orderBy: { updatedAt: 'desc' },
+        select: COMPANY_EXPORT_SELECT,
+      });
+      for (const company of batch) {
+        rows.push(CompaniesService.mapCompanyToExportRow(company, locale));
+      }
+      skip += batch.length;
+      if (batch.length === 0) {
+        break;
+      }
+    }
+    return rows;
+  }
+
+  private static mapCompanyToExportRow(
+    company: {
+      id: string;
+      companyNameVi: string | null;
+      companyNameEn: string | null;
+      companyNameZh: string | null;
+      industry: string[];
+      isActive: boolean;
+      taxId: string | null;
+      country: string | null;
+      region: string | null;
+      updatedAt: Date;
+      companyContacts: Array<{ type: string; value: string }>;
+    },
+    locale: CompanyExportLocale,
+  ): CompanyExportRow {
+    const contacts = company.companyContacts;
+    return {
+      id: company.id,
+      companyNameVi: company.companyNameVi?.trim() ?? '',
+      companyNameEn: company.companyNameEn?.trim() ?? '',
+      companyNameZh: company.companyNameZh?.trim() ?? '',
+      industry: formatExportIndustry(company.industry),
+      active: formatExportActiveLabel(company.isActive, locale),
+      allEmails: buildAllEmailsFromContacts(contacts),
+      allPhones: buildAllPhonesFromContacts(contacts),
+      website: getFirstContactValueByType(contacts, CONTACT_TYPE.WEBSITE),
+      address: getFirstContactValueByType(contacts, CONTACT_TYPE.ADDRESS),
+      taxId: company.taxId?.trim() ?? '',
+      country: company.country?.trim() ?? '',
+      region: company.region
+        ? translateRegionForExport(company.region, locale)
+        : '',
+      updatedAt: formatExportUpdatedAt(company.updatedAt, locale),
+    };
+  }
+
+  async adminListCompanies(
+    query: AdminListCompaniesQueryDto,
+  ): Promise<AdminListCompaniesResponseDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+    const listWhere = await this.buildAdminCompanyListWhere({
+      search: query.search,
+      status: query.status,
+      isActive: query.isActive,
+    });
+    if (listWhere.isEmptyFromSearch || !listWhere.where) {
+      return {
+        companies: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
       };
     }
+    const where = listWhere.where;
     const orderBy: Prisma.CompanyOrderByWithRelationInput =
       sortBy === 'companyNameVi'
         ? { companyNameVi: sortOrder }
@@ -949,7 +1118,6 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    // Check if user has access to this company's industry
     if (
       maskingContext &&
       !this.maskingService.hasIndustryAccess(
@@ -962,7 +1130,6 @@ export class CompaniesService {
       );
     }
 
-    // Apply masking if context is provided
     if (maskingContext) {
       const contactView = CompaniesService.buildCompanyContactView(
         company.companyContacts,
@@ -1061,9 +1228,6 @@ export class CompaniesService {
     };
   }
 
-  /**
-   * Helper method to apply ad effects to a company and transform to response format
-   */
   private applyEffectsToCompany(
     company: CompanyWithActiveAdsRecord,
   ): CompanyData {
@@ -1098,10 +1262,6 @@ export class CompaniesService {
     return this.adEffectsRegistry.applyEffects(companyData, activeAds);
   }
 
-  /**
-   * Build a CompanyWithAdsResponseDto from a raw company record and virtual ActiveAdInfo[].
-   * Used by the ad order preview to simulate effects without real ActiveAd records.
-   */
   buildPreviewCompanyItem(
     company: {
       id: string;
@@ -1197,10 +1357,6 @@ export class CompaniesService {
     };
   }
 
-  /**
-   * Get companies with POPUP_PRIORITY_SLOT or POPUP_ROTATION_SLOT ads.
-   * Computes effects on the fly using active ads and the ad effects registry.
-   */
   async getPopupCompanies(): Promise<CompanyWithAdsResponseDto[]> {
     return this.getPopupCompaniesBySlotTypes(
       [AdPackageType.POPUP_PRIORITY_SLOT, AdPackageType.POPUP_ROTATION_SLOT],
@@ -1208,10 +1364,6 @@ export class CompaniesService {
     );
   }
 
-  /**
-   * Get companies with POPUP_PRIORITY_SLOT ads.
-   * Computes effects on the fly using active ads and the ad effects registry.
-   */
   async getPopupPriorityCompanies(): Promise<CompanyWithAdsResponseDto[]> {
     return this.getPopupCompaniesBySlotTypes(
       [AdPackageType.POPUP_PRIORITY_SLOT],

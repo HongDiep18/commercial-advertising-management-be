@@ -1,15 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
 import unidecode from 'unidecode';
+import { buildCsvBuffer } from './csv-export.utils';
+import type { CompanyExportSheetInput } from './types/company-export-sheet.types';
 import type { OrderInvoiceData } from './types/order-invoice-data.types';
 
 @Injectable()
 export class FileGeneratingService {
-  /**
-   * Generate an order invoice PDF as a readable stream.
-   * Uses built-in Helvetica font (no font switching).
-   */
   generateOrderInvoicePdf(order: OrderInvoiceData): Readable {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
     const stream = new Readable();
@@ -125,5 +124,30 @@ export class FileGeneratingService {
     doc.end();
     return stream;
   }
-}
 
+  async generateCompaniesExcelBuffer(
+    input: CompanyExportSheetInput,
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet(input.sheetName);
+    const headerRow = sheet.addRow(input.headers);
+    headerRow.font = { bold: true };
+    for (const row of input.rows) {
+      sheet.addRow(row);
+    }
+    sheet.columns.forEach((column) => {
+      let maxLength = 10;
+      column.eachCell?.({ includeEmpty: false }, (cell) => {
+        const cellValue = (cell.value as string)?.toString() ?? '';
+        maxLength = Math.max(maxLength, cellValue.length);
+      });
+      column.width = Math.min(maxLength + 2, 60);
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  generateCompaniesCsvBuffer(input: CompanyExportSheetInput): Buffer {
+    return buildCsvBuffer(input.headers, input.rows);
+  }
+}

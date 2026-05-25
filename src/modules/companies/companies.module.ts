@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { AdEffectsModule } from '../ad-effects/ad-effects.module';
 import { AuthModule } from '../auth/auth.module';
+import { FileGeneratingModule } from '../file-generating/file-generating.module';
 import { FileUploadModule } from '../file-upload/file-upload.module';
 import { AdminCompaniesController } from './admin-companies.controller';
 import { CompaniesController } from './companies.controller';
@@ -9,9 +10,15 @@ import { CompaniesService } from './companies.service';
 import { CompanyMaskingService } from './company-masking.service';
 
 @Module({
-  imports: [AdEffectsModule, AuthModule, DatabaseModule, FileUploadModule],
+  imports: [
+    AdEffectsModule,
+    AuthModule,
+    DatabaseModule,
+    FileGeneratingModule,
+    FileUploadModule,
+  ],
   controllers: [CompaniesController, AdminCompaniesController],
   providers: [CompaniesService, CompanyMaskingService],
   exports: [CompaniesService, CompanyMaskingService],
 })
-export class CompaniesModule { }
+export class CompaniesModule {}

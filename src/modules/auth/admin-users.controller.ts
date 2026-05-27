@@ -24,10 +24,11 @@ export class AdminUsersController {
 
   @Get()
   @ApiOperation({
-    summary: 'List staff users for admin table',
+    summary: 'List users for admin table (paginated)',
     description:
-      'Returns only users with role ADMIN or SUPER_ADMIN ' +
-      'Includes company info, last login, status, plus ids for actions.',
+      'Returns non-deleted users. Default 10 per page. ' +
+      'Optional `role` filter: `admin` (ADMIN, SUPER_ADMIN) or `user` (MEMBER, VISITOR). ' +
+      'Pagination: page, limit, total, totalPages.',
   })
   @ApiResponse({
     status: 200,

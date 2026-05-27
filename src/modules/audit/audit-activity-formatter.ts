@@ -238,6 +238,16 @@ function resolveLegalDocumentNameFromContext(c: ContentContext): string | null {
 }
 
 export class AuditActivityFormatter {
+  static findActionsByTitleSearch(search: string): readonly string[] {
+    const term = search.trim().toLowerCase();
+    if (term.length === 0) {
+      return [];
+    }
+    return Object.entries(TITLE_BY_ACTION)
+      .filter(([, title]) => title.toLowerCase().includes(term))
+      .map(([action]) => action);
+  }
+
   static toTitle(action: string): string {
     return TITLE_BY_ACTION[action] ?? action.replaceAll('_', ' ');
   }
@@ -494,4 +504,3 @@ export class AuditActivityFormatter {
     return `${value.slice(0, 8)}...`;
   }
 }
-

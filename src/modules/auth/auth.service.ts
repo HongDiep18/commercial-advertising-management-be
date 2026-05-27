@@ -43,6 +43,11 @@ import type {
   AdminUserStatus,
 } from './dto/admin-list-users.dto';
 import {
+  ADMIN_LIST_USER_ROLE_FILTER_TO_DB_ROLES,
+  ADMIN_LIST_USERS_DEFAULT_LIMIT,
+  ADMIN_LIST_USERS_DEFAULT_PAGE,
+} from './admin-list-users.constants';
+import {
   PROFILE_REQUESTS_DEFAULT_LIMIT,
   PROFILE_REQUESTS_DEFAULT_PAGE,
   PROFILE_REQUESTS_DEFAULT_SORT_BY,
@@ -404,11 +409,10 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const existingRegisterContact =
-      await this.prisma.companyContact.findFirst({
-        where: { type: CONTACT_TYPE.REGISTER_EMAIL, value: registerEmail },
-        select: { company: true },
-      });
+    const existingRegisterContact = await this.prisma.companyContact.findFirst({
+      where: { type: CONTACT_TYPE.REGISTER_EMAIL, value: registerEmail },
+      select: { company: true },
+    });
     const existingCompany = existingRegisterContact?.company ?? null;
     if (existingCompany) {
       if (existingCompany.status === CompanyProfileRequestStatus.PENDING) {
@@ -460,7 +464,11 @@ export class AuthService {
     }
 
     const company = await this.prisma.company.create({
-      data: AuthService.companyCreateDataFromRegisterDto(data, companyEmail, registerEmail),
+      data: AuthService.companyCreateDataFromRegisterDto(
+        data,
+        companyEmail,
+        registerEmail,
+      ),
     });
 
     await this.auditService.record({
@@ -898,7 +906,9 @@ export class AuthService {
         take: limit,
         include: {
           companyContacts: {
-            where: { type: { in: [CONTACT_TYPE.REGISTER_EMAIL, CONTACT_TYPE.EMAIL] } },
+            where: {
+              type: { in: [CONTACT_TYPE.REGISTER_EMAIL, CONTACT_TYPE.EMAIL] },
+            },
             select: { type: true, value: true, contactName: true },
           },
         },
@@ -1103,27 +1113,22 @@ export class AuthService {
   async adminListUsers(
     query: AdminListUsersQueryDto,
   ): Promise<AdminListUsersResponseDto> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const page = query.page ?? ADMIN_LIST_USERS_DEFAULT_PAGE;
+    const limit = query.limit ?? ADMIN_LIST_USERS_DEFAULT_LIMIT;
     const skip = (page - 1) * limit;
-
     const search = query.search?.trim();
     const status = query.status;
-
-    const where: Prisma.UserWhereInput = {
-      role: { in: [Role.ADMIN, Role.SUPER_ADMIN] },
-    };
-
+    const where: Prisma.UserWhereInput = { deletedAt: null };
     if (status === 'active') {
       where.isActive = true;
-      where.deletedAt = null;
     } else if (status === 'suspended') {
       where.isActive = false;
-      where.deletedAt = null;
-    } else if (status === 'deleted') {
-      where.deletedAt = { not: null };
     }
-
+    if (query.role) {
+      where.role = {
+        in: [...ADMIN_LIST_USER_ROLE_FILTER_TO_DB_ROLES[query.role]],
+      };
+    }
     if (search) {
       const searchOr: Prisma.UserWhereInput[] = [
         { email: { contains: search, mode: 'insensitive' } },
@@ -1206,8 +1211,6 @@ export class AuthService {
       }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
-
     type AdminListUserRow = {
       id: string;
       email: string;
@@ -1228,8 +1231,7 @@ export class AuthService {
     };
 
     const rows = (users as unknown as AdminListUserRow[]).map((u) => {
-      const statusVal: AdminUserStatus =
-        u.deletedAt != null ? 'deleted' : u.isActive ? 'active' : 'suspended';
+      const statusVal: AdminUserStatus = u.isActive ? 'active' : 'suspended';
       const company = u.company;
       const contactName = company
         ? AuthService.getContactNameFromContacts(company.companyContacts)
@@ -1255,7 +1257,7 @@ export class AuthService {
         page,
         limit,
         total,
-        totalPages,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
     };
   }

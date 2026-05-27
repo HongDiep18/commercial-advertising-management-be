@@ -12,6 +12,12 @@ import {
 } from './audit-activity-formatter';
 import { AUDIT_LOG_RECORDED_EVENT_NAME } from './audit-log-recorded-event-name.constant';
 import type { AuditLogRecordedEvent } from './audit-log-recorded.event';
+import {
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_LIMIT,
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_PAGE,
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_SORT_ORDER,
+} from './admin-recent-activities.constants';
+import type { AdminRecentActivitiesQueryDto } from './dto/admin-recent-activities.dto';
 import type {
   AdminRecentActivitiesResponseDto,
   RecentActivityItemDto,
@@ -85,26 +91,36 @@ export class AuditService {
     }
   }
 
-  async listRecentActivities(): Promise<AdminRecentActivitiesResponseDto> {
-    const limit = 6;
-    const rows = await this.prisma.$queryRaw<AuditLogRow[]>(
-      Prisma.sql`
-        SELECT
-          id,
-          created_at AS "createdAt",
-          action,
-          entity_type AS "entityType",
-          entity_id AS "entityId",
-          actor_id AS "actorId",
-          old_value AS "oldValue",
-          new_value AS "newValue",
-          metadata
-        FROM audit_logs
-        ORDER BY created_at DESC
-        LIMIT ${limit}
-      `,
-    );
-
+  async listRecentActivities(
+    query: AdminRecentActivitiesQueryDto,
+  ): Promise<AdminRecentActivitiesResponseDto> {
+    const page = query.page ?? ADMIN_RECENT_ACTIVITIES_DEFAULT_PAGE;
+    const limit = query.limit ?? ADMIN_RECENT_ACTIVITIES_DEFAULT_LIMIT;
+    const sortOrder =
+      query.sortOrder ?? ADMIN_RECENT_ACTIVITIES_DEFAULT_SORT_ORDER;
+    const where = await this.buildRecentActivitiesWhere(query);
+    const skip = (page - 1) * limit;
+    const [total, logs] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: sortOrder },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          createdAt: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          actorId: true,
+          oldValue: true,
+          newValue: true,
+          metadata: true,
+        },
+      }),
+    ]);
+    const rows: AuditLogRow[] = logs;
     const userLabelById = await this.buildUserLabelMap(rows);
     const profileRequestLabelById =
       await this.buildProfileRequestLabelMap(rows);
@@ -121,12 +137,56 @@ export class AuditService {
     return {
       activities,
       pagination: {
-        page: 1,
+        page,
         limit,
-        total: activities.length,
-        totalPages: 1,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
     };
+  }
+
+  private async buildRecentActivitiesWhere(
+    query: AdminRecentActivitiesQueryDto,
+  ): Promise<Prisma.AuditLogWhereInput> {
+    const search = query.search?.trim();
+    if (!search) {
+      return {};
+    }
+    const orConditions: Prisma.AuditLogWhereInput[] = [
+      { oldValue: { contains: search, mode: 'insensitive' } },
+      { newValue: { contains: search, mode: 'insensitive' } },
+      { metadata: { contains: search, mode: 'insensitive' } },
+      { actor: { email: { contains: search, mode: 'insensitive' } } },
+    ];
+    const matchingActions =
+      AuditActivityFormatter.findActionsByTitleSearch(search);
+    if (matchingActions.length > 0) {
+      orConditions.push({ action: { in: [...matchingActions] } });
+    }
+    const usersByEmail = await this.prisma.user.findMany({
+      where: { email: { contains: search, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    const userIds = usersByEmail.map((user) => user.id);
+    if (userIds.length > 0) {
+      orConditions.push({ actorId: { in: userIds } });
+      orConditions.push({
+        AND: [{ entityType: 'User' }, { entityId: { in: userIds } }],
+      });
+    }
+    const companyContacts = await this.prisma.companyContact.findMany({
+      where: {
+        type: { in: [CONTACT_TYPE.EMAIL, CONTACT_TYPE.REGISTER_EMAIL] },
+        value: { contains: search, mode: 'insensitive' },
+      },
+      select: { companyId: true },
+      distinct: ['companyId'],
+    });
+    const companyIds = companyContacts.map((contact) => contact.companyId);
+    if (companyIds.length > 0) {
+      orConditions.push({ entityId: { in: companyIds } });
+    }
+    return { OR: orConditions };
   }
 
   private mapRowToActivity(
@@ -145,10 +205,6 @@ export class AuditService {
       time: row.createdAt.toISOString(),
       title,
       content,
-      action: row.action,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      actorId: row.actorId,
     };
   }
 

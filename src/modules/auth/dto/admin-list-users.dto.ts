@@ -1,8 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  ADMIN_LIST_USER_ROLE_FILTERS,
+  ADMIN_LIST_USERS_DEFAULT_LIMIT,
+  ADMIN_LIST_USERS_DEFAULT_PAGE,
+  ADMIN_LIST_USERS_MAX_LIMIT,
+  type AdminListUserRoleFilter,
+} from '../admin-list-users.constants';
 
-export type AdminUserStatus = 'active' | 'suspended' | 'deleted';
+export type AdminUserStatus = 'active' | 'suspended';
+
+export type { AdminListUserRoleFilter };
 
 export class AdminListUsersQueryDto {
   @ApiPropertyOptional({ description: 'Search by email/contact/company name' })
@@ -11,27 +20,47 @@ export class AdminListUsersQueryDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by status',
-    enum: ['active', 'suspended', 'deleted'],
+    description:
+      'Filter by status (non-deleted users only). Omit for all active and suspended users.',
+    enum: ['active', 'suspended'],
   })
   @IsOptional()
-  @IsIn(['active', 'suspended', 'deleted'])
+  @IsIn(['active', 'suspended'])
   status?: AdminUserStatus;
 
-  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @ApiPropertyOptional({
+    description:
+      'Filter by user category: `admin` = ADMIN + SUPER_ADMIN, `user` = MEMBER + VISITOR. Omit for all non-deleted roles.',
+    enum: ADMIN_LIST_USER_ROLE_FILTERS,
+    example: 'user',
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
+  @IsIn([...ADMIN_LIST_USER_ROLE_FILTERS])
+  role?: AdminListUserRoleFilter;
 
-  @ApiPropertyOptional({ default: 10, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    default: ADMIN_LIST_USERS_DEFAULT_PAGE,
+    minimum: 1,
+    description: 'Current page (1-based)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
-  limit?: number = 10;
+  page?: number = ADMIN_LIST_USERS_DEFAULT_PAGE;
+
+  @ApiPropertyOptional({
+    default: ADMIN_LIST_USERS_DEFAULT_LIMIT,
+    minimum: 1,
+    maximum: ADMIN_LIST_USERS_MAX_LIMIT,
+    description: 'Users per page',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(ADMIN_LIST_USERS_MAX_LIMIT)
+  limit?: number = ADMIN_LIST_USERS_DEFAULT_LIMIT;
 
   @ApiPropertyOptional({
     description: 'Sort field',
@@ -78,7 +107,7 @@ export class AdminUserListItemDto {
   @ApiPropertyOptional({ description: 'Last login timestamp (ISO)' })
   lastLoginAt!: string | null;
 
-  @ApiProperty({ enum: ['active', 'suspended', 'deleted'] })
+  @ApiProperty({ enum: ['active', 'suspended'] })
   status!: AdminUserStatus;
 
   @ApiProperty()
@@ -93,7 +122,8 @@ export class AdminListUsersResponseDto {
   users!: AdminUserListItemDto[];
 
   @ApiProperty({
-    example: { page: 1, limit: 20, total: 150, totalPages: 8 },
+    description: 'Pagination metadata for the user list',
+    example: { page: 1, limit: 10, total: 150, totalPages: 15 },
   })
   pagination!: {
     page: number;
@@ -102,4 +132,3 @@ export class AdminListUsersResponseDto {
     totalPages: number;
   };
 }
-

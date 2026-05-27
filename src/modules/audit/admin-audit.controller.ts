@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -9,7 +9,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from './audit.service';
-import { AdminRecentActivitiesResponseDto } from './dto/admin-recent-activities.dto';
+import {
+  AdminRecentActivitiesQueryDto,
+  AdminRecentActivitiesResponseDto,
+} from './dto/admin-recent-activities.dto';
 
 @ApiTags('Admin - Audit')
 @ApiBearerAuth()
@@ -21,15 +24,19 @@ export class AdminAuditController {
 
   @Get()
   @ApiOperation({
-    summary: 'List recent activity logs',
-    description: 'Returns the latest 5 recent activities.',
+    summary: 'List recent activity logs (paginated)',
+    description:
+      'Returns audit log entries with pagination (default 15 per page). ' +
+      'Use `sortOrder=desc` for newest first (default) or `sortOrder=asc` for oldest first.',
   })
   @ApiResponse({
     status: 200,
     description: 'Recent activities retrieved successfully',
     type: AdminRecentActivitiesResponseDto,
   })
-  async listRecentActivities(): Promise<AdminRecentActivitiesResponseDto> {
-    return this.auditService.listRecentActivities();
+  async listRecentActivities(
+    @Query() query: AdminRecentActivitiesQueryDto,
+  ): Promise<AdminRecentActivitiesResponseDto> {
+    return this.auditService.listRecentActivities(query);
   }
 }

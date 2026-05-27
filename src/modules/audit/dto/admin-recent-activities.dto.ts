@@ -1,67 +1,53 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
-  IsIn,
-  IsInt,
-  IsISO8601,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_LIMIT,
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_PAGE,
+  ADMIN_RECENT_ACTIVITIES_DEFAULT_SORT_ORDER,
+  ADMIN_RECENT_ACTIVITIES_MAX_LIMIT,
+} from '../admin-recent-activities.constants';
 
 export class AdminRecentActivitiesQueryDto {
-  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @ApiPropertyOptional({
+    default: ADMIN_RECENT_ACTIVITIES_DEFAULT_PAGE,
+    minimum: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
+  page?: number = ADMIN_RECENT_ACTIVITIES_DEFAULT_PAGE;
 
   @ApiPropertyOptional({
-    description: 'Search in action/entity/changes/metadata',
+    default: ADMIN_RECENT_ACTIVITIES_DEFAULT_LIMIT,
+    minimum: 1,
+    maximum: ADMIN_RECENT_ACTIVITIES_MAX_LIMIT,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(ADMIN_RECENT_ACTIVITIES_MAX_LIMIT)
+  limit?: number = ADMIN_RECENT_ACTIVITIES_DEFAULT_LIMIT;
+
+  @ApiPropertyOptional({
+    description:
+      'Search by email, activity title (e.g. "Profile request submitted"), or changed values (old/new).',
   })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by exact action value' })
-  @IsOptional()
-  @IsString()
-  action?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by exact entity type' })
-  @IsOptional()
-  @IsString()
-  entityType?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by actor user id' })
-  @IsOptional()
-  @IsString()
-  actorId?: string;
-
-  @ApiPropertyOptional({ description: 'Start time (ISO8601)' })
-  @IsOptional()
-  @IsISO8601()
-  from?: string;
-
-  @ApiPropertyOptional({ description: 'End time (ISO8601)' })
-  @IsOptional()
-  @IsISO8601()
-  to?: string;
-
-  @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
+  @ApiPropertyOptional({
+    enum: ['asc', 'desc'],
+    default: ADMIN_RECENT_ACTIVITIES_DEFAULT_SORT_ORDER,
+    description:
+      '`desc` = newest first (latest activity on top). `asc` = oldest first.',
+  })
   @IsOptional()
   @IsIn(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  sortOrder?: 'asc' | 'desc' = ADMIN_RECENT_ACTIVITIES_DEFAULT_SORT_ORDER;
 }
 
 export class RecentActivityItemDto {
@@ -76,18 +62,6 @@ export class RecentActivityItemDto {
 
   @ApiProperty()
   content!: string;
-
-  @ApiProperty()
-  action!: string;
-
-  @ApiProperty()
-  entityType!: string;
-
-  @ApiProperty()
-  entityId!: string;
-
-  @ApiPropertyOptional()
-  actorId!: string | null;
 }
 
 export class AdminRecentActivitiesResponseDto {
@@ -95,7 +69,7 @@ export class AdminRecentActivitiesResponseDto {
   activities!: RecentActivityItemDto[];
 
   @ApiProperty({
-    example: { page: 1, limit: 20, total: 150, totalPages: 8 },
+    example: { page: 1, limit: 15, total: 150, totalPages: 10 },
   })
   pagination!: {
     page: number;

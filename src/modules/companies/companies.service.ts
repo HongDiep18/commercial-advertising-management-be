@@ -56,6 +56,7 @@ import type {
 import type { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
 import type { AdminArchiveCompanyResponseDto } from './dto/admin-archive-company-response.dto';
 import type { AdminExportCompaniesQueryDto } from './dto/admin-export-companies.dto';
+import type { AdminListUnlinkedCompaniesResponseDto } from './dto/admin-list-unlinked-companies.dto';
 import {
   buildCompanyExportFilename,
   COMPANY_EXPORT_CSV_TYPE,
@@ -1033,6 +1034,67 @@ export class CompaniesService {
         total,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
+    };
+  }
+
+  async adminListUnlinkedCompanies(): Promise<AdminListUnlinkedCompaniesResponseDto> {
+    const where: Prisma.CompanyWhereInput = {
+      status: CompanyProfileRequestStatus.APPROVED,
+      users: { none: {} },
+    };
+    const rows = await this.prisma.company.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        companyNameVi: true,
+        companyNameEn: true,
+        companyNameZh: true,
+        taxId: true,
+        industry: true,
+        description: true,
+        logoUrl: true,
+        country: true,
+        region: true,
+        status: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        companyContacts: {
+          select: {
+            id: true,
+            type: true,
+            value: true,
+            contactName: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    return {
+      companies: rows.map((row) => ({
+        id: row.id,
+        companyNameVi: row.companyNameVi,
+        companyNameEn: row.companyNameEn,
+        companyNameZh: row.companyNameZh,
+        taxId: row.taxId,
+        industry: [...row.industry],
+        description: row.description,
+        logoUrl: row.logoUrl,
+        country: row.country,
+        region: row.region,
+        status: row.status,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        contacts: row.companyContacts.map((c) => ({
+          id: c.id,
+          type: c.type,
+          value: c.value,
+          contactName: c.contactName,
+          createdAt: c.createdAt.toISOString(),
+        })),
+      })),
     };
   }
 

@@ -86,6 +86,9 @@ export class AdminUserListItemDto {
   @ApiProperty({ description: 'User id', format: 'uuid' })
   userId!: string;
 
+  @ApiProperty({ description: 'Account creation timestamp (ISO)' })
+  createdAt!: string;
+
   @ApiPropertyOptional({ description: 'Company id', format: 'uuid' })
   companyId!: string | null;
 

@@ -11,6 +11,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -25,8 +26,17 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AuthService } from '../auth/auth.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { CompaniesService } from './companies.service';
+import {
+  AdminAssignCompanyUserDto,
+  AdminAssignCompanyUserResponseDto,
+} from './dto/admin-assign-company-user.dto';
+import {
+  AdminCreateCompanyDto,
+  AdminCreateCompanyResponseDto,
+} from './dto/admin-create-company.dto';
 import { AdminCompanyDetailResponseDto } from './dto/admin-company-detail.dto';
 import { AdminUpdateCompanyDto } from './dto/admin-update-company.dto';
 import { AddCompanyContactsDto } from './dto/add-company-contacts.dto';
@@ -41,6 +51,7 @@ import {
   AdminListCompaniesResponseDto,
 } from './dto/admin-list-companies.dto';
 import { AdminExportCompaniesQueryDto } from './dto/admin-export-companies.dto';
+import { AdminListUnlinkedCompaniesResponseDto } from './dto/admin-list-unlinked-companies.dto';
 
 const ADMIN_UPDATE_COMPANY_SCHEMA = {
   type: 'object',
@@ -114,7 +125,35 @@ export class AdminCompaniesController {
   constructor(
     private readonly companiesService: CompaniesService,
     private readonly fileUploadService: FileUploadService,
+    private readonly authService: AuthService,
   ) {}
+
+  @Post()
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Create a new company with a linked member account (admin)',
+    description:
+      'Creates a company record (status APPROVED, isActive true) and a linked MEMBER user account in one transaction. ' +
+      'Sends a set-password email immediately — no approval step required.',
+  })
+  @ApiBody({ type: AdminCreateCompanyDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Company and member account created; set-password email sent',
+    type: AdminCreateCompanyResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'register_email already in use or already registered to a company',
+  })
+  async createCompany(
+    @Body() dto: AdminCreateCompanyDto,
+    @CurrentUser('userId') actorId: string,
+  ): Promise<AdminCreateCompanyResponseDto> {
+    return this.authService.adminCreateCompany(actorId, dto);
+  }
 
   @Get('stats')
   @ApiOperation({
@@ -202,6 +241,23 @@ export class AdminCompaniesController {
   })
   async getCompanyContactTypes(): Promise<CompanyContactTypesResponseDto> {
     return this.companiesService.getCompanyContactTypes();
+  }
+
+  @Get('no-user')
+  @ApiOperation({
+    summary: 'List companies with no linked user account (admin)',
+    description:
+      'Returns approved companies that have never had a linked user account ' +
+      '(excludes PENDING/REJECTED/DELETED and companies with any user history), ' +
+      'including full company_contacts rows for each company.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of unlinked companies with contacts',
+    type: AdminListUnlinkedCompaniesResponseDto,
+  })
+  async listUnlinkedCompanies(): Promise<AdminListUnlinkedCompaniesResponseDto> {
+    return this.companiesService.adminListUnlinkedCompanies();
   }
 
   @Get(':companyId')
@@ -325,6 +381,37 @@ export class AdminCompaniesController {
       companyId,
       dto.isActive,
     );
+  }
+
+  @Post(':companyId/assign-user')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Assign a member user to an unlinked company (admin)',
+    description:
+      'Creates a new MEMBER account or links an existing unlinked account to the company. ' +
+      'Company must be APPROVED and have no existing linked user. ' +
+      'Sends a set-password email so the user activates their own password.',
+  })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiBody({ type: AdminAssignCompanyUserDto })
+  @ApiResponse({
+    status: 201,
+    description: 'User created or linked; set-password email sent',
+    type: AdminAssignCompanyUserResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Company not approved' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Company already has a user, or email belongs to another company',
+  })
+  async assignCompanyUser(
+    @Param('companyId') companyId: string,
+    @Body() dto: AdminAssignCompanyUserDto,
+    @CurrentUser('userId') actorId: string,
+  ): Promise<AdminAssignCompanyUserResponseDto> {
+    return this.authService.adminAssignCompanyUser(actorId, companyId, dto);
   }
 
   @Post(':companyId/contacts')

@@ -61,6 +61,9 @@ const TITLE_BY_ACTION: Record<string, string> = {
   'property.legal_document_uploaded': 'Property legal documents uploaded',
   'property.legal_document_deleted': 'Property legal document deleted',
   'property.contact_inquiry_created': 'Property contact inquiry created',
+  'user.admin_created': 'Admin user created',
+  'company.user_assigned': 'User assigned to company',
+  'company.admin_created': 'Company created by admin',
 };
 
 const ACTION_CONTENT_HANDLERS: Record<string, (c: ContentContext) => string> = {
@@ -108,6 +111,11 @@ const ACTION_CONTENT_HANDLERS: Record<string, (c: ContentContext) => string> = {
   },
   'property.contact_inquiry_created': (c) =>
     `Created contact inquiry for ${c.propertySubject}.`,
+  'user.admin_created': (c) =>
+    `Created admin account for ${c.userAccountLabel}.`,
+  'company.user_assigned': (c) => `Assigned ${c.userAccountLabel} to company.`,
+  'company.admin_created': (c) =>
+    `Created company ${c.companySubject} with member account.`,
 };
 
 const ENTITY_CONTENT_HANDLERS: Partial<

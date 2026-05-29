@@ -120,9 +120,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email    String @unique @db.VarChar(255)
-  password String @db.VarChar(255)
-  role     String @default("MEMBER") @db.VarChar(32)
+  email    String  @unique @db.VarChar(255)
+  password String  @db.VarChar(255)
+  name     String? @db.VarChar(255)
+  role     String  @default("MEMBER") @db.VarChar(32)
 
   isActive       Boolean        @default(true)
   membershipTier MembershipTier @default(BRONZE)

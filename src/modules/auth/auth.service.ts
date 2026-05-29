@@ -1167,9 +1167,7 @@ export class AuthService {
       | Prisma.UserOrderByWithRelationInput[] = { createdAt: 'desc' };
 
     if (sortBy === 'lastLoginAt') {
-      orderBy = {
-        lastLoginAt: sortOrder,
-      } as unknown as Prisma.UserOrderByWithRelationInput;
+      orderBy = { lastLoginAt: { sort: sortOrder, nulls: 'last' } };
     } else if (sortBy === 'email') {
       orderBy = { email: sortOrder };
     } else if (sortBy === 'createdAt') {
@@ -1192,7 +1190,9 @@ export class AuthService {
         orderBy,
         select: {
           id: true,
+          createdAt: true,
           email: true,
+          name: true,
           role: true,
           isActive: true,
           deletedAt: true,
@@ -1213,7 +1213,9 @@ export class AuthService {
 
     type AdminListUserRow = {
       id: string;
+      createdAt: Date;
       email: string;
+      name: string | null;
       role: string;
       isActive: boolean;
       deletedAt: Date | null;
@@ -1233,11 +1235,13 @@ export class AuthService {
     const rows = (users as unknown as AdminListUserRow[]).map((u) => {
       const statusVal: AdminUserStatus = u.isActive ? 'active' : 'suspended';
       const company = u.company;
-      const contactName = company
+      const contactNameFromCompany = company
         ? AuthService.getContactNameFromContacts(company.companyContacts)
         : null;
+      const contactName = u.name ?? contactNameFromCompany ?? null;
       return {
         userId: u.id,
+        createdAt: u.createdAt.toISOString(),
         companyId: u.companyId,
         contactName,
         email: u.email,
@@ -1259,6 +1263,338 @@ export class AuthService {
         total,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
+    };
+  }
+
+  async adminCreateUser(
+    actorId: string,
+    dto: { email: string; password: string; name: string },
+  ): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    status: 'active' | 'suspended';
+  }> {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const trimmedName = dto.name.trim();
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: hashedPassword,
+        name: trimmedName,
+        role: Role.ADMIN,
+        membershipTier: MembershipTier.BRONZE,
+        isActive: true,
+      } as Prisma.UserUncheckedCreateInput,
+      select: { id: true, email: true, name: true, role: true, isActive: true },
+    });
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.ADMIN_USER_CREATED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: user.id,
+      actorId,
+      metadata: { email: user.email, name: trimmedName },
+    });
+
+    type CreatedUser = typeof user & { name: string | null };
+    const created = user as unknown as CreatedUser;
+
+    return {
+      id: created.id,
+      email: created.email,
+      name: created.name ?? trimmedName,
+      role: created.role,
+      status: created.isActive ? 'active' : 'suspended',
+    };
+  }
+
+  async adminAssignCompanyUser(
+    actorId: string,
+    companyId: string,
+    dto: { email: string; name?: string },
+  ): Promise<{
+    userId: string;
+    email: string;
+    name: string | null;
+    role: string;
+    companyId: string;
+    action: 'created' | 'linked';
+    setPasswordEmailSent: boolean;
+  }> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        status: true,
+        industry: true,
+        users: { select: { id: true } },
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+    if (company.status !== CompanyProfileRequestStatus.APPROVED) {
+      throw new BadRequestException('Company is not approved');
+    }
+    if (company.users.length > 0) {
+      throw new ConflictException('Company already has a linked user');
+    }
+
+    const normalizedEmail = dto.email.trim().toLowerCase();
+
+    const emailTaken = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true, companyId: true, deletedAt: true },
+    });
+
+    if (emailTaken?.deletedAt) {
+      throw new ConflictException('Email is already taken');
+    }
+
+    const existingUser = emailTaken ?? null;
+
+    if (existingUser?.companyId && existingUser.companyId !== companyId) {
+      throw new ConflictException('Email is already linked to another company');
+    }
+
+    const { token, expiresAt } = this.buildSetPasswordTokenData();
+    const trimmedName = dto.name?.trim() ?? null;
+
+    let userId: string;
+    let action: 'created' | 'linked';
+
+    if (existingUser) {
+      const updateData: Prisma.UserUncheckedUpdateInput = {
+        companyId,
+        role: Role.MEMBER,
+        primaryIndustry: company.industry[0] ?? null,
+        setPasswordToken: token,
+        setPasswordTokenExpiresAt: expiresAt,
+      };
+      if (trimmedName) updateData.name = trimmedName;
+
+      await this.prisma.user.update({
+        where: { id: existingUser.id },
+        data: updateData,
+      });
+      userId = existingUser.id;
+      action = 'linked';
+    } else {
+      const placeholderPassword = await this.buildPlaceholderPassword();
+      const created = await this.prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          password: placeholderPassword,
+          name: trimmedName,
+          role: Role.MEMBER,
+          membershipTier: MembershipTier.BRONZE,
+          primaryIndustry: company.industry[0] ?? null,
+          companyId,
+          setPasswordToken: token,
+          setPasswordTokenExpiresAt: expiresAt,
+        } as Prisma.UserUncheckedCreateInput,
+        select: { id: true },
+      });
+      userId = created.id;
+      action = 'created';
+    }
+
+    await this.mailService.sendAccountApprovedEmail(normalizedEmail, token);
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.COMPANY_USER_ASSIGNED,
+      entityType: AUDIT_ENTITY.USER,
+      entityId: userId,
+      actorId,
+      metadata: { email: normalizedEmail, companyId, action },
+    });
+
+    return {
+      userId,
+      email: normalizedEmail,
+      name: trimmedName,
+      role: Role.MEMBER,
+      companyId,
+      action,
+      setPasswordEmailSent: true,
+    };
+  }
+
+  async adminCreateCompany(
+    actorId: string,
+    dto: {
+      company_name_vi: string;
+      company_name_en?: string;
+      company_name_zh: string;
+      phone: string;
+      tax_id: string;
+      contact_person: string;
+      company_address: string;
+      register_email: string;
+      company_email: string;
+      country: string;
+      region?: string;
+      industry: string[];
+      website: string;
+      fax?: string;
+      skype?: string;
+      note?: string;
+      introduction: string;
+    },
+  ): Promise<{
+    companyId: string;
+    userId: string;
+    email: string;
+    role: string;
+    companyStatus: string;
+    setPasswordEmailSent: boolean;
+  }> {
+    const registerEmail = dto.register_email.trim().toLowerCase();
+    const companyEmail = dto.company_email.trim().toLowerCase();
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: registerEmail, deletedAt: null },
+      select: { id: true },
+    });
+    if (existingUser) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const existingContact = await this.prisma.companyContact.findFirst({
+      where: { type: CONTACT_TYPE.REGISTER_EMAIL, value: registerEmail },
+      select: { id: true },
+    });
+    if (existingContact) {
+      throw new ConflictException('Email already registered to a company');
+    }
+
+    const { token, expiresAt } = this.buildSetPasswordTokenData();
+    const placeholderPassword = await this.buildPlaceholderPassword();
+
+    const personLabel = dto.contact_person.trim();
+    const contactRows: Array<{
+      type: string;
+      value: string;
+      contactName: string | null;
+    }> = [
+      {
+        type: CONTACT_TYPE.REGISTER_EMAIL,
+        value: registerEmail,
+        contactName: null,
+      },
+      { type: CONTACT_TYPE.EMAIL, value: companyEmail, contactName: null },
+      {
+        type: CONTACT_TYPE.CONTACT_PERSON,
+        value: dto.phone.trim(),
+        contactName: personLabel,
+      },
+      {
+        type: CONTACT_TYPE.ADDRESS,
+        value: dto.company_address.trim(),
+        contactName: null,
+      },
+      {
+        type: CONTACT_TYPE.WEBSITE,
+        value: dto.website.trim(),
+        contactName: null,
+      },
+      ...(dto.fax?.trim()
+        ? [{ type: CONTACT_TYPE.FAX, value: dto.fax.trim(), contactName: null }]
+        : []),
+      ...(dto.skype?.trim()
+        ? [
+            {
+              type: CONTACT_TYPE.SKYPE,
+              value: dto.skype.trim(),
+              contactName: null,
+            },
+          ]
+        : []),
+      ...(dto.note?.trim()
+        ? [
+            {
+              type: CONTACT_TYPE.NOTE,
+              value: dto.note.trim(),
+              contactName: null,
+            },
+          ]
+        : []),
+    ];
+
+    const industry = dto.industry.map((v) => v.trim()).filter(Boolean);
+
+    const { company, user } = await this.prisma.$transaction(async (tx) => {
+      const newCompany = await tx.company.create({
+        data: {
+          companyNameVi: dto.company_name_vi.trim(),
+          companyNameEn: dto.company_name_en?.trim() || null,
+          companyNameZh: dto.company_name_zh.trim(),
+          taxId: dto.tax_id.trim(),
+          country: dto.country.trim(),
+          region: dto.region?.trim() || null,
+          industry,
+          description: dto.introduction.trim(),
+          status: CompanyProfileRequestStatus.APPROVED,
+          isActive: true,
+          companyContacts: { create: contactRows },
+        },
+        select: { id: true },
+      });
+
+      const newUser = await tx.user.create({
+        data: {
+          email: registerEmail,
+          password: placeholderPassword,
+          role: Role.MEMBER,
+          membershipTier: MembershipTier.BRONZE,
+          primaryIndustry: industry[0] ?? null,
+          companyId: newCompany.id,
+          isActive: true,
+          setPasswordToken: token,
+          setPasswordTokenExpiresAt: expiresAt,
+        } as Prisma.UserUncheckedCreateInput,
+        select: { id: true },
+      });
+
+      return { company: newCompany, user: newUser };
+    });
+
+    await this.mailService.sendAccountApprovedEmail(registerEmail, token);
+
+    await this.auditService.record({
+      action: AUDIT_ACTION.ADMIN_COMPANY_CREATED,
+      entityType: AUDIT_ENTITY.COMPANY,
+      entityId: company.id,
+      actorId,
+      metadata: {
+        email: registerEmail,
+        companyNameVi: dto.company_name_vi.trim(),
+        userId: user.id,
+      },
+    });
+
+    return {
+      companyId: company.id,
+      userId: user.id,
+      email: registerEmail,
+      role: Role.MEMBER,
+      companyStatus: CompanyProfileRequestStatus.APPROVED,
+      setPasswordEmailSent: true,
     };
   }
 
@@ -1826,13 +2162,6 @@ export class AuthService {
         isActive: true,
         deletedAt: true,
         companyId: true,
-        company: {
-          select: {
-            companyContacts: {
-              select: { type: true, value: true },
-            },
-          },
-        },
       },
     });
     if (!user || !user.isActive || user.deletedAt != null) {
@@ -1852,12 +2181,7 @@ export class AuthService {
         setPasswordTokenExpiresAt: expiresAt,
       } as Prisma.UserUncheckedUpdateInput,
     });
-    const contacts = user.company?.companyContacts ?? [];
-    const sendTo =
-      AuthService.getContactValue(contacts, CONTACT_TYPE.REGISTER_EMAIL) ??
-      AuthService.getContactValue(contacts, CONTACT_TYPE.EMAIL) ??
-      normalizedEmail;
-    await this.mailService.sendForgotPasswordEmail(sendTo, token);
+    await this.mailService.sendForgotPasswordEmail(normalizedEmail, token);
     return {
       message:
         'If an account exists with this email, you will receive a password reset link.',

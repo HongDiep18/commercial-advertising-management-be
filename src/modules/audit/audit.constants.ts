@@ -61,4 +61,9 @@ export const AUDIT_ACTION = {
 
   COMPANY_UPDATED_BY_ADMIN: 'company.updated_by_admin',
   COMPANY_CONTACTS_ADDED: 'company.contacts_added',
+
+  // Admin user management
+  ADMIN_USER_CREATED: 'user.admin_created',
+  COMPANY_USER_ASSIGNED: 'company.user_assigned',
+  ADMIN_COMPANY_CREATED: 'company.admin_created',
 } as const;

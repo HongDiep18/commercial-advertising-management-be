@@ -1,15 +1,26 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import type { Pool } from 'pg';
-import { CHATBOT_PG_POOL } from '../../database/chatbot-pg-pool.token';
+import { ConfigService } from '@nestjs/config';
 
 export const CHECKPOINT_SAVER = 'CHECKPOINT_SAVER';
 
 export const checkpointProvider = {
   provide: CHECKPOINT_SAVER,
-  inject: [CHATBOT_PG_POOL],
-  useFactory: async (pool: Pool): Promise<PostgresSaver> => {
-    const saver = new PostgresSaver(pool);
+  inject: [ConfigService],
+  useFactory: async (config: ConfigService): Promise<PostgresSaver> => {
+    const saver = PostgresSaver.fromConnString(
+      buildConnectionString(config),
+    );
+    // Creates checkpoints, checkpoint_blobs, checkpoint_writes tables if not exist
     await saver.setup();
     return saver;
   },
 };
+
+function buildConnectionString(config: ConfigService): string {
+  const host = config.get<string>('database.host');
+  const port = config.get<number>('database.port');
+  const user = config.get<string>('database.username');
+  const password = config.get<string>('database.password');
+  const database = config.get<string>('database.database');
+  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+}
